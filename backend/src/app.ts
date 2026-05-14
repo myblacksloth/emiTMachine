@@ -2,7 +2,6 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import morgan from "morgan";
 import { config } from "./config.js";
 import { errorHandler, notFound } from "./errors.js";
 import authRoutes from "./routes/auth.js";
@@ -15,6 +14,7 @@ import recoveryRoutes from "./routes/recovery.js";
 import reportRoutes from "./routes/reports.js";
 import tagRoutes from "./routes/tags.js";
 import totpRoutes from "./routes/totp.js";
+import { requestLogger } from "./utils/logger.js";
 
 export function createApp() {
   const app = express();
@@ -26,9 +26,9 @@ export function createApp() {
       credentials: true
     })
   );
+  app.use(requestLogger);
   app.use(express.json({ limit: "2mb" }));
   app.use(cookieParser());
-  app.use(morgan(config.nodeEnv === "production" ? "combined" : "dev"));
 
   app.use("/health", healthRoutes);
   app.use("/api/health", healthRoutes);

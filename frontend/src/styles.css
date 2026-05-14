@@ -713,6 +713,32 @@ button:disabled {
   background: #fff;
 }
 
+.password-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0.2rem 0;
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.password-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #687b79;
+  transition: color 0.15s;
+}
+
+.password-hint.met {
+  color: #0c837c;
+}
+
+.password-hint.unmet {
+  color: #c0392b;
+}
+
 .file-input {
   display: grid;
   gap: 0.45rem;

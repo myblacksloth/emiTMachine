@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { config } from "../config.js";
 import { pool } from "../db.js";
 
 const router = Router();
@@ -14,6 +15,17 @@ router.get("/ready", async (_req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+router.get("/diagnostics", async (req, res) => {
+  req.log?.debug("diagnostics endpoint called");
+  res.json({
+    status: "ok",
+    requestId: req.requestId,
+    logLevel: config.logLevel,
+    logFormat: config.logFormat,
+    nodeEnv: config.nodeEnv
+  });
 });
 
 export default router;

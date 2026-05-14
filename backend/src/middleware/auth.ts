@@ -6,7 +6,8 @@ import { sha256 } from "../utils/crypto.js";
 
 export type AuthUser = {
   id: string;
-  email: string;
+  username: string;
+  email?: string | null;
   displayName: string;
   role: string;
   totpEnabled: boolean;
@@ -30,7 +31,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
     const tokenHash = sha256(token);
     const result = await pool.query(
-      `select s.id as session_id, u.id, u.email, u.display_name, u.role, u.totp_enabled
+      `select s.id as session_id, u.id, u.username, u.email, u.display_name, u.role, u.totp_enabled
        from app_sessions s
        join users u on u.id = s.user_id
        where s.token_hash = $1 and s.expires_at > now() and s.revoked_at is null and u.disabled_at is null`,
@@ -45,6 +46,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     req.sessionId = row.session_id;
     req.user = {
       id: row.id,
+      username: row.username,
       email: row.email,
       displayName: row.display_name,
       role: row.role,

@@ -42,7 +42,7 @@ export type Countdown = {
 export type DashboardData = {
   user: {
     name: string;
-    email: string;
+    username: string;
     totpEnabled: boolean;
     passkeyCount: number;
   };

@@ -13,7 +13,8 @@ CREATE TYPE countdown_status AS ENUM ('active', 'completed', 'cancelled');
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email citext NOT NULL UNIQUE,
+  username citext NOT NULL UNIQUE,
+  email citext UNIQUE,
   name text NOT NULL DEFAULT '',
   display_name text NOT NULL DEFAULT '',
   password_hash text NOT NULL,
@@ -28,7 +29,9 @@ CREATE TABLE users (
   locked_until timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT users_email_not_blank CHECK (length(btrim(email::text)) > 3),
+  CONSTRAINT users_username_not_blank CHECK (length(btrim(username::text)) >= 3),
+  CONSTRAINT users_username_format CHECK (username::text ~ '^[A-Za-z0-9_][A-Za-z0-9_.-]{2,31}$'),
+  CONSTRAINT users_email_not_blank CHECK (email IS NULL OR length(btrim(email::text)) > 3),
   CONSTRAINT users_password_hash_not_blank CHECK (length(btrim(password_hash)) > 0),
   CONSTRAINT users_timezone_not_blank CHECK (length(btrim(timezone)) > 0),
   CONSTRAINT users_disabled_state CHECK ((status = 'disabled') = (disabled_at IS NOT NULL))

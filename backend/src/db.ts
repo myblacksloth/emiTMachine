@@ -1,8 +1,13 @@
 import pg from "pg";
 import { config } from "./config.js";
+import { logger } from "./utils/logger.js";
 
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl
+});
+
+pool.on("error", (error) => {
+  logger.error("postgres pool error", { error });
 });
 
 export type DbClient = pg.PoolClient | pg.Pool;

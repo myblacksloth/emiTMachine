@@ -25,6 +25,8 @@ services:
       DATABASE_URL: postgres://emitmachine:emitmachine@postgres:5432/emitmachine
       CORS_ORIGIN: http://localhost:5173
       COOKIE_SECURE: "false"
+      LOG_LEVEL: info
+      LOG_FORMAT: pretty
       RP_ID: localhost
       RP_NAME: emiTMachine
       TOTP_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
@@ -38,7 +40,7 @@ services:
     build:
       context: ./frontend
     environment:
-      VITE_API_BASE_URL: http://localhost:4000
+      VITE_BACKEND_PROXY_TARGET: http://backend:4000
     depends_on:
       - backend
     ports:

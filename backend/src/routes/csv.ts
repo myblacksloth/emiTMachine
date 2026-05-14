@@ -42,6 +42,7 @@ router.get("/export", async (req, res, next) => {
 
     res.header("Content-Type", "text/csv; charset=utf-8");
     res.header("Content-Disposition", `attachment; filename="emitmachine-export.csv"`);
+    req.log?.info("csv exported", { userId: req.user!.id, rows: result.rowCount });
     res.send(csv);
   } catch (error) {
     next(error);
@@ -55,6 +56,11 @@ router.post("/import/preview", async (req, res, next) => {
     const preview = rows.map((row: unknown, index: number) => {
       const parsed = importRowSchema.safeParse(row);
       return { rowNumber: index + 2, valid: parsed.success, data: parsed.success ? parsed.data : row, errors: parsed.success ? [] : parsed.error.issues };
+    });
+    req.log?.info("csv import previewed", {
+      userId: req.user!.id,
+      validRows: preview.filter((row) => row.valid).length,
+      invalidRows: preview.filter((row) => !row.valid).length
     });
     res.json({ rows: preview, validRows: preview.filter((row) => row.valid).length, invalidRows: preview.filter((row) => !row.valid).length });
   } catch (error) {
@@ -127,6 +133,7 @@ router.post("/import", async (req, res, next) => {
       return { importId, importedEvents };
     });
 
+    req.log?.info("csv imported", { userId: req.user!.id, importId: result.importId, importedEvents: result.importedEvents });
     res.status(201).json(result);
   } catch (error) {
     next(error);

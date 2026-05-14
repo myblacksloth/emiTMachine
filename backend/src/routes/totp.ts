@@ -13,13 +13,14 @@ const router = Router();
 router.post("/setup", requireAuth, async (req, res, next) => {
   try {
     const secret = speakeasy.generateSecret({
-      name: `${config.rpName}:${req.user!.email}`,
+      name: `${config.rpName}:${req.user!.username}`,
       issuer: config.rpName,
       length: 32
     });
 
     await pool.query("update users set totp_secret = $1, totp_enabled = false where id = $2", [encryptTotpSecret(secret.base32), req.user!.id]);
     const qrCodeDataUrl = await QRCode.toDataURL(secret.otpauth_url!);
+    req.log?.info("totp setup started", { userId: req.user!.id, username: req.user!.username });
     res.json({ secret: secret.base32, otpauthUrl: secret.otpauth_url, qrCodeDataUrl });
   } catch (error) {
     next(error);
@@ -43,10 +44,12 @@ router.post("/verify", requireAuth, async (req, res, next) => {
     });
 
     if (!valid) {
+      req.log?.warn("totp verification failed", { userId: req.user!.id, username: req.user!.username });
       throw new HttpError(400, "Invalid TOTP code");
     }
 
     await pool.query("update users set totp_enabled = true where id = $1", [req.user!.id]);
+    req.log?.info("totp enabled", { userId: req.user!.id, username: req.user!.username });
     res.json({ totpEnabled: true });
   } catch (error) {
     next(error);
@@ -56,6 +59,7 @@ router.post("/verify", requireAuth, async (req, res, next) => {
 router.delete("/", requireAuth, async (req, res, next) => {
   try {
     await pool.query("update users set totp_secret = null, totp_enabled = false where id = $1", [req.user!.id]);
+    req.log?.warn("totp disabled", { userId: req.user!.id, username: req.user!.username });
     res.status(204).send();
   } catch (error) {
     next(error);

@@ -3,7 +3,7 @@ import { api } from "./api";
 import type { AuthMode, ChartBucket, DashboardData, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
-  user: { name: "User", email: "", totpEnabled: false, passkeyCount: 0 },
+  user: { name: "User", username: "", totpEnabled: false, passkeyCount: 0 },
   activeSession: null,
   tags: [],
   charts: { daily: [], weekly: [], monthly: [] },
@@ -64,7 +64,11 @@ function App() {
   };
 
   useEffect(() => {
-    void loadDashboard();
+    api.currentUser()
+      .then((result) => {
+        if (result) void loadDashboard();
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to check the current session."));
   }, []);
 
   const handleAuthenticated = async (requiresTotp?: boolean) => {
@@ -136,7 +140,7 @@ function AuthPanel({
   onAuthenticated: (requiresTotp?: boolean) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
   const [totpCode, setTotpCode] = useState("");
@@ -149,20 +153,20 @@ function AuthPanel({
     setMessage("");
     try {
       if (mode === "login") {
-        const result = await api.login(email, password);
+        const result = await api.login(username, password);
         await onAuthenticated(result.requiresTotp);
       } else if (mode === "register") {
-        await api.register(name, email, password);
+        await api.register(name, username, password);
         await onAuthenticated(false);
       } else if (mode === "passkey") {
-        await api.passkeyLogin(email);
+        await api.passkeyLogin(username);
         await onAuthenticated(false);
       } else if (mode === "recovery") {
-        await api.recoverAccount(email, recoveryCode, totpCode, password);
+        await api.recoverAccount(username, recoveryCode, totpCode, password);
         setMessage("Recovery accepted. You can sign in with your updated credentials.");
         setMode("login");
       } else {
-        await api.login(email, password, totpCode);
+        await api.login(username, password, totpCode);
         await onAuthenticated(false);
       }
     } catch (err) {
@@ -196,16 +200,22 @@ function AuthPanel({
         </div>
         <form className="stack" onSubmit={submit}>
           <h2>{mode === "totp" ? "Authentication code" : authTitle(mode)}</h2>
-          {mode === "register" ? <TextField label="Full name" value={name} onChange={setName} autoComplete="name" /> : null}
-          {mode !== "totp" ? <TextField label="Email" value={email} onChange={setEmail} type="email" autoComplete="email" /> : null}
+          {mode === "register" ? <TextField label="Full name, optional" value={name} onChange={setName} autoComplete="name" /> : null}
+          {mode !== "totp" ? <TextField label="Username" value={username} onChange={setUsername} autoComplete="username" /> : null}
           {mode === "login" || mode === "register" || mode === "totp" || mode === "recovery" ? (
-            <TextField
-              label={mode === "recovery" ? "New password" : "Password"}
-              value={password}
-              onChange={setPassword}
-              type="password"
-              autoComplete={mode === "login" || mode === "totp" ? "current-password" : "new-password"}
-            />
+            <>
+              <TextField
+                label={mode === "recovery" ? "New password" : "Password"}
+                value={password}
+                onChange={setPassword}
+                type="password"
+                autoComplete={mode === "login" || mode === "totp" ? "current-password" : "new-password"}
+                minLength={mode === "register" || mode === "recovery" ? 8 : undefined}
+              />
+              {mode === "register" || mode === "recovery" ? (
+                <PasswordHints password={password} />
+              ) : null}
+            </>
           ) : null}
           {mode === "recovery" ? <TextField label="Recovery code" value={recoveryCode} onChange={setRecoveryCode} autoComplete="one-time-code" /> : null}
           {mode === "recovery" || mode === "totp" ? <TextField label="TOTP code" value={totpCode} onChange={setTotpCode} inputMode="numeric" autoComplete="one-time-code" /> : null}
@@ -272,7 +282,7 @@ function Dashboard({
     <main className="workspace">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Signed in as {data.user.email || data.user.name}</p>
+          <p className="eyebrow">Signed in as {data.user.username || data.user.name}</p>
           <h1>Work dashboard</h1>
         </div>
         <div className="topbar-actions">
@@ -554,7 +564,8 @@ function ProfileSettings({ data, onToast }: { data: DashboardData; onToast: (ton
       >
         <h2>Password</h2>
         <TextField label="Current password" value={currentPassword} onChange={setCurrentPassword} type="password" autoComplete="current-password" />
-        <TextField label="New password" value={newPassword} onChange={setNewPassword} type="password" autoComplete="new-password" />
+        <TextField label="New password" value={newPassword} onChange={setNewPassword} type="password" autoComplete="new-password" minLength={8} />
+        <PasswordHints password={newPassword} />
         <button className="primary-action" type="submit">
           Change password
         </button>
@@ -685,6 +696,24 @@ function Countdowns({ countdowns }: { countdowns: DashboardData["countdowns"] })
   );
 }
 
+function PasswordHints({ password }: { password: string }) {
+  const dirty = password.length > 0;
+  const rules = [
+    { label: "At least 8 characters", met: password.length >= 8 },
+    { label: "200 characters or fewer", met: password.length <= 200 }
+  ];
+  return (
+    <ul className="password-hints" aria-label="Password requirements">
+      {rules.map(({ label, met }) => (
+        <li key={label} className={`password-hint ${dirty ? (met ? "met" : "unmet") : ""}`}>
+          <span aria-hidden="true">{dirty ? (met ? "✓" : "✗") : "·"}</span>
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TextField({
   label,
   value,
@@ -692,7 +721,8 @@ function TextField({
   type = "text",
   autoComplete,
   inputMode,
-  placeholder
+  placeholder,
+  minLength
 }: {
   label: string;
   value: string;
@@ -701,11 +731,12 @@ function TextField({
   autoComplete?: string;
   inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
   placeholder?: string;
+  minLength?: number;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} autoComplete={autoComplete} inputMode={inputMode} placeholder={placeholder} />
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} autoComplete={autoComplete} inputMode={inputMode} placeholder={placeholder} minLength={minLength} />
     </label>
   );
 }

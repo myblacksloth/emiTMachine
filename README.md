@@ -4,7 +4,7 @@ emiTMachine is a multi-user time tracking webapp for work sessions, tags, report
 
 ## Features
 
-- Email/password registration and login.
+- Username/password registration and login.
 - Optional TOTP setup with QR code verification.
 - Passkey registration/login flow with persisted credential records and challenge validation. The current browser UI uses a development credential-id prompt; replace it with native WebAuthn ceremonies before production use.
 - Recovery codes for account recovery.
@@ -37,13 +37,51 @@ The Compose file provides development defaults:
 DATABASE_URL=postgres://emitmachine:emitmachine@postgres:5432/emitmachine
 CORS_ORIGIN=http://localhost:5173
 COOKIE_SECURE=false
+LOG_LEVEL=info
+LOG_FORMAT=pretty
 RP_ID=localhost
 RP_NAME=emiTMachine
 TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
-VITE_API_BASE_URL=http://localhost:4000
+VITE_BACKEND_PROXY_TARGET=http://backend:4000
 ```
 
+Logging defaults are intended for local development:
+
+- `LOG_LEVEL`: minimum backend log severity. Use `debug` for local troubleshooting, `info` for normal development, and `warn` or `error` to reduce noise.
+- `LOG_FORMAT`: backend log format. Use `pretty` for readable local logs and `json` when logs are collected by Docker, a reverse proxy, or a central logging system.
+
 Change `TOTP_ENCRYPTION_KEY`, cookie settings, and database credentials for any non-local deployment. HTTPS and reverse proxy configuration are intentionally left for the deployment layer.
+
+## Logging And Troubleshooting
+
+Follow backend logs while using the app:
+
+```bash
+docker compose logs -f backend
+```
+
+Show logs for all services:
+
+```bash
+docker compose logs -f
+```
+
+Show recent PostgreSQL startup and migration logs:
+
+```bash
+docker compose logs --tail=100 postgres
+```
+
+Use request ids to correlate browser, reverse proxy, and backend logs. Send an `X-Request-Id` header from a reverse proxy or API client, then search for the same value in backend logs. If no upstream request id is provided, the backend should generate one and include it in the response as `X-Request-Id`.
+
+Common checks:
+
+- Login or API calls fail: run `docker compose logs -f backend` and look for the request method, path, status code, and request id.
+- The backend cannot connect to PostgreSQL: run `docker compose logs postgres backend` and check for database health or authentication errors.
+- Logs are too noisy: set `LOG_LEVEL=warn` in `docker-compose.yml`, then recreate the backend container with `docker compose up -d --build backend`.
+- Structured log collection is needed: set `LOG_FORMAT=json` and collect Docker stdout/stderr from the backend service.
+
+More operational logging notes are in `doc/troubleshooting.md`.
 
 ## Agentic Workflow
 

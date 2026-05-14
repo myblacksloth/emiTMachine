@@ -10,6 +10,30 @@ flowchart LR
     Postgres --> Init[backend/db/init.sql]
 ```
 
+## Logging
+
+The Docker Compose stack writes service logs to stdout and stderr so Docker, a reverse proxy, or a host logging driver can collect them without extra files or sidecars.
+
+Backend logging is configured through environment variables on the `backend` service:
+
+- `LOG_LEVEL`: minimum emitted severity. Recommended values are `debug`, `info`, `warn`, and `error`.
+- `LOG_FORMAT`: emitted log shape. Use `pretty` for local development and `json` for structured collection.
+
+Every backend request should have a request id. If an upstream proxy or client sends `X-Request-Id`, the backend should keep that value and include it in request logs and the response header. If no request id is supplied, the backend should generate one and return it as `X-Request-Id`. This makes a single request traceable across browser developer tools, proxy access logs, backend logs, and error reports.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant P as Reverse proxy
+    participant B as Backend
+    participant L as Docker logs
+    C->>P: HTTP request with X-Request-Id
+    P->>B: Forward request id
+    B->>L: Log method, path, status, duration, request id
+    B-->>P: Response with X-Request-Id
+    P-->>C: Response with same request id
+```
+
 ## Login With TOTP
 
 ```mermaid
@@ -18,7 +42,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as Backend
     participant D as PostgreSQL
-    U->>F: Submit email and password
+    U->>F: Submit username and password
     F->>B: POST /api/auth/login
     B->>D: Load user and TOTP state
     alt TOTP disabled

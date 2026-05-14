@@ -6,33 +6,35 @@ import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { createSession, clearSessionCookie, setSessionCookie } from "../services/sessions.js";
 import { decryptTotpSecret, hashPassword, sha256, verifyPassword } from "../utils/crypto.js";
-import { emailSchema, passwordSchema } from "../utils/validators.js";
+import { emailSchema, passwordSchema, usernameSchema } from "../utils/validators.js";
 
 const router = Router();
 
 const registerSchema = z.object({
-  email: emailSchema,
+  username: usernameSchema,
+  email: emailSchema.optional(),
   password: passwordSchema,
-  displayName: z.string().trim().min(1).max(120)
+  displayName: z.string().trim().max(120).optional()
 });
 
 const loginSchema = z.object({
-  email: emailSchema,
+  username: usernameSchema,
   password: z.string().min(1).max(200),
   totpCode: z.string().trim().min(6).max(8).optional(),
   recoveryCode: z.string().trim().min(8).max(32).optional()
 });
 
 const recoverPasswordSchema = z.object({
-  email: emailSchema,
+  username: usernameSchema,
   recoveryCode: z.string().trim().min(8).max(32),
   totpCode: z.string().trim().min(6).max(8).optional(),
   newPassword: passwordSchema
 });
 
-function publicUser(row: { id: string; email: string; display_name: string; role: string; totp_enabled?: boolean }) {
+function publicUser(row: { id: string; username: string; email?: string | null; display_name: string; role: string; totp_enabled?: boolean }) {
   return {
     id: row.id,
+    username: row.username,
     email: row.email,
     displayName: row.display_name,
     role: row.role,
@@ -47,10 +49,10 @@ router.post("/register", async (req, res, next) => {
 
     const user = await withTransaction(async (client) => {
       const result = await client.query(
-        `insert into users (email, password_hash, display_name)
-         values ($1, $2, $3)
-         returning id, email, display_name, role, totp_enabled`,
-        [input.email, passwordHash, input.displayName]
+        `insert into users (username, email, password_hash, display_name)
+         values ($1, $2, $3, $4)
+         returning id, username, email, display_name, role, totp_enabled`,
+        [input.username, input.email ?? null, passwordHash, input.displayName || input.username]
       );
 
       const userId = result.rows[0].id;
@@ -65,10 +67,12 @@ router.post("/register", async (req, res, next) => {
     });
 
     setSessionCookie(res, user.session.token, user.session.expiresAt);
+    req.log?.info("user registered", { userId: user.row.id, username: user.row.username });
     res.status(201).json({ user: publicUser(user.row) });
   } catch (error) {
     if ((error as { code?: string }).code === "23505") {
-      next(new HttpError(409, "A user with this email already exists"));
+      req.log?.warn("registration conflict", { username: req.body?.username });
+      next(new HttpError(409, "A user with this username or email already exists"));
       return;
     }
     next(error);
@@ -79,18 +83,20 @@ router.post("/login", async (req, res, next) => {
   try {
     const input = loginSchema.parse(req.body);
     const result = await pool.query(
-      `select id, email, password_hash, display_name, role, totp_enabled, totp_secret, disabled_at
+      `select id, username, email, password_hash, display_name, role, totp_enabled, totp_secret, disabled_at
        from users
-       where email = $1`,
-      [input.email]
+       where username = $1`,
+      [input.username]
     );
 
     const user = result.rows[0];
     if (!user || user.disabled_at || !(await verifyPassword(input.password, user.password_hash))) {
-      throw new HttpError(401, "Invalid email or password");
+      req.log?.warn("login failed", { username: input.username, reason: "invalid_credentials" });
+      throw new HttpError(401, "Invalid username or password");
     }
 
     if (user.totp_enabled && !input.totpCode && !input.recoveryCode) {
+      req.log?.info("login requires second factor", { userId: user.id, username: user.username });
       res.status(202).json({ requiresTotp: true, message: "TOTP or recovery code is required" });
       return;
     }
@@ -103,6 +109,7 @@ router.post("/login", async (req, res, next) => {
         window: 1
       });
       if (!valid) {
+        req.log?.warn("login failed", { userId: user.id, username: user.username, reason: "invalid_totp" });
         throw new HttpError(401, "Invalid TOTP code");
       }
     }
@@ -117,12 +124,14 @@ router.post("/login", async (req, res, next) => {
         [user.id, recoveryHash]
       );
       if (!recoveryResult.rows[0]) {
+        req.log?.warn("login failed", { userId: user.id, username: user.username, reason: "invalid_recovery_code" });
         throw new HttpError(401, "Invalid recovery code");
       }
     }
 
     const session = await createSession(pool, user.id);
     setSessionCookie(res, session.token, session.expiresAt);
+    req.log?.info("login succeeded", { userId: user.id, username: user.username });
     res.json({ user: publicUser(user) });
   } catch (error) {
     next(error);
@@ -133,6 +142,7 @@ router.post("/logout", requireAuth, async (req, res, next) => {
   try {
     await pool.query("update app_sessions set revoked_at = now() where id = $1", [req.sessionId]);
     clearSessionCookie(res);
+    req.log?.info("logout succeeded", { userId: req.user!.id });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -146,12 +156,13 @@ router.post("/recover-password", async (req, res, next) => {
       const userResult = await client.query(
         `select id, totp_enabled, totp_secret
          from users
-         where email = $1 and disabled_at is null
+         where username = $1 and disabled_at is null
          for update`,
-        [input.email]
+        [input.username]
       );
       const user = userResult.rows[0];
       if (!user) {
+        req.log?.warn("password recovery failed", { username: input.username, reason: "unknown_user" });
         throw new HttpError(401, "Invalid recovery request");
       }
 
@@ -166,6 +177,7 @@ router.post("/recover-password", async (req, res, next) => {
           window: 1
         });
         if (!validTotp) {
+          req.log?.warn("password recovery failed", { userId: user.id, username: input.username, reason: "invalid_totp" });
           throw new HttpError(401, "Invalid recovery request");
         }
       }
@@ -178,6 +190,7 @@ router.post("/recover-password", async (req, res, next) => {
         [user.id, sha256(input.recoveryCode)]
       );
       if (!recoveryResult.rows[0]) {
+        req.log?.warn("password recovery failed", { userId: user.id, username: input.username, reason: "invalid_recovery_code" });
         throw new HttpError(401, "Invalid recovery request");
       }
 
@@ -186,6 +199,7 @@ router.post("/recover-password", async (req, res, next) => {
         await hashPassword(input.newPassword)
       ]);
       await client.query("update app_sessions set revoked_at = now() where user_id = $1 and revoked_at is null", [user.id]);
+      req.log?.info("password recovered", { userId: user.id, username: input.username });
     });
 
     res.status(204).send();

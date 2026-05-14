@@ -7,6 +7,16 @@ const jsonHeaders = {
   Accept: "application/json"
 };
 
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly requestId: string | null
+  ) {
+    super(requestId ? `${message} (request id: ${requestId})` : message);
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.body instanceof FormData ? undefined : jsonHeaders);
   if (options.headers) {
@@ -21,13 +31,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     let message = "The request could not be completed.";
+    const requestId = response.headers.get("x-request-id");
     try {
       const payload = (await response.json()) as { message?: string; error?: string };
       message = payload.message ?? payload.error ?? message;
     } catch {
       message = response.statusText || message;
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status, requestId);
   }
 
   if (response.status === 204) {
@@ -37,9 +48,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestOptional<T>(path: string, options: RequestInit = {}): Promise<T | null> {
+  try {
+    return await request<T>(path, options);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 type BackendUser = {
   id: string;
-  email: string;
+  username: string;
   displayName: string;
   totpEnabled: boolean;
   passkeyCount?: number;
@@ -104,7 +126,7 @@ async function fetchDashboard() {
   return {
     user: {
       name: me.user.displayName,
-      email: me.user.email,
+      username: me.user.username,
       totpEnabled: me.user.totpEnabled,
       passkeyCount: me.user.passkeyCount ?? 0
     },
@@ -134,32 +156,33 @@ async function fetchDashboard() {
 }
 
 export const api = {
-  login: (email: string, password: string, totpCode?: string, recoveryCode?: string) =>
+  currentUser: () => requestOptional<{ user: BackendUser }>("/api/auth/me"),
+  login: (username: string, password: string, totpCode?: string, recoveryCode?: string) =>
     request<{ requiresTotp?: boolean; user?: BackendUser }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password, totpCode: totpCode || undefined, recoveryCode: recoveryCode || undefined })
+      body: JSON.stringify({ username, password, totpCode: totpCode || undefined, recoveryCode: recoveryCode || undefined })
     }),
-  register: (name: string, email: string, password: string) =>
+  register: (name: string, username: string, password: string) =>
     request<{ user: BackendUser }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ displayName: name, email, password })
+      body: JSON.stringify({ displayName: name, username, password })
     }),
-  passkeyLogin: async (email: string) => {
+  passkeyLogin: async (username: string) => {
     const options = await request<{ publicKey: { challenge: string } }>("/api/auth/passkeys/login/options", {
       method: "POST",
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ username })
     });
     const credentialId = window.prompt("Enter your registered passkey credential id");
     if (!credentialId) throw new Error("Passkey login cancelled.");
     return request<{ ok: true }>("/api/auth/passkeys/login/verify", {
       method: "POST",
-      body: JSON.stringify({ email, credentialId, challenge: options.publicKey.challenge })
+      body: JSON.stringify({ username, credentialId, challenge: options.publicKey.challenge })
     });
   },
-  recoverAccount: (email: string, recoveryCode: string, totpCode: string, newPassword: string) =>
+  recoverAccount: (username: string, recoveryCode: string, totpCode: string, newPassword: string) =>
     request<void>("/api/auth/recover-password", {
       method: "POST",
-      body: JSON.stringify({ email, recoveryCode, totpCode: totpCode || undefined, newPassword })
+      body: JSON.stringify({ username, recoveryCode, totpCode: totpCode || undefined, newPassword })
     }),
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
   dashboard: fetchDashboard,
