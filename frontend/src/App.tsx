@@ -325,9 +325,9 @@ function Dashboard({
             <Chart title="Monthly hours" buckets={data.charts.monthly} />
           </section>
 
-          <section className="work-band">
+          <section className={`work-band ${data.activeSession ? "open" : ""}`}>
             <div className={`session-state ${data.activeSession ? "open" : ""}`}>
-              <span>{data.activeSession ? "Open session" : "No open session"}</span>
+              <span>{data.activeSession ? "Session active" : "No active session"}</span>
               <strong>{data.activeSession ? `Started ${new Date(data.activeSession.startedAt).toLocaleString()}` : "Ready to start work"}</strong>
               {activeTagNames ? <small>{activeTagNames}</small> : null}
             </div>
