@@ -44,6 +44,24 @@ export function errorHandler(error: unknown, req: Request, res: Response, _next:
     return res.status(400).json({ error: "Invalid request payload", details: (error as { issues: unknown }).issues });
   }
 
+  const pgCode = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : null;
+  const pgConstraint = error && typeof error === "object" && "constraint" in error ? (error as { constraint: string }).constraint : "";
+
+  if (pgCode === "23P01") {
+    const message =
+      pgConstraint === "time_sessions_no_overlap"
+        ? "The selected time overlaps an existing work session"
+        : "A conflict prevented this operation";
+    requestLog.warn("database exclusion conflict", {
+      method: req.method,
+      path: req.path,
+      statusCode: 409,
+      userId: req.user?.id,
+      constraint: pgConstraint
+    });
+    return res.status(409).json({ error: message });
+  }
+
   requestLog.error("unhandled error", {
     method: req.method,
     path: req.path,
