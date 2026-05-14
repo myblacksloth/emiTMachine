@@ -1,60 +1,67 @@
 ---
 name: emiTMachine Agent Suite
-description: Custom agents for the emiTMachine time tracker webapp. Use these agents to implement UI, backend, database, DevOps, and authentication features from todo.txt.
+description: Custom agents for implementing the emiTMachine time tracker webapp from todo.txt.
 agents:
   - name: ui/ux designer
-    description: "Design modern, mobile-first time tracker UI and UX flows for login, dashboard, time punch, and profile pages."
+    description: "Design mobile-first time tracker UI and UX flows for login, dashboard, punch confirmation, tags, reports, and profile pages."
     applyTo:
-      - "**/*.md"
-      - "**/*.tsx"
-      - "**/*.ts"
-      - "**/*.css"
-      - "**/*.scss"
-      - "**/*.html"
+      - "todo.txt"
+      - "frontend/**"
+      - "README.md"
+      - "doc/**"
   - name: postgres db expert
-    description: "Design and validate PostgreSQL schema, migration scripts, indexes, and security for multi-user time tracking."
+    description: "Design and validate PostgreSQL schema, init SQL, constraints, indexes, and database security."
     applyTo:
       - "**/*.sql"
-      - "**/*.ts"
-      - "**/*.js"
+      - "backend/**"
       - "README.md"
       - "doc/**"
   - name: backend developer
-    description: "Implement backend services, REST/GraphQL APIs, authentication, session tracking, and database integration."
+    description: "Implement backend APIs, authentication integration, business rules, data access, reporting, and CSV import/export."
     applyTo:
-      - "emiTMachine/src/**"
-      - "**/*.ts"
-      - "**/*.js"
+      - "backend/**"
       - "README.md"
       - "doc/**"
   - name: frontend developer
-    description: "Build the frontend application, responsive components, charts, forms, and mobile-friendly interactions."
+    description: "Build responsive frontend screens, charts, forms, profile settings, and API integration."
     applyTo:
-      - "emiTMachine/src/**"
-      - "**/*.tsx"
-      - "**/*.ts"
-      - "**/*.css"
-      - "**/*.scss"
+      - "frontend/**"
       - "README.md"
       - "doc/**"
   - name: devops
-    description: "Create Docker and Compose configurations, local development setup, and container orchestration for the webapp."
+    description: "Create Docker and Compose configuration, local development setup, and runtime documentation."
     applyTo:
       - "docker-compose.yml"
-      - "emiTMachine/Dockerfile"
+      - "backend/Dockerfile"
+      - "frontend/Dockerfile"
       - "**/*.yml"
       - "README.md"
       - "doc/**"
   - name: security/auth specialist
-    description: "Design secure authentication flows for login, TOTP, passkeys, recovery codes, and account management."
+    description: "Design and review secure authentication for passwords, TOTP, passkeys, recovery codes, and sessions."
     applyTo:
-      - "**/*.ts"
-      - "**/*.js"
+      - "backend/**"
+      - "frontend/**"
       - "README.md"
       - "doc/**"
+  - name: qa/test engineer
+    description: "Create automated and manual verification for auth, punch flows, tags, reports, CSV import/export, and Docker startup."
+    applyTo:
+      - "backend/**"
+      - "frontend/**"
+      - "README.md"
+      - "doc/**"
+  - name: technical writer
+    description: "Maintain README and technical documentation with Mermaid diagrams and English project guidance."
+    applyTo:
+      - "README.md"
+      - "doc/**"
+      - "todo.txt"
 ---
 
 # emiTMachine Agent Suite
 
-This file defines workspace agents for the emiTMachine project.
-Use direct agent addressing in Copilot chat, for example: `@ui/ux designer`, `@backend developer`, or `@postgres db expert`.
+Use these agents to divide implementation work for emiTMachine.
+The detailed per-agent instructions live in the sibling `*.agent.md` files in this directory.
+
+Start every feature prompt by referencing `todo.txt`, then ask one agent to plan or implement a focused slice.
