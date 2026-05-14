@@ -29,6 +29,7 @@ services:
       LOG_FORMAT: pretty
       RP_ID: localhost
       RP_NAME: emiTMachine
+      RP_ORIGIN: http://localhost:5173
       TOTP_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     depends_on:
       postgres:

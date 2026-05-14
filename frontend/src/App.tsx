@@ -552,6 +552,7 @@ function ProfileSettings({
   const [totp, setTotp] = useState<{ qrCodeUrl: string; secretLabel: string } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [passkeyLabel, setPasskeyLabel] = useState("");
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [remainingCount, setRemainingCount] = useState(data.user.recoveryCodeCount);
   const [importResult, setImportResult] = useState("");
@@ -609,16 +610,25 @@ function ProfileSettings({
         className="panel stack"
         onSubmit={async (event) => {
           event.preventDefault();
-          await api.registerPasskey(passkeyLabel);
-          setPasskeyLabel("");
-          onToast("success", "Passkey registration started.");
+          if (passkeyBusy) return;
+          setPasskeyBusy(true);
+          try {
+            await api.registerPasskey(passkeyLabel);
+            setPasskeyLabel("");
+            await onRefresh();
+            onToast("success", "Passkey registered.");
+          } catch (err) {
+            onToast("error", err instanceof Error ? err.message : "Passkey registration failed.");
+          } finally {
+            setPasskeyBusy(false);
+          }
         }}
       >
         <h2>Passkeys</h2>
         <p className="muted">{data.user.passkeyCount} passkey records are linked to this account.</p>
         <TextField label="Passkey label" value={passkeyLabel} onChange={setPasskeyLabel} placeholder="Work laptop" />
-        <button className="primary-action" type="submit">
-          Register passkey
+        <button className="primary-action" type="submit" disabled={passkeyBusy}>
+          {passkeyBusy ? "Waiting for authenticator…" : "Register passkey"}
         </button>
       </form>
 

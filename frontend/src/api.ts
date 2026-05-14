@@ -1,3 +1,4 @@
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import type { DashboardData, Tag } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
@@ -170,15 +171,14 @@ export const api = {
       body: JSON.stringify({ displayName: name, username, password })
     }),
   passkeyLogin: async (username: string) => {
-    const options = await request<{ publicKey: { challenge: string } }>("/api/auth/passkeys/login/options", {
-      method: "POST",
-      body: JSON.stringify({ username })
-    });
-    const credentialId = window.prompt("Enter your registered passkey credential id");
-    if (!credentialId) throw new Error("Passkey login cancelled.");
+    const options = await request<Parameters<typeof startAuthentication>[0]["optionsJSON"]>(
+      "/api/auth/passkeys/login/options",
+      { method: "POST", body: JSON.stringify({ username }) }
+    );
+    const response = await startAuthentication({ optionsJSON: options });
     return request<{ ok: true }>("/api/auth/passkeys/login/verify", {
       method: "POST",
-      body: JSON.stringify({ username, credentialId, challenge: options.publicKey.challenge })
+      body: JSON.stringify({ username, response })
     });
   },
   recoverAccount: (username: string, recoveryCode: string, totpCode: string, newPassword: string) =>
@@ -223,15 +223,14 @@ export const api = {
       body: JSON.stringify({ code })
     }),
   registerPasskey: async (label: string) => {
-    const options = await request<{ publicKey: { challenge: string } }>("/api/auth/passkeys/register/options", {
-      method: "POST",
-      body: JSON.stringify({ label })
-    });
-    const credentialId = window.prompt("Save this development credential id for future passkey login", options.publicKey.challenge);
-    if (!credentialId) throw new Error("Passkey registration cancelled.");
+    const options = await request<Parameters<typeof startRegistration>[0]["optionsJSON"]>(
+      "/api/auth/passkeys/register/options",
+      { method: "POST", body: JSON.stringify({ label }) }
+    );
+    const response = await startRegistration({ optionsJSON: options });
     return request<void>("/api/auth/passkeys/register/verify", {
       method: "POST",
-      body: JSON.stringify({ label, credentialId, publicKey: credentialId, challenge: options.publicKey.challenge })
+      body: JSON.stringify({ label, response })
     });
   },
   generateRecoveryCodes: () =>
