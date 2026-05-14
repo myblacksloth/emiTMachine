@@ -210,8 +210,17 @@ router.post("/recover-password", async (req, res, next) => {
 
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
-    const passkeys = await pool.query("select count(*)::int as count from passkeys where user_id = $1", [req.user!.id]);
-    res.json({ user: { ...req.user, passkeyCount: Number(passkeys.rows[0]?.count ?? 0) } });
+    const [passkeys, recoveryCodes] = await Promise.all([
+      pool.query("select count(*)::int as count from passkeys where user_id = $1", [req.user!.id]),
+      pool.query("select count(*)::int as count from recovery_codes where user_id = $1 and used_at is null", [req.user!.id])
+    ]);
+    res.json({
+      user: {
+        ...req.user,
+        passkeyCount: Number(passkeys.rows[0]?.count ?? 0),
+        recoveryCodeCount: Number(recoveryCodes.rows[0]?.count ?? 0)
+      }
+    });
   } catch (error) {
     next(error);
   }

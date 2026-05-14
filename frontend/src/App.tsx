@@ -3,7 +3,7 @@ import { api } from "./api";
 import type { AuthMode, ChartBucket, DashboardData, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
-  user: { name: "User", username: "", totpEnabled: false, passkeyCount: 0 },
+  user: { name: "User", username: "", totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
   activeSession: null,
   tags: [],
   charts: { daily: [], weekly: [], monthly: [] },
@@ -341,7 +341,7 @@ function Dashboard({
       ) : null}
 
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
-      {view === "profile" ? <ProfileSettings data={data} onToast={onToast} /> : null}
+      {view === "profile" ? <ProfileSettings data={data} onToast={onToast} onRefresh={onRefresh} /> : null}
 
       {confirming ? (
         <PunchDialog
@@ -538,13 +538,22 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
   );
 }
 
-function ProfileSettings({ data, onToast }: { data: DashboardData; onToast: (tone: Toast["tone"], message: string) => void }) {
+function ProfileSettings({
+  data,
+  onToast,
+  onRefresh
+}: {
+  data: DashboardData;
+  onToast: (tone: Toast["tone"], message: string) => void;
+  onRefresh: () => Promise<void>;
+}) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [totp, setTotp] = useState<{ qrCodeUrl: string; secretLabel: string } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [passkeyLabel, setPasskeyLabel] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [remainingCount, setRemainingCount] = useState(data.user.recoveryCodeCount);
   const [importResult, setImportResult] = useState("");
 
   const recoveryBlob = useMemo(() => new Blob([recoveryCodes.join("\n")], { type: "text/plain" }), [recoveryCodes]);
@@ -615,23 +624,48 @@ function ProfileSettings({ data, onToast }: { data: DashboardData; onToast: (ton
 
       <section className="panel stack">
         <h2>Recovery codes</h2>
-        <button
-          type="button"
-          onClick={async () => {
-            const result = await api.generateRecoveryCodes();
-            setRecoveryCodes(result.codes);
-          }}
-        >
-          Generate recovery codes
-        </button>
-        {recoveryCodes.length ? (
+
+        {recoveryCodes.length === 0 ? (
           <>
+            {remainingCount === 0 ? (
+              <p className="recovery-status warn">
+                No recovery codes — you won't be able to recover your account if you lose access.
+              </p>
+            ) : (
+              <p className="recovery-status ok">
+                {remainingCount} unused {remainingCount === 1 ? "code" : "codes"} stored for this account.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={async () => {
+                if (
+                  remainingCount > 0 &&
+                  !window.confirm("This will permanently invalidate all existing recovery codes. Continue?")
+                ) return;
+                const result = await api.generateRecoveryCodes();
+                setRecoveryCodes(result.codes);
+                setRemainingCount(result.codes.length);
+                await onRefresh();
+              }}
+            >
+              {remainingCount === 0 ? "Generate recovery codes" : "Regenerate codes"}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="recovery-status warn">
+              Save these codes now — they will not be shown again.
+            </p>
             <pre className="codes">{recoveryCodes.join("\n")}</pre>
             <a className="download-link" href={recoveryUrl} download="emitmachine-recovery-codes.txt">
               Download recovery codes
             </a>
+            <button type="button" onClick={() => setRecoveryCodes([])}>
+              Done — I have saved my codes
+            </button>
           </>
-        ) : null}
+        )}
       </section>
 
       <section className="panel stack wide">

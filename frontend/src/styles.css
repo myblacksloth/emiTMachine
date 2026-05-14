@@ -958,6 +958,43 @@ input[type="datetime-local"] {
 }
 
 /* ── Password hints ─────────────────────────────────────────── */
+.recovery-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.7rem 0.875rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+
+.recovery-status.ok {
+  background: rgba(52, 199, 89, 0.10);
+  border-color: rgba(52, 199, 89, 0.35);
+  color: #1a6b38;
+}
+
+.recovery-status.ok::before {
+  content: "✓";
+  font-weight: 700;
+  color: var(--green);
+  flex-shrink: 0;
+}
+
+.recovery-status.warn {
+  background: rgba(255, 149, 0, 0.10);
+  border-color: rgba(255, 149, 0, 0.35);
+  color: #7a4400;
+}
+
+.recovery-status.warn::before {
+  content: "⚠";
+  flex-shrink: 0;
+}
+
 .password-hints {
   list-style: none;
   display: grid;

@@ -65,6 +65,7 @@ type BackendUser = {
   displayName: string;
   totpEnabled: boolean;
   passkeyCount?: number;
+  recoveryCodeCount?: number;
 };
 
 type BackendTag = Tag & { is_default?: boolean };
@@ -128,7 +129,8 @@ async function fetchDashboard() {
       name: me.user.displayName,
       username: me.user.username,
       totpEnabled: me.user.totpEnabled,
-      passkeyCount: me.user.passkeyCount ?? 0
+      passkeyCount: me.user.passkeyCount ?? 0,
+      recoveryCodeCount: me.user.recoveryCodeCount ?? 0
     },
     activeSession: status.activeSession
       ? {

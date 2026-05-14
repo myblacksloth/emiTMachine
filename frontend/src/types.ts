@@ -45,6 +45,7 @@ export type DashboardData = {
     username: string;
     totpEnabled: boolean;
     passkeyCount: number;
+    recoveryCodeCount: number;
   };
   activeSession: ActiveSession | null;
   tags: Tag[];
