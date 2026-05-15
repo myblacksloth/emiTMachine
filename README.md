@@ -1,5 +1,7 @@
 # emiTMachine
 
+![](./stuff/i/SCR-20260515-ogph.png)
+
 ![](./stuff/i/SCR-20260515-nyjq.png)
 
 |   |   |
