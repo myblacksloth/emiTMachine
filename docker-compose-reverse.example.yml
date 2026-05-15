@@ -4,11 +4,11 @@
 # 1. Copy this file to docker-compose-reverse.yml.
 # 2. Copy caddy/config/Caddyfile.example to caddy/config/Caddyfile.
 # 3. Replace the placeholder domain in Caddyfile.
-# 4. Export the required environment variables before starting:
-#    PUBLIC_DOMAIN=your.domain.com
-#    TOTP_ENCRYPTION_KEY=<32-byte-base64-key>
+# 4. Copy the reverse env examples to private env files.
+# 5. Fill the private env files with your real values.
 #
-# The real docker-compose-reverse.yml and caddy/config/Caddyfile are ignored by Git.
+# The real docker-compose-reverse.yml, docker-compose-reverse.*.env and
+# caddy/config/Caddyfile are ignored by Git.
 
 services:
   caddy:
@@ -45,10 +45,12 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    user: postgres
+    env_file:
+      - ./docker-compose-reverse.postgres.env
     environment:
       POSTGRES_DB: emitmachine
       POSTGRES_USER: emitmachine
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
@@ -59,37 +61,44 @@ services:
       retries: 5
     networks:
       - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   backend:
     build:
       context: ./backend
+    user: node
+    env_file:
+      - ./docker-compose-reverse.backend.env
     environment:
-      NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgres://emitmachine:${POSTGRES_PASSWORD:-change-me}@postgres:5432/emitmachine
-      CORS_ORIGIN: https://${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN}
-      COOKIE_SECURE: "true"
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      LOG_FORMAT: ${LOG_FORMAT:-json}
-      RP_ID: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN}
       RP_NAME: emiTMachine
-      RP_ORIGIN: https://${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN}
-      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?set TOTP_ENCRYPTION_KEY}
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   frontend:
     build:
       context: ./frontend
+    user: node
     environment:
       VITE_BACKEND_PROXY_TARGET: http://backend:4000
     depends_on:
       - backend
     networks:
       - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   postgres_data:

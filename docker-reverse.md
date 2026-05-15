@@ -6,6 +6,10 @@ This guide explains how to run emiTMachine behind the included Caddy reverse pro
 
 - `docker-compose-reverse.example.yml`: public placeholder compose file.
 - `docker-compose-reverse.yml`: private local compose file, ignored by Git.
+- `docker-compose-reverse.postgres.env.example`: public placeholder Postgres environment file.
+- `docker-compose-reverse.backend.env.example`: public placeholder backend environment file.
+- `docker-compose-reverse.postgres.env`: private local Postgres environment file, ignored by Git.
+- `docker-compose-reverse.backend.env`: private local backend environment file, ignored by Git.
 - `caddy/config/Caddyfile.example`: public placeholder Caddy config.
 - `caddy/config/Caddyfile`: private local Caddy config, ignored by Git.
 - `caddy/certs/*.pem`: private TLS certificates, ignored by Git.
@@ -16,6 +20,8 @@ Copy the placeholders:
 
 ```bash
 cp docker-compose-reverse.example.yml docker-compose-reverse.yml
+cp docker-compose-reverse.postgres.env.example docker-compose-reverse.postgres.env
+cp docker-compose-reverse.backend.env.example docker-compose-reverse.backend.env
 cp caddy/config/Caddyfile.example caddy/config/Caddyfile
 ```
 
@@ -51,26 +57,39 @@ The example Caddyfile expects exactly these paths:
 tls /certs/cert.pem /certs/key.pem
 ```
 
-## 3. Set Required Variables
+## 3. Configure Private Variables
 
-The reverse compose uses environment variables so real values do not need to be committed.
+Edit `docker-compose-reverse.postgres.env`:
 
-Required:
+```dotenv
+POSTGRES_PASSWORD=change-this-password
+```
 
-```bash
-export PUBLIC_DOMAIN=your.domain.com
-export POSTGRES_PASSWORD=change-this-password
-export TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
+Edit `docker-compose-reverse.backend.env`:
+
+```dotenv
+NODE_ENV=production
+
+DATABASE_URL=postgres://emitmachine:change-this-password@postgres:5432/emitmachine
+
+CORS_ORIGIN=https://your.domain.com
+COOKIE_SECURE=true
+
+RP_ID=your.domain.com
+RP_ORIGIN=https://your.domain.com
+
+TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
 ```
 
 Optional:
 
-```bash
-export LOG_LEVEL=info
-export LOG_FORMAT=json
+```dotenv
+LOG_LEVEL=info
+LOG_FORMAT=json
 ```
 
-For passkeys, `PUBLIC_DOMAIN` must match the HTTPS domain opened in the browser.
+For passkeys, `RP_ID`, `RP_ORIGIN`, and the browser URL must use the same HTTPS domain.
+Keep the password in `DATABASE_URL` aligned with `POSTGRES_PASSWORD`.
 
 ## 4. Start The Stack
 
@@ -108,6 +127,10 @@ The reverse stack uses two Docker networks:
 - `emitmachineint`: internal network used by Caddy, frontend, backend, and Postgres.
 
 `emitmachineint` is internal, so backend and Postgres are not published directly on the host.
+
+Postgres runs as `postgres`; backend and frontend run as the non-root `node` user. The Caddy reverse proxy intentionally keeps the default image behavior so it can bind host ports `80` and `443`.
+
+If Postgres fails with permission errors on an old local volume, the volume was probably initialized before the non-root setting. Fix the volume ownership or recreate the local database volume.
 
 With the current placeholder, Compose creates `gotproxed` automatically. If you need to share the same reverse proxy network with other Compose projects, change it to:
 
