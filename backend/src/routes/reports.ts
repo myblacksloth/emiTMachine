@@ -22,11 +22,12 @@ const sessionUpdateSchema = z.object({
 
 const sessionCreateSchema = sessionUpdateSchema;
 
-function assertActivityEditEnabled() {
-  // Activity editing is enabled by default for the owning user.
-  // Future admin-controlled access should be enforced here by checking a
-  // per-user permission flag before allowing update/delete operations.
-  return true;
+function assertActivityEditEnabled(canEditSessions: boolean) {
+  // Root/admin users always keep session correction access. Standard users
+  // depend on the per-user flag managed from the admin dashboard.
+  if (!canEditSessions) {
+    throw new HttpError(403, "Activity editing is not enabled for this user");
+  }
 }
 
 router.get("/summary", async (req, res, next) => {
@@ -135,7 +136,7 @@ router.get("/sessions", async (req, res, next) => {
 
 router.post("/sessions", async (req, res, next) => {
   try {
-    assertActivityEditEnabled();
+    assertActivityEditEnabled(req.user!.canEditSessions || req.user!.role === "admin" || req.user!.role === "root");
     const input = sessionCreateSchema.parse(req.body);
     const startedAt = new Date(input.startedAt);
     const endedAt = input.endedAt ? new Date(input.endedAt) : null;
@@ -196,7 +197,7 @@ router.post("/sessions", async (req, res, next) => {
 
 router.patch("/sessions/:id", async (req, res, next) => {
   try {
-    assertActivityEditEnabled();
+    assertActivityEditEnabled(req.user!.canEditSessions || req.user!.role === "admin" || req.user!.role === "root");
     const sessionId = uuidSchema.parse(req.params.id);
     const input = sessionUpdateSchema.parse(req.body);
     const startedAt = new Date(input.startedAt);
@@ -329,7 +330,7 @@ router.patch("/sessions/:id", async (req, res, next) => {
 
 router.delete("/sessions/:id", async (req, res, next) => {
   try {
-    assertActivityEditEnabled();
+    assertActivityEditEnabled(req.user!.canEditSessions || req.user!.role === "admin" || req.user!.role === "root");
     const sessionId = uuidSchema.parse(req.params.id);
 
     const result = await pool.query("delete from time_sessions where id = $1 and user_id = $2 returning id", [sessionId, req.user!.id]);

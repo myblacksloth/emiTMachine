@@ -9,7 +9,9 @@ export type AuthUser = {
   username: string;
   email?: string | null;
   displayName: string;
-  role: string;
+  role: "user" | "admin" | "root";
+  adminApproved: boolean;
+  canEditSessions: boolean;
   totpEnabled: boolean;
 };
 
@@ -31,7 +33,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
     const tokenHash = sha256(token);
     const result = await pool.query(
-      `select s.id as session_id, u.id, u.username, u.email, u.display_name, u.role, u.totp_enabled
+      `select s.id as session_id, u.id, u.username, u.email, u.display_name, u.role, u.admin_approved, u.can_edit_sessions, u.totp_enabled
        from app_sessions s
        join users u on u.id = s.user_id
        where s.token_hash = $1 and s.expires_at > now() and s.revoked_at is null and u.disabled_at is null`,
@@ -50,6 +52,8 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       email: row.email,
       displayName: row.display_name,
       role: row.role,
+      adminApproved: Boolean(row.admin_approved),
+      canEditSessions: Boolean(row.can_edit_sessions),
       totpEnabled: Boolean(row.totp_enabled)
     };
     next();

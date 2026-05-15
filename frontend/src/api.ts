@@ -1,4 +1,4 @@
-import type { ActivitySession, Countdown, DashboardData, Tag } from "./types";
+import type { ActivitySession, AdminUser, Countdown, DashboardData, Tag, UserRole } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -62,10 +62,28 @@ async function requestOptional<T>(path: string, options: RequestInit = {}): Prom
 type BackendUser = {
   id: string;
   username: string;
+  email?: string | null;
   displayName: string;
+  role: UserRole;
+  adminApproved?: boolean;
+  canEditSessions?: boolean;
   totpEnabled: boolean;
   passkeyCount?: number;
   recoveryCodeCount?: number;
+};
+
+type BackendAdminUser = {
+  id: string;
+  username: string;
+  email: string | null;
+  display_name: string;
+  role: UserRole;
+  admin_approved: boolean;
+  can_edit_sessions: boolean;
+  status: "active" | "disabled" | "locked";
+  disabled_at: string | null;
+  created_at: string;
+  last_login_at: string | null;
 };
 
 type BackendTag = Tag & { is_default?: boolean };
@@ -186,6 +204,22 @@ function mapSession(session: BackendSession): ActivitySession {
     durationMinutes: session.duration_seconds === null ? null : secondsToMinutes(session.duration_seconds),
     tagIds: session.tags.map((tag) => tag.id),
     tags: session.tags
+  };
+}
+
+function mapAdminUser(user: BackendAdminUser): AdminUser {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    displayName: user.display_name,
+    role: user.role,
+    adminApproved: user.admin_approved,
+    canEditSessions: user.can_edit_sessions,
+    status: user.status,
+    disabledAt: user.disabled_at,
+    createdAt: user.created_at,
+    lastLoginAt: user.last_login_at
   };
 }
 
@@ -371,6 +405,9 @@ async function fetchDashboard() {
     user: {
       name: me.user.displayName,
       username: me.user.username,
+      role: me.user.role,
+      adminApproved: me.user.adminApproved ?? true,
+      canEditSessions: me.user.canEditSessions ?? true,
       totpEnabled: me.user.totpEnabled,
       passkeyCount: me.user.passkeyCount ?? 0,
       recoveryCodeCount: me.user.recoveryCodeCount ?? 0
@@ -408,10 +445,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ username, password, totpCode: totpCode || undefined, recoveryCode: recoveryCode || undefined })
     }),
-  register: (name: string, username: string, password: string) =>
-    request<{ user: BackendUser }>("/api/auth/register", {
+  register: (name: string, username: string, password: string, role: "user" | "admin" = "user") =>
+    request<{ user: BackendUser; requiresApproval?: boolean }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ displayName: name, username, password })
+      body: JSON.stringify({ displayName: name, username, password, role })
     }),
   passkeyLogin: async (username: string) => {
     const options = await request<PublicKeyCredentialRequestOptionsJSON>(
@@ -477,6 +514,25 @@ export const api = {
       body: JSON.stringify({ status: "completed" })
     }),
   deleteCountdown: (id: string) => request<void>(`/api/countdowns/${id}`, { method: "DELETE" }),
+  adminUsers: () => request<{ users: BackendAdminUser[] }>("/api/admin/users").then((payload) => payload.users.map(mapAdminUser)),
+  approveAdmin: (id: string) => request<void>(`/api/admin/users/${id}/approve-admin`, { method: "POST" }),
+  setUserEditPermission: (id: string, canEditSessions: boolean) =>
+    request<void>(`/api/admin/users/${id}/edit-permission`, {
+      method: "PATCH",
+      body: JSON.stringify({ canEditSessions })
+    }),
+  resetUserPassword: (id: string) => request<{ temporaryPassword: string }>(`/api/admin/users/${id}/reset-password`, { method: "POST" }),
+  deleteUser: (id: string) => request<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
+  registrationSetting: () => request<{ enabled: boolean }>("/api/admin/settings/registration"),
+  setRegistrationSetting: (enabled: boolean) =>
+    request<void>("/api/admin/settings/registration", {
+      method: "PATCH",
+      body: JSON.stringify({ enabled })
+    }),
+  adminUserSummary: (id: string) => request<{ summary: BackendSummary }>(`/api/admin/users/${id}/summary`),
+  adminUserSessions: (id: string) =>
+    request<{ sessions: BackendSession[] }>(`/api/admin/users/${id}/sessions?limit=100`).then((payload) => payload.sessions.map(mapSession)),
+  adminDumpUrl: `${apiBaseUrl}/api/admin/dump`,
   clockIn: (occurredAt: string, tagIds: string[], note: string) =>
     request<{ session: unknown }>("/api/punch/in", {
       method: "POST",

@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { config } from "./config.js";
 import { errorHandler, notFound } from "./errors.js";
 import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
 import countdownRoutes from "./routes/countdowns.js";
 import csvRoutes from "./routes/csv.js";
 import healthRoutes from "./routes/health.js";
@@ -33,6 +34,7 @@ export function createApp() {
 
   app.use("/health", healthRoutes);
   app.use("/api/health", healthRoutes);
+  app.use("/api/admin", adminRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/auth/totp", totpRoutes);
   app.use("/api/auth/recovery", recoveryRoutes);

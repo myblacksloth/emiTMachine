@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
-CREATE TYPE user_role AS ENUM ('user', 'admin');
+CREATE TYPE user_role AS ENUM ('user', 'admin', 'root');
 CREATE TYPE account_status AS ENUM ('active', 'disabled', 'locked');
 CREATE TYPE work_session_status AS ENUM ('open', 'closed', 'anomalous');
 CREATE TYPE time_event_type AS ENUM ('clock_in', 'clock_out', 'break_start', 'break_end', 'manual_adjustment');
@@ -20,6 +20,8 @@ CREATE TABLE users (
   password_hash text NOT NULL,
   role user_role NOT NULL DEFAULT 'user',
   status account_status NOT NULL DEFAULT 'active',
+  admin_approved boolean NOT NULL DEFAULT true,
+  can_edit_sessions boolean NOT NULL DEFAULT true,
   disabled_at timestamptz,
   timezone text NOT NULL DEFAULT 'UTC',
   totp_secret text,
@@ -37,6 +39,20 @@ CREATE TABLE users (
   CONSTRAINT users_disabled_state CHECK ((status = 'disabled') = (disabled_at IS NOT NULL))
 );
 
+CREATE TABLE system_settings (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT system_settings_key_not_blank CHECK (length(btrim(key)) > 0)
+);
+
+INSERT INTO system_settings (key, value)
+VALUES ('registration_enabled', 'true'::jsonb);
+
+INSERT INTO users (username, name, display_name, password_hash, role, admin_approved, can_edit_sessions)
+VALUES ('root', 'root', 'root', crypt('goodlife', gen_salt('bf', 12)), 'root', true, true)
+ON CONFLICT (username) DO NOTHING;
+
 CREATE TABLE tags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -53,6 +69,14 @@ CREATE TABLE tags (
 
 CREATE UNIQUE INDEX tags_user_lower_name_idx ON tags (user_id, lower(name));
 CREATE INDEX tags_user_id_idx ON tags (user_id);
+
+INSERT INTO tags (user_id, name, color, is_default)
+SELECT id, 'Presence', '#21A67A', true FROM users WHERE username = 'root'
+ON CONFLICT (user_id, name) DO NOTHING;
+
+INSERT INTO tags (user_id, name, color, is_default)
+SELECT id, 'Smart working', '#3B82F6', true FROM users WHERE username = 'root'
+ON CONFLICT (user_id, name) DO NOTHING;
 
 CREATE TABLE default_tag_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,4 +1,5 @@
 export type AuthMode = "login" | "register" | "passkey" | "recovery" | "totp";
+export type UserRole = "user" | "admin" | "root";
 
 export type Tag = {
   id: string;
@@ -57,6 +58,9 @@ export type DashboardData = {
   user: {
     name: string;
     username: string;
+    role: UserRole;
+    adminApproved: boolean;
+    canEditSessions: boolean;
     totpEnabled: boolean;
     passkeyCount: number;
     recoveryCodeCount: number;
@@ -70,6 +74,20 @@ export type DashboardData = {
   };
   summary: DashboardSummary;
   countdowns: Countdown[];
+};
+
+export type AdminUser = {
+  id: string;
+  username: string;
+  email: string | null;
+  displayName: string;
+  role: UserRole;
+  adminApproved: boolean;
+  canEditSessions: boolean;
+  status: "active" | "disabled" | "locked";
+  disabledAt: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
 };
 
 export type Toast = {

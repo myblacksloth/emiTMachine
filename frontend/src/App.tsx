@@ -20,10 +20,10 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
-import type { ActivitySession, AuthMode, ChartBucket, DashboardData, Tag, Toast } from "./types";
+import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
-  user: { name: "User", username: "", totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
+  user: { name: "User", username: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
   activeSession: null,
   tags: [],
   charts: { daily: [], weekly: [], monthly: [] },
@@ -188,6 +188,7 @@ function AuthPanel({
 }) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [requestedRole, setRequestedRole] = useState<"user" | "admin">("user");
   const [password, setPassword] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
   const [totpCode, setTotpCode] = useState("");
@@ -204,7 +205,12 @@ function AuthPanel({
         const result = await api.login(username, password);
         await onAuthenticated(result.requiresTotp);
       } else if (mode === "register") {
-        await api.register(name, username, password);
+        const result = await api.register(name, username, password, requestedRole);
+        if (result.requiresApproval) {
+          setMessage("Admin registration submitted. A root user must approve it before sign-in.");
+          setMode("login");
+          return;
+        }
         await onAuthenticated(false);
       } else if (mode === "passkey") {
         if (!username.trim()) {
@@ -260,6 +266,15 @@ function AuthPanel({
           <h2>{mode === "totp" ? "Authentication code" : authTitle(mode)}</h2>
           {passkeyWarning ? <p className="form-message error">{passkeyWarning}</p> : null}
           {mode === "register" ? <TextField label="Full name, optional" value={name} onChange={setName} autoComplete="name" /> : null}
+          {mode === "register" ? (
+            <label className="field">
+              <span>Account type</span>
+              <select value={requestedRole} onChange={(event) => setRequestedRole(event.target.value as "user" | "admin")}>
+                <option value="user">Standard user</option>
+                <option value="admin">Admin, requires root approval</option>
+              </select>
+            </label>
+          ) : null}
           {mode !== "totp" ? <TextField label="Username" value={username} onChange={setUsername} autoComplete="username" /> : null}
           {mode === "login" || mode === "register" || mode === "totp" || mode === "recovery" ? (
             <>
@@ -341,7 +356,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "tags" | "profile">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "tags" | "profile" | "admin">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -377,6 +392,11 @@ function Dashboard({
         <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")} type="button">
           <UserRound size={16} /> Profile
         </button>
+        {data.user.role !== "user" ? (
+          <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")} type="button">
+            <ShieldCheck size={16} /> Admin
+          </button>
+        ) : null}
       </nav>
 
       {error ? <div className="global-error">{error}</div> : null}
@@ -416,6 +436,7 @@ function Dashboard({
       {view === "activities" ? <ActivityPanel tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "profile" ? <ProfileSettings data={data} onToast={onToast} onRefresh={onRefresh} /> : null}
+      {view === "admin" && data.user.role !== "user" ? <AdminPanel currentRole={data.user.role} onToast={onToast} /> : null}
 
       {confirming ? (
         <PunchDialog
@@ -470,6 +491,179 @@ function Chart({ title, buckets }: { title: string; buckets: ChartBucket[] }) {
         </div>
       )}
     </article>
+  );
+}
+
+function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; onToast: (tone: Toast["tone"], message: string) => void }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedSessions, setSelectedSessions] = useState<ActivitySession[]>([]);
+  const [summary, setSummary] = useState<{ sessions: number; total_seconds: string | number; average_session_seconds: string | number; days_worked: number } | null>(null);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [message, setMessage] = useState("");
+
+  const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+
+  const loadUsers = async () => {
+    setMessage("");
+    try {
+      const loaded = await api.adminUsers();
+      setUsers(loaded);
+      setSelectedUserId((current) => current || loaded.find((user) => user.role === "user")?.id || loaded[0]?.id || "");
+      if (currentRole === "root") {
+        setRegistrationEnabled((await api.registrationSetting()).enabled);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load admin data.");
+    }
+  };
+
+  const loadSelectedUserData = async (userId: string) => {
+    if (!userId) return;
+    try {
+      const [summaryPayload, sessions] = await Promise.all([api.adminUserSummary(userId), api.adminUserSessions(userId)]);
+      setSummary(summaryPayload.summary);
+      setSelectedSessions(sessions);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load selected user data.");
+    }
+  };
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  useEffect(() => {
+    void loadSelectedUserData(selectedUserId);
+  }, [selectedUserId]);
+
+  const approveAdmin = async (user: AdminUser) => {
+    await api.approveAdmin(user.id);
+    await loadUsers();
+    onToast("success", `${user.username} approved.`);
+  };
+
+  const toggleEditPermission = async (user: AdminUser) => {
+    await api.setUserEditPermission(user.id, !user.canEditSessions);
+    await loadUsers();
+    onToast("success", "Session edit permission updated.");
+  };
+
+  const resetPassword = async (user: AdminUser) => {
+    if (!window.confirm(`Reset password for ${user.username}? Active sessions will be revoked.`)) return;
+    const result = await api.resetUserPassword(user.id);
+    setTemporaryPassword(result.temporaryPassword);
+    onToast("success", "Temporary password generated.");
+  };
+
+  const deleteUser = async (user: AdminUser) => {
+    if (!window.confirm(`Delete ${user.username} permanently?`)) return;
+    await api.deleteUser(user.id);
+    setSelectedUserId("");
+    await loadUsers();
+    onToast("success", "User deleted.");
+  };
+
+  const toggleRegistration = async () => {
+    await api.setRegistrationSetting(!registrationEnabled);
+    setRegistrationEnabled(!registrationEnabled);
+    onToast("success", "Registration setting updated.");
+  };
+
+  return (
+    <section className="admin-grid">
+      <section className="panel stack">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">{currentRole} console</p>
+            <h2>Users</h2>
+          </div>
+          <button type="button" onClick={loadUsers}>
+            <RefreshCw size={16} /> Refresh
+          </button>
+        </div>
+        {currentRole === "root" ? (
+          <div className="admin-system-row">
+            <span>Registration is {registrationEnabled ? "open" : "locked"}</span>
+            <button type="button" onClick={toggleRegistration}>
+              {registrationEnabled ? "Lock registration" : "Open registration"}
+            </button>
+          </div>
+        ) : null}
+        {message ? <p className="form-message error">{message}</p> : null}
+        {temporaryPassword ? (
+          <p className="form-message">Temporary password: <strong>{temporaryPassword}</strong></p>
+        ) : null}
+        <div className="admin-user-list">
+          {users.map((user) => (
+            <article className={`admin-user ${selectedUserId === user.id ? "active" : ""}`} key={user.id}>
+              <button type="button" onClick={() => setSelectedUserId(user.id)}>
+                <strong>{user.username}</strong>
+                <span>{user.role}{user.role === "admin" && !user.adminApproved ? " · pending" : ""}</span>
+              </button>
+              <div className="admin-user-actions">
+                {currentRole === "root" && user.role === "admin" && !user.adminApproved ? (
+                  <button type="button" onClick={() => approveAdmin(user)}>Approve</button>
+                ) : null}
+                {user.role !== "root" ? (
+                  <button type="button" onClick={() => toggleEditPermission(user)}>
+                    {user.canEditSessions ? "Disable edits" : "Enable edits"}
+                  </button>
+                ) : null}
+                {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
+                  <>
+                    <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
+                    <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
+                  </>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+        {currentRole === "root" ? (
+          <a className="download-link" href={api.adminDumpUrl}>
+            <Download size={16} /> Download JSON dump
+          </a>
+        ) : null}
+      </section>
+
+      <section className="panel stack">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Selected user</p>
+            <h2>{selectedUser?.username ?? "No user selected"}</h2>
+          </div>
+        </div>
+        {summary ? (
+          <section className="summary-grid compact" aria-label="Selected user summary">
+            <Metric label="Sessions" value={String(summary.sessions ?? 0)} icon={<CalendarClock size={18} />} />
+            <Metric label="Total" value={minutesLabel(Math.round(Number(summary.total_seconds ?? 0) / 60))} icon={<TimerReset size={18} />} />
+            <Metric label="Average" value={minutesLabel(Math.round(Number(summary.average_session_seconds ?? 0) / 60))} icon={<BarChart3 size={18} />} />
+            <Metric label="Days" value={String(summary.days_worked ?? 0)} icon={<Sparkles size={18} />} />
+          </section>
+        ) : null}
+        <div className="activity-list">
+          {selectedSessions.map((session) => (
+            <article className="activity-card" key={session.id}>
+              <div className="activity-main">
+                <div>
+                  <p className="eyebrow">{session.endedAt ? "Closed session" : "Open session"}</p>
+                  <h3>{new Date(session.startedAt).toLocaleString()} - {session.endedAt ? new Date(session.endedAt).toLocaleString() : "now"}</h3>
+                  <p className="muted">{session.note || "No note"}</p>
+                </div>
+                <strong>{session.durationMinutes === null ? "Live" : minutesLabel(session.durationMinutes)}</strong>
+              </div>
+              <div className="activity-tags">
+                {session.tags.map((tag) => (
+                  <span key={tag.id}><i style={{ background: tag.color }} />{tag.name}</span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </section>
   );
 }
 

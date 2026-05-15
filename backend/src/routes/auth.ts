@@ -14,7 +14,8 @@ const registerSchema = z.object({
   username: usernameSchema,
   email: emailSchema.optional(),
   password: passwordSchema,
-  displayName: z.string().trim().max(120).optional()
+  displayName: z.string().trim().max(120).optional(),
+  role: z.enum(["user", "admin"]).optional().default("user")
 });
 
 const loginSchema = z.object({
@@ -31,13 +32,24 @@ const recoverPasswordSchema = z.object({
   newPassword: passwordSchema
 });
 
-function publicUser(row: { id: string; username: string; email?: string | null; display_name: string; role: string; totp_enabled?: boolean }) {
+function publicUser(row: {
+  id: string;
+  username: string;
+  email?: string | null;
+  display_name: string;
+  role: string;
+  admin_approved?: boolean;
+  can_edit_sessions?: boolean;
+  totp_enabled?: boolean;
+}) {
   return {
     id: row.id,
     username: row.username,
     email: row.email,
     displayName: row.display_name,
     role: row.role,
+    adminApproved: row.admin_approved ?? true,
+    canEditSessions: row.can_edit_sessions ?? true,
     totpEnabled: Boolean(row.totp_enabled)
   };
 }
@@ -46,13 +58,17 @@ router.post("/register", async (req, res, next) => {
   try {
     const input = registerSchema.parse(req.body);
     const passwordHash = await hashPassword(input.password);
+    const registration = await pool.query("select coalesce((value #>> '{}')::boolean, true) as enabled from system_settings where key = 'registration_enabled'");
+    if (registration.rows[0] && !registration.rows[0].enabled) {
+      throw new HttpError(403, "Registration is temporarily disabled");
+    }
 
     const user = await withTransaction(async (client) => {
       const result = await client.query(
-        `insert into users (username, email, password_hash, display_name)
-         values ($1, $2, $3, $4)
-         returning id, username, email, display_name, role, totp_enabled`,
-        [input.username, input.email ?? null, passwordHash, input.displayName || input.username]
+        `insert into users (username, email, password_hash, display_name, role, admin_approved)
+         values ($1, $2, $3, $4, $5, $6)
+         returning id, username, email, display_name, role, admin_approved, can_edit_sessions, totp_enabled`,
+        [input.username, input.email ?? null, passwordHash, input.displayName || input.username, input.role, input.role !== "admin"]
       );
 
       const userId = result.rows[0].id;
@@ -62,13 +78,15 @@ router.post("/register", async (req, res, next) => {
         [userId]
       );
 
-      const session = await createSession(client, userId);
+      const session = input.role === "admin" ? null : await createSession(client, userId);
       return { row: result.rows[0], session };
     });
 
-    setSessionCookie(res, user.session.token, user.session.expiresAt);
+    if (user.session) {
+      setSessionCookie(res, user.session.token, user.session.expiresAt);
+    }
     req.log?.info("user registered", { userId: user.row.id, username: user.row.username });
-    res.status(201).json({ user: publicUser(user.row) });
+    res.status(201).json({ user: publicUser(user.row), requiresApproval: input.role === "admin" });
   } catch (error) {
     if ((error as { code?: string }).code === "23505") {
       req.log?.warn("registration conflict", { username: req.body?.username });
@@ -83,7 +101,7 @@ router.post("/login", async (req, res, next) => {
   try {
     const input = loginSchema.parse(req.body);
     const result = await pool.query(
-      `select id, username, email, password_hash, display_name, role, totp_enabled, totp_secret, disabled_at
+      `select id, username, email, password_hash, display_name, role, admin_approved, can_edit_sessions, totp_enabled, totp_secret, disabled_at
        from users
        where username = $1`,
       [input.username]
@@ -93,6 +111,10 @@ router.post("/login", async (req, res, next) => {
     if (!user || user.disabled_at || !(await verifyPassword(input.password, user.password_hash))) {
       req.log?.warn("login failed", { username: input.username, reason: "invalid_credentials" });
       throw new HttpError(401, "Invalid username or password");
+    }
+    if (user.role === "admin" && !user.admin_approved) {
+      req.log?.warn("login failed", { userId: user.id, username: user.username, reason: "admin_pending_approval" });
+      throw new HttpError(403, "Admin account is waiting for root approval");
     }
 
     if (user.totp_enabled && !input.totpCode && !input.recoveryCode) {

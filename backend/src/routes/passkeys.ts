@@ -92,6 +92,8 @@ function publicUser(row: {
   email?: string | null;
   display_name: string;
   role: string;
+  admin_approved?: boolean;
+  can_edit_sessions?: boolean;
   totp_enabled?: boolean;
 }) {
   return {
@@ -100,6 +102,8 @@ function publicUser(row: {
     email: row.email,
     displayName: row.display_name,
     role: row.role,
+    adminApproved: row.admin_approved ?? true,
+    canEditSessions: row.can_edit_sessions ?? true,
     totpEnabled: Boolean(row.totp_enabled)
   };
 }
@@ -274,7 +278,7 @@ router.post("/login/verify", async (req, res, next) => {
 
     const passkeyResult = await pool.query(
       `select p.id as passkey_id, p.credential_id, p.public_key_cose, p.counter, p.transports,
-              u.id as user_id, u.username, u.email, u.display_name, u.role, u.totp_enabled, u.disabled_at
+              u.id as user_id, u.username, u.email, u.display_name, u.role, u.admin_approved, u.can_edit_sessions, u.totp_enabled, u.disabled_at
        from passkeys p
        join users u on u.id = p.user_id
        where p.credential_id = $1 and ($2::citext is null or u.username = $2::citext)`,
@@ -285,6 +289,10 @@ router.post("/login/verify", async (req, res, next) => {
     if (!passkey || passkey.disabled_at) {
       req.log?.warn("passkey login failed", { username: input.username, reason: "unknown_credential" });
       throw new HttpError(401, "Invalid passkey");
+    }
+    if (passkey.role === "admin" && !passkey.admin_approved) {
+      req.log?.warn("passkey login failed", { userId: passkey.user_id, username: passkey.username, reason: "admin_pending_approval" });
+      throw new HttpError(403, "Admin account is waiting for root approval");
     }
 
     if (!passkey.public_key_cose) {
