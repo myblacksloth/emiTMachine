@@ -9,6 +9,10 @@ upload.sh
 Caddyfile
 
 
+*.pem
+!*.placeholder.pem
+
+
 .DS_Store
 ._*
 
