@@ -6,6 +6,9 @@ removeme.sh
 upload.sh
 
 
+Caddyfile
+
+
 .DS_Store
 ._*
 
