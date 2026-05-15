@@ -2,7 +2,7 @@
 
 emiTMachine is a multi-user time tracking webapp for work sessions, tags, reports, TOTP, passkeys, recovery codes, and CSV history.
 
-Activity history can be reviewed, edited, and deleted from the frontend. See `doc/activity-management.md` for the current default behavior and the planned admin-controlled permission model.
+Activity history can be manually inserted, reviewed, edited, and deleted from the frontend. See `doc/activity-management.md` for the current default behavior and the planned admin-controlled permission model. Countdown behavior is documented in `doc/countdowns.md`.
 
 ## Features
 

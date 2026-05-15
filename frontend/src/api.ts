@@ -1,4 +1,4 @@
-import type { ActivitySession, DashboardData, Tag } from "./types";
+import type { ActivitySession, Countdown, DashboardData, Tag } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -94,6 +94,15 @@ type BackendSession = {
   tags: BackendTag[];
 };
 
+type BackendCountdown = {
+  id: string;
+  title: string;
+  targetAt: string;
+  targetTimezone: string;
+  linkedToCurrentSession: boolean;
+  status: Countdown["status"];
+};
+
 type PublicKeyCredentialDescriptorJSON = Omit<PublicKeyCredentialDescriptor, "id"> & {
   id: string;
 };
@@ -177,6 +186,17 @@ function mapSession(session: BackendSession): ActivitySession {
     durationMinutes: session.duration_seconds === null ? null : secondsToMinutes(session.duration_seconds),
     tagIds: session.tags.map((tag) => tag.id),
     tags: session.tags
+  };
+}
+
+function mapCountdown(countdown: BackendCountdown): Countdown {
+  return {
+    id: countdown.id,
+    title: countdown.title,
+    targetAt: countdown.targetAt,
+    targetTimezone: countdown.targetTimezone,
+    linkedToCurrentSession: countdown.linkedToCurrentSession,
+    status: countdown.status
   };
 }
 
@@ -334,11 +354,12 @@ async function getPasskey(options: PublicKeyCredentialRequestOptionsJSON): Promi
 }
 
 async function fetchDashboard() {
-  const [me, status, tagsPayload, reports] = await Promise.all([
+  const [me, status, tagsPayload, reports, countdownsPayload] = await Promise.all([
     request<{ user: BackendUser }>("/api/auth/me"),
     request<{ activeSession: { id: string; started_at: string; tags: BackendTag[]; note?: string } | null }>("/api/punch/status"),
     request<{ tags: BackendTag[] }>("/api/tags"),
-    request<{ summary: BackendSummary; buckets: BackendBucket[]; byTag: Array<BackendTag & { total_seconds: string | number }> }>("/api/reports/summary")
+    request<{ summary: BackendSummary; buckets: BackendBucket[]; byTag: Array<BackendTag & { total_seconds: string | number }> }>("/api/reports/summary"),
+    request<{ countdowns: BackendCountdown[] }>("/api/countdowns")
   ]);
 
   const presence = reports.byTag.find((tag) => tag.name.toLowerCase() === "presence");
@@ -375,7 +396,7 @@ async function fetchDashboard() {
       presenceMinutes: presence ? secondsToMinutes(presence.total_seconds) : 0,
       smartWorkingMinutes: smartWorking ? secondsToMinutes(smartWorking.total_seconds) : 0
     },
-    countdowns: []
+    countdowns: countdownsPayload.countdowns.map(mapCountdown)
   } satisfies DashboardData;
 }
 
@@ -413,6 +434,19 @@ export const api = {
   activities: () =>
     request<{ sessions: BackendSession[] }>("/api/reports/sessions?limit=100")
       .then((payload) => payload.sessions.map(mapSession)),
+  createActivity: (input: {
+    startedAt: string;
+    endedAt: string | null;
+    startTimezone: string;
+    endTimezone: string | null;
+    note: string;
+    tagIds: string[];
+    reason: string;
+  }) =>
+    request<{ session: BackendSession }>("/api/reports/sessions", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }).then((payload) => mapSession(payload.session)),
   updateActivity: (id: string, input: {
     startedAt: string;
     endedAt: string | null;
@@ -427,6 +461,22 @@ export const api = {
       body: JSON.stringify(input)
     }).then((payload) => mapSession(payload.session)),
   deleteActivity: (id: string) => request<void>(`/api/reports/sessions/${id}`, { method: "DELETE" }),
+  createCountdown: (title: string, targetAt: string, linkToCurrentSession: boolean) =>
+    request<{ countdown: BackendCountdown }>("/api/countdowns", {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        targetAt,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        linkToCurrentSession
+      })
+    }).then((payload) => mapCountdown(payload.countdown)),
+  completeCountdown: (id: string) =>
+    request<void>(`/api/countdowns/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "completed" })
+    }),
+  deleteCountdown: (id: string) => request<void>(`/api/countdowns/${id}`, { method: "DELETE" }),
   clockIn: (occurredAt: string, tagIds: string[], note: string) =>
     request<{ session: unknown }>("/api/punch/in", {
       method: "POST",

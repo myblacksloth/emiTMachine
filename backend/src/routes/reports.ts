@@ -20,6 +20,8 @@ const sessionUpdateSchema = z.object({
   reason: z.string().trim().min(3).max(500)
 });
 
+const sessionCreateSchema = sessionUpdateSchema;
+
 function assertActivityEditEnabled() {
   // Activity editing is enabled by default for the owning user.
   // Future admin-controlled access should be enforced here by checking a
@@ -126,6 +128,67 @@ router.get("/sessions", async (req, res, next) => {
     );
 
     res.json({ sessions: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/sessions", async (req, res, next) => {
+  try {
+    assertActivityEditEnabled();
+    const input = sessionCreateSchema.parse(req.body);
+    const startedAt = new Date(input.startedAt);
+    const endedAt = input.endedAt ? new Date(input.endedAt) : null;
+    const endTimezone = endedAt ? input.endTimezone ?? input.startTimezone : null;
+
+    if (endedAt && endedAt <= startedAt) {
+      throw new HttpError(400, "End time must be after start time");
+    }
+
+    const session = await withTransaction(async (client) => {
+      await assertUserTags(client, req.user!.id, input.tagIds);
+
+      const sessionResult = await client.query(
+        `insert into time_sessions (user_id, started_at, ended_at, start_timezone, end_timezone, note, source)
+         values ($1, $2, $3, $4, $5, $6, 'manual_edit')
+         returning id, started_at, ended_at, start_timezone, end_timezone, note,
+                   case when ended_at is null then null else extract(epoch from (ended_at - started_at))::bigint end as duration_seconds`,
+        [req.user!.id, startedAt, endedAt, input.startTimezone, endTimezone, input.note ?? null]
+      );
+      const sessionId = sessionResult.rows[0].id;
+
+      for (const tagId of input.tagIds) {
+        await client.query("insert into session_tags (session_id, tag_id) values ($1, $2)", [sessionId, tagId]);
+      }
+
+      await client.query(
+        `insert into time_events (user_id, session_id, event_type, occurred_at, timezone, note, source, change_reason, created_by_user_id)
+         values ($1, $2, 'clock_in', $3, $4, $5, 'manual_edit', $6, $1)`,
+        [req.user!.id, sessionId, startedAt, input.startTimezone, input.note ?? null, input.reason]
+      );
+
+      if (endedAt) {
+        await client.query(
+          `insert into time_events (user_id, session_id, event_type, occurred_at, timezone, note, source, change_reason, created_by_user_id)
+           values ($1, $2, 'clock_out', $3, $4, $5, 'manual_edit', $6, $1)`,
+          [req.user!.id, sessionId, endedAt, endTimezone, input.note ?? null, input.reason]
+        );
+      }
+
+      const tagResult = await client.query(
+        `select t.id, t.name, t.color
+         from session_tags st
+         join tags t on t.id = st.tag_id
+         where st.session_id = $1
+         order by t.name`,
+        [sessionId]
+      );
+
+      return { ...sessionResult.rows[0], tags: tagResult.rows };
+    });
+
+    req.log?.info("activity created manually", { userId: req.user!.id, sessionId: session.id, reason: input.reason });
+    res.status(201).json({ session });
   } catch (error) {
     next(error);
   }

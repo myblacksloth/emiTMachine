@@ -8,6 +8,7 @@ Activity editing is enabled by default for the authenticated owner of the sessio
 
 Users can:
 
+- insert a manual activity from the `Activities` panel;
 - view their latest recorded sessions in the `Activities` panel;
 - edit start time, end time, timezones, tags, note, and correction reason;
 - delete a session permanently.
@@ -15,10 +16,11 @@ Users can:
 Backend endpoints:
 
 - `GET /api/reports/sessions`
+- `POST /api/reports/sessions`
 - `PATCH /api/reports/sessions/:id`
 - `DELETE /api/reports/sessions/:id`
 
-Updates keep `time_sessions`, `session_tags`, and the related `clock_in` / `clock_out` events aligned. Manual edits use `source = 'manual_edit'` and write event revisions to `time_event_revisions` when existing events are changed.
+Manual inserts create `time_sessions`, `session_tags`, and related `clock_in` / `clock_out` events. Updates keep those records aligned. Manual inserts and edits use `source = 'manual_edit'`; updates write event revisions to `time_event_revisions` when existing events are changed.
 
 Deletes currently remove the session physically. Because `time_events` and `session_tags` reference `time_sessions` with `ON DELETE CASCADE`, deleting a session also deletes its events and tag links.
 

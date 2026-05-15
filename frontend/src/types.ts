@@ -35,8 +35,10 @@ export type ActiveSession = {
 export type Countdown = {
   id: string;
   title: string;
-  targetTime: string;
+  targetAt: string;
+  targetTimezone: string;
   linkedToCurrentSession: boolean;
+  status: "active" | "completed" | "cancelled";
 };
 
 export type ActivitySession = {

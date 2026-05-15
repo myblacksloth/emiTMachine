@@ -55,6 +55,26 @@ function isoFromLocalValue(value: string) {
   return new Date(value).toISOString();
 }
 
+function defaultEndDateTimeValue() {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+}
+
+function defaultStartDateTimeValue() {
+  const date = new Date();
+  date.setHours(date.getHours() - 1);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+function defaultCountdownValue() {
+  const date = new Date();
+  date.setHours(date.getHours() + 1);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 function localValueFromIso(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -389,7 +409,7 @@ function Dashboard({
             <Chart title="Monthly hours" buckets={data.charts.monthly} />
           </section>
 
-          <Countdowns countdowns={data.countdowns} />
+          <Countdowns countdowns={data.countdowns} activeSessionId={data.activeSession?.id ?? null} onRefresh={onRefresh} onToast={onToast} />
         </>
       ) : null}
 
@@ -457,6 +477,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   const [activities, setActivities] = useState<ActivitySession[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ActivityDraft | null>(null);
+  const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -489,6 +510,21 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
     });
   };
 
+  const startCreate = () => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setCreating(true);
+    setEditingId(null);
+    setDraft({
+      startedAt: defaultStartDateTimeValue(),
+      endedAt: defaultEndDateTimeValue(),
+      startTimezone: timezone,
+      endTimezone: timezone,
+      note: "",
+      tagIds: tags[0] ? [tags[0].id] : [],
+      reason: "Manual activity insert"
+    });
+  };
+
   const saveActivity = async (activityId: string) => {
     if (!draft) return;
     if (draft.tagIds.length === 0) {
@@ -512,6 +548,32 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       onToast("success", "Activity updated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to update activity.");
+    }
+  };
+
+  const createActivity = async () => {
+    if (!draft) return;
+    if (draft.tagIds.length === 0) {
+      setMessage("Select at least one tag before creating the activity.");
+      return;
+    }
+    try {
+      await api.createActivity({
+        startedAt: isoFromLocalValue(draft.startedAt),
+        endedAt: draft.endedAt ? isoFromLocalValue(draft.endedAt) : null,
+        startTimezone: draft.startTimezone,
+        endTimezone: draft.endedAt ? draft.endTimezone : null,
+        note: draft.note,
+        tagIds: draft.tagIds,
+        reason: draft.reason
+      });
+      setCreating(false);
+      setDraft(null);
+      await loadActivities();
+      await onRefresh();
+      onToast("success", "Activity created.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to create activity.");
     }
   };
 
@@ -539,61 +601,41 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
         </button>
       </div>
       <p className="muted">Review, correct, or delete recorded work sessions. This is currently enabled for every user and is ready to become an admin-controlled permission.</p>
+      <div className="activity-actions">
+        <button type="button" onClick={startCreate}>
+          <Plus size={16} /> Add activity
+        </button>
+      </div>
       {message ? <p className="form-message error">{message}</p> : null}
       {loading ? <div className="loading-line">Loading activities...</div> : null}
       {activities.length === 0 && !loading ? <p className="empty-state">No activities recorded yet.</p> : null}
       <div className="activity-list">
+        {creating && draft ? (
+          <ActivityEditor
+            draft={draft}
+            tags={tags}
+            onDraft={setDraft}
+            onCancel={() => {
+              setCreating(false);
+              setDraft(null);
+            }}
+            onSave={createActivity}
+            saveLabel="Create activity"
+          />
+        ) : null}
         {activities.map((activity) => {
           const activeDraft = editingId === activity.id ? draft : null;
           return (
             <article className="activity-card" key={activity.id}>
               {activeDraft ? (
-                <>
-                  <div className="activity-edit-grid">
-                    <label className="field">
-                      <span>Start</span>
-                      <input type="datetime-local" value={activeDraft.startedAt} onChange={(event) => setDraft({ ...activeDraft, startedAt: event.target.value })} />
-                    </label>
-                    <label className="field">
-                      <span>End</span>
-                      <input type="datetime-local" value={activeDraft.endedAt} onChange={(event) => setDraft({ ...activeDraft, endedAt: event.target.value })} />
-                    </label>
-                    <TextField label="Start timezone" value={activeDraft.startTimezone} onChange={(value) => setDraft({ ...activeDraft, startTimezone: value })} />
-                    <TextField label="End timezone" value={activeDraft.endTimezone} onChange={(value) => setDraft({ ...activeDraft, endTimezone: value })} />
-                  </div>
-                  <fieldset className="tag-picker">
-                    <legend>Tags</legend>
-                    {tags.map((tag) => (
-                      <label key={tag.id}>
-                        <input
-                          type="checkbox"
-                          checked={activeDraft.tagIds.includes(tag.id)}
-                          onChange={(event) =>
-                            setDraft({
-                              ...activeDraft,
-                              tagIds: event.target.checked ? [...activeDraft.tagIds, tag.id] : activeDraft.tagIds.filter((tagId) => tagId !== tag.id)
-                            })
-                          }
-                        />
-                        <span style={{ background: tag.color }} />
-                        {tag.name}
-                      </label>
-                    ))}
-                  </fieldset>
-                  <TextField label="Reason" value={activeDraft.reason} onChange={(value) => setDraft({ ...activeDraft, reason: value })} />
-                  <label className="field">
-                    <span>Note</span>
-                    <textarea value={activeDraft.note} onChange={(event) => setDraft({ ...activeDraft, note: event.target.value })} />
-                  </label>
-                  <div className="activity-actions">
-                    <button type="button" onClick={() => { setEditingId(null); setDraft(null); }}>
-                      Cancel
-                    </button>
-                    <button className="primary-action" type="button" onClick={() => saveActivity(activity.id)}>
-                      <Save size={18} /> Save activity
-                    </button>
-                  </div>
-                </>
+                <ActivityEditor
+                  draft={activeDraft}
+                  tags={tags}
+                  onDraft={setDraft}
+                  onCancel={() => { setEditingId(null); setDraft(null); }}
+                  onSave={() => saveActivity(activity.id)}
+                  saveLabel="Save activity"
+                />
               ) : (
                 <>
                   <div className="activity-main">
@@ -636,6 +678,72 @@ type ActivityDraft = {
   tagIds: string[];
   reason: string;
 };
+
+function ActivityEditor({
+  draft,
+  tags,
+  onDraft,
+  onCancel,
+  onSave,
+  saveLabel
+}: {
+  draft: ActivityDraft;
+  tags: Tag[];
+  onDraft: (draft: ActivityDraft) => void;
+  onCancel: () => void;
+  onSave: () => void;
+  saveLabel: string;
+}) {
+  return (
+    <div className="activity-editor activity-card-editing">
+      <div className="activity-edit-grid">
+        <label className="field">
+          <span>Start</span>
+          <input type="datetime-local" value={draft.startedAt} onChange={(event) => onDraft({ ...draft, startedAt: event.target.value })} />
+        </label>
+        <label className="field">
+          <span>End</span>
+          <input type="datetime-local" value={draft.endedAt} onChange={(event) => onDraft({ ...draft, endedAt: event.target.value })} />
+        </label>
+        <TextField label="Start timezone" value={draft.startTimezone} onChange={(value) => onDraft({ ...draft, startTimezone: value })} />
+        <TextField label="End timezone" value={draft.endTimezone} onChange={(value) => onDraft({ ...draft, endTimezone: value })} />
+      </div>
+      <fieldset className="tag-picker">
+        <legend>Tags</legend>
+        {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}
+        {tags.map((tag) => (
+          <label key={tag.id}>
+            <input
+              type="checkbox"
+              checked={draft.tagIds.includes(tag.id)}
+              onChange={(event) =>
+                onDraft({
+                  ...draft,
+                  tagIds: event.target.checked ? [...draft.tagIds, tag.id] : draft.tagIds.filter((tagId) => tagId !== tag.id)
+                })
+              }
+            />
+            <span style={{ background: tag.color }} />
+            {tag.name}
+          </label>
+        ))}
+      </fieldset>
+      <TextField label="Reason" value={draft.reason} onChange={(value) => onDraft({ ...draft, reason: value })} />
+      <label className="field">
+        <span>Note</span>
+        <textarea value={draft.note} onChange={(event) => onDraft({ ...draft, note: event.target.value })} />
+      </label>
+      <div className="activity-actions">
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="primary-action" type="button" onClick={onSave}>
+          <Save size={18} /> {saveLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function PunchDialog({
   mode,
@@ -946,24 +1054,90 @@ function ProfileSettings({
   );
 }
 
-function Countdowns({ countdowns }: { countdowns: DashboardData["countdowns"] }) {
+function Countdowns({
+  countdowns,
+  activeSessionId,
+  onRefresh,
+  onToast
+}: {
+  countdowns: DashboardData["countdowns"];
+  activeSessionId: string | null;
+  onRefresh: () => Promise<void>;
+  onToast: (tone: Toast["tone"], message: string) => void;
+}) {
   const [, tick] = useState(0);
+  const [title, setTitle] = useState("");
+  const [targetAt, setTargetAt] = useState(defaultCountdownValue());
+  const [linkToCurrentSession, setLinkToCurrentSession] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
   useEffect(() => {
     const timer = window.setInterval(() => tick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.createCountdown(title, isoFromLocalValue(targetAt), linkToCurrentSession);
+      setTitle("");
+      setTargetAt(defaultCountdownValue());
+      setLinkToCurrentSession(false);
+      await onRefresh();
+      onToast("success", "Countdown created.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to create countdown.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const complete = async (id: string) => {
+    await api.completeCountdown(id);
+    await onRefresh();
+    onToast("success", "Countdown completed.");
+  };
+
+  const remove = async (id: string) => {
+    await api.deleteCountdown(id);
+    await onRefresh();
+    onToast("success", "Countdown removed.");
+  };
 
   return (
     <section className="panel countdown-panel">
       <div className="panel-title">
         <h2>Countdowns</h2>
       </div>
+      <form className="countdown-form" onSubmit={create}>
+        <TextField label="Title" value={title} onChange={setTitle} placeholder="End focus block" />
+        <label className="field">
+          <span>Target</span>
+          <input type="datetime-local" value={targetAt} onChange={(event) => setTargetAt(event.target.value)} />
+        </label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={linkToCurrentSession}
+            disabled={!activeSessionId}
+            onChange={(event) => setLinkToCurrentSession(event.target.checked)}
+          />
+          Link to current session
+        </label>
+        <button className="primary-action" type="submit" disabled={busy || !title.trim()}>
+          <Plus size={18} /> {busy ? "Creating..." : "Add countdown"}
+        </button>
+      </form>
+      {message ? <p className="form-message error">{message}</p> : null}
       {countdowns.length === 0 ? (
         <p className="empty-state">No countdowns configured.</p>
       ) : (
         <div className="countdown-grid">
           {countdowns.map((countdown) => {
-            const remaining = Math.max(0, new Date(countdown.targetTime).getTime() - Date.now());
+            const remaining = Math.max(0, new Date(countdown.targetAt).getTime() - Date.now());
             const hours = Math.floor(remaining / 3_600_000);
             const minutes = Math.floor((remaining % 3_600_000) / 60_000);
             const seconds = Math.floor((remaining % 60_000) / 1000);
@@ -973,6 +1147,15 @@ function Countdowns({ countdowns }: { countdowns: DashboardData["countdowns"] })
                 <strong>
                   {String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
                 </strong>
+                <small>{countdown.linkedToCurrentSession ? "Linked to current session" : countdown.targetTimezone}</small>
+                <div className="countdown-actions">
+                  <button type="button" onClick={() => complete(countdown.id)}>
+                    Done
+                  </button>
+                  <button className="danger-action" type="button" onClick={() => remove(countdown.id)}>
+                    <Trash2 size={16} /> Remove
+                  </button>
+                </div>
               </article>
             );
           })}
