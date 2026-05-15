@@ -1431,6 +1431,94 @@ button svg,
   gap: 0.4rem;
 }
 
+.activity-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.activity-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.activity-card {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  border-radius: 22px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.64);
+  box-shadow: 0 12px 32px rgba(31, 35, 45, 0.08);
+}
+
+.activity-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.activity-main h3 {
+  margin-top: 0.2rem;
+}
+
+.activity-main > strong {
+  flex: 0 0 auto;
+  border-radius: var(--r-pill);
+  padding: 0.45rem 0.75rem;
+  background: rgba(0, 122, 255, 0.1);
+  color: #007aff;
+  font-size: 0.92rem;
+}
+
+.activity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.activity-tags span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 30px;
+  border-radius: var(--r-pill);
+  padding: 0 0.7rem;
+  background: rgba(120, 120, 128, 0.1);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #3a3a3c;
+}
+
+.activity-tags i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.activity-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.danger-action {
+  color: #c8261a;
+  background: rgba(255, 59, 48, 0.08);
+}
+
+.danger-action:hover:not(:disabled) {
+  border-color: rgba(255, 59, 48, 0.28);
+  background: rgba(255, 59, 48, 0.12);
+}
+
+.activity-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
 @media (max-width: 920px) {
   .auth-layout {
     gap: 1.4rem;
@@ -1483,5 +1571,15 @@ button svg,
     right: 0.75rem;
     bottom: 0.75rem;
     width: calc(100vw - 1.5rem);
+  }
+
+  .activity-main,
+  .activity-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-edit-grid {
+    grid-template-columns: 1fr;
   }
 }

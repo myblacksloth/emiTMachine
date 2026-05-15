@@ -64,6 +64,17 @@ export function errorHandler(error: unknown, req: Request, res: Response, _next:
     return res.status(409).json({ error: message });
   }
 
+  if (pgCode === "23505" && pgConstraint === "one_active_session_per_user") {
+    requestLog.warn("database unique conflict", {
+      method: req.method,
+      path: req.path,
+      statusCode: 409,
+      userId: req.user?.id,
+      constraint: pgConstraint
+    });
+    return res.status(409).json({ error: "Only one activity can be open at a time" });
+  }
+
   requestLog.error("unhandled error", {
     method: req.method,
     path: req.path,

@@ -1,4 +1,4 @@
-import type { DashboardData, Tag } from "./types";
+import type { ActivitySession, DashboardData, Tag } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -83,6 +83,17 @@ type BackendSummary = {
   days_worked: number;
 };
 
+type BackendSession = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  start_timezone: string;
+  end_timezone: string | null;
+  note: string | null;
+  duration_seconds: string | number | null;
+  tags: BackendTag[];
+};
+
 type PublicKeyCredentialDescriptorJSON = Omit<PublicKeyCredentialDescriptor, "id"> & {
   id: string;
 };
@@ -153,6 +164,20 @@ function mapBuckets(buckets: BackendBucket[], type: BackendBucket["bucket_type"]
         segments: [{ tagId: "all", tagName: "All tags", color: "#27b3a8", minutes: totalMinutes }]
       };
     });
+}
+
+function mapSession(session: BackendSession): ActivitySession {
+  return {
+    id: session.id,
+    startedAt: session.started_at,
+    endedAt: session.ended_at,
+    startTimezone: session.start_timezone,
+    endTimezone: session.end_timezone,
+    note: session.note ?? "",
+    durationMinutes: session.duration_seconds === null ? null : secondsToMinutes(session.duration_seconds),
+    tagIds: session.tags.map((tag) => tag.id),
+    tags: session.tags
+  };
 }
 
 function base64urlToArrayBuffer(value: string) {
@@ -385,6 +410,23 @@ export const api = {
     }),
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
   dashboard: fetchDashboard,
+  activities: () =>
+    request<{ sessions: BackendSession[] }>("/api/reports/sessions?limit=100")
+      .then((payload) => payload.sessions.map(mapSession)),
+  updateActivity: (id: string, input: {
+    startedAt: string;
+    endedAt: string | null;
+    startTimezone: string;
+    endTimezone: string | null;
+    note: string;
+    tagIds: string[];
+    reason: string;
+  }) =>
+    request<{ session: BackendSession }>(`/api/reports/sessions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }).then((payload) => mapSession(payload.session)),
+  deleteActivity: (id: string) => request<void>(`/api/reports/sessions/${id}`, { method: "DELETE" }),
   clockIn: (occurredAt: string, tagIds: string[], note: string) =>
     request<{ session: unknown }>("/api/punch/in", {
       method: "POST",

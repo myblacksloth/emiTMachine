@@ -39,6 +39,18 @@ export type Countdown = {
   linkedToCurrentSession: boolean;
 };
 
+export type ActivitySession = {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  startTimezone: string;
+  endTimezone: string | null;
+  note: string;
+  durationMinutes: number | null;
+  tagIds: string[];
+  tags: Tag[];
+};
+
 export type DashboardData = {
   user: {
     name: string;
