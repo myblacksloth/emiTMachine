@@ -8,6 +8,8 @@ upload.sh
 
 Caddyfile
 
+docker-compose-reverse.yml
+
 
 *.pem
 !*.placeholder.pem
