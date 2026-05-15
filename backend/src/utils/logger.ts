@@ -119,10 +119,13 @@ export const requestLogger: RequestHandler = (req: Request, res: Response, next:
   res.setHeader("X-Request-Id", req.requestId);
 
   res.on("finish", () => {
-    req.log?.info("request completed", {
+    const statusCode = res.statusCode;
+    const logLevel: LogLevel =
+      statusCode === 401 && req.originalUrl === "/api/auth/me" ? "debug" : statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
+    req.log?.[logLevel]("request completed", {
       method: req.method,
       path: req.originalUrl,
-      statusCode: res.statusCode,
+      statusCode,
       durationMs: Date.now() - startedAt,
       userId: req.user?.id
     });

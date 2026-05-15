@@ -6,7 +6,7 @@ emiTMachine is a multi-user time tracking webapp for work sessions, tags, report
 
 - Username/password registration and login.
 - Optional TOTP setup with QR code verification.
-- Passkey registration/login flow with persisted credential records and challenge validation. The current browser UI uses a development credential-id prompt; replace it with native WebAuthn ceremonies before production use.
+- Passkey registration/login flow with native WebAuthn ceremonies, persisted credential records, and challenge validation.
 - Recovery codes for account recovery.
 - Clock in/out workflow with editable client time confirmation.
 - Tags with colors, including default `Presence` and `Smart working` tags.
@@ -51,6 +51,16 @@ Logging defaults are intended for local development:
 - `LOG_FORMAT`: backend log format. Use `pretty` for readable local logs and `json` when logs are collected by Docker, a reverse proxy, or a central logging system.
 
 Change `TOTP_ENCRYPTION_KEY`, cookie settings, and database credentials for any non-local deployment. HTTPS and reverse proxy configuration are intentionally left for the deployment layer.
+
+## Passkeys
+
+Passkeys require a secure browser context. Use one of these access patterns:
+
+- Local development: `http://localhost:5173`
+- Remote server without HTTPS yet: `ssh -N -L 5173:localhost:5173 user@server`, then open `http://localhost:5173`
+- Production: HTTPS reverse proxy, with `RP_ID` set to the public hostname and `RP_ORIGIN` set to the exact browser origin
+
+Do not open the app as `http://<server-ip>:5173` for passkeys. Browsers reject WebAuthn on plain HTTP except for localhost.
 
 ## Logging And Troubleshooting
 

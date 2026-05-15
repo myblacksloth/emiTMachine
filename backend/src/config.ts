@@ -26,7 +26,10 @@ export const config = {
   sessionTtlHours: Number(process.env.SESSION_TTL_HOURS ?? 168),
   rpId: process.env.RP_ID ?? "localhost",
   rpName: process.env.RP_NAME ?? "emiTMachine",
-  rpOrigin: process.env.RP_ORIGIN ?? "http://localhost:5173",
+  rpOrigins: (process.env.RP_ORIGIN ?? process.env.CORS_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   totpEncryptionKey: process.env.TOTP_ENCRYPTION_KEY,
   logLevel: parseLogLevel(process.env.LOG_LEVEL),
   logFormat: parseLogFormat(process.env.LOG_FORMAT)

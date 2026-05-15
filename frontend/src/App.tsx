@@ -146,6 +146,7 @@ function AuthPanel({
   const [totpCode, setTotpCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const passkeyWarning = mode === "passkey" ? api.passkeyEnvironmentWarning() : null;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -159,6 +160,10 @@ function AuthPanel({
         await api.register(name, username, password);
         await onAuthenticated(false);
       } else if (mode === "passkey") {
+        if (!username.trim()) {
+          setMessage("Enter your username before using a passkey.");
+          return;
+        }
         await api.passkeyLogin(username);
         await onAuthenticated(false);
       } else if (mode === "recovery") {
@@ -200,6 +205,7 @@ function AuthPanel({
         </div>
         <form className="stack" onSubmit={submit}>
           <h2>{mode === "totp" ? "Authentication code" : authTitle(mode)}</h2>
+          {passkeyWarning ? <p className="form-message error">{passkeyWarning}</p> : null}
           {mode === "register" ? <TextField label="Full name, optional" value={name} onChange={setName} autoComplete="name" /> : null}
           {mode !== "totp" ? <TextField label="Username" value={username} onChange={setUsername} autoComplete="username" /> : null}
           {mode === "login" || mode === "register" || mode === "totp" || mode === "recovery" ? (
@@ -219,7 +225,7 @@ function AuthPanel({
           ) : null}
           {mode === "recovery" ? <TextField label="Recovery code" value={recoveryCode} onChange={setRecoveryCode} autoComplete="one-time-code" /> : null}
           {mode === "recovery" || mode === "totp" ? <TextField label="TOTP code" value={totpCode} onChange={setTotpCode} inputMode="numeric" autoComplete="one-time-code" /> : null}
-          <button className="primary-action" type="submit" disabled={busy}>
+          <button className="primary-action" type="submit" disabled={busy || (mode === "passkey" && Boolean(passkeyWarning))}>
             {busy ? "Please wait..." : authButton(mode)}
           </button>
           {mode === "login" ? (
@@ -556,6 +562,7 @@ function ProfileSettings({
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [remainingCount, setRemainingCount] = useState(data.user.recoveryCodeCount);
   const [importResult, setImportResult] = useState("");
+  const passkeyWarning = api.passkeyEnvironmentWarning();
 
   const recoveryBlob = useMemo(() => new Blob([recoveryCodes.join("\n")], { type: "text/plain" }), [recoveryCodes]);
   const recoveryUrl = useMemo(() => (recoveryCodes.length ? URL.createObjectURL(recoveryBlob) : ""), [recoveryBlob, recoveryCodes.length]);
@@ -626,8 +633,9 @@ function ProfileSettings({
       >
         <h2>Passkeys</h2>
         <p className="muted">{data.user.passkeyCount} passkey records are linked to this account.</p>
+        {passkeyWarning ? <p className="form-message error">{passkeyWarning}</p> : null}
         <TextField label="Passkey label" value={passkeyLabel} onChange={setPasskeyLabel} placeholder="Work laptop" />
-        <button className="primary-action" type="submit" disabled={passkeyBusy}>
+        <button className="primary-action" type="submit" disabled={passkeyBusy || Boolean(passkeyWarning)}>
           {passkeyBusy ? "Waiting for authenticator…" : "Register passkey"}
         </button>
       </form>

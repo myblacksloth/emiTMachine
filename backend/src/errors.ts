@@ -26,7 +26,9 @@ export function errorHandler(error: unknown, req: Request, res: Response, _next:
       userId: req.user?.id,
       error: sanitizeError(error)
     };
-    if (error.status >= 500) requestLog.error("http error", fields);
+    if (error.status === 401 && req.path === "/me" && error.message === "Authentication required") {
+      requestLog.debug("anonymous session check", fields);
+    } else if (error.status >= 500) requestLog.error("http error", fields);
     else requestLog.warn("http error", fields);
     return res.status(error.status).json({ error: error.message, details: error.details });
   }

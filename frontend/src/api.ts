@@ -1,4 +1,3 @@
-import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import type { DashboardData, Tag } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
@@ -84,6 +83,50 @@ type BackendSummary = {
   days_worked: number;
 };
 
+type PublicKeyCredentialDescriptorJSON = Omit<PublicKeyCredentialDescriptor, "id"> & {
+  id: string;
+};
+
+type PublicKeyCredentialRequestOptionsJSON = Omit<PublicKeyCredentialRequestOptions, "allowCredentials" | "challenge"> & {
+  allowCredentials?: PublicKeyCredentialDescriptorJSON[];
+  challenge: string;
+};
+
+type PublicKeyCredentialCreationOptionsJSON = Omit<PublicKeyCredentialCreationOptions, "challenge" | "excludeCredentials" | "user"> & {
+  challenge: string;
+  excludeCredentials?: PublicKeyCredentialDescriptorJSON[];
+  user: Omit<PublicKeyCredentialUserEntity, "id"> & { id: string };
+};
+
+type RegistrationResponseJSON = {
+  id: string;
+  rawId: string;
+  response: {
+    attestationObject: string;
+    clientDataJSON: string;
+    transports?: string[];
+    publicKey?: string;
+    publicKeyAlgorithm?: number;
+  };
+  type: PublicKeyCredential["type"];
+  clientExtensionResults: AuthenticationExtensionsClientOutputs;
+  authenticatorAttachment?: AuthenticatorAttachment | null;
+};
+
+type AuthenticationResponseJSON = {
+  id: string;
+  rawId: string;
+  response: {
+    authenticatorData: string;
+    clientDataJSON: string;
+    signature: string;
+    userHandle: string | null;
+  };
+  type: PublicKeyCredential["type"];
+  clientExtensionResults: AuthenticationExtensionsClientOutputs;
+  authenticatorAttachment?: AuthenticatorAttachment | null;
+};
+
 function secondsToMinutes(value: string | number) {
   return Math.round(Number(value) / 60);
 }
@@ -110,6 +153,159 @@ function mapBuckets(buckets: BackendBucket[], type: BackendBucket["bucket_type"]
         segments: [{ tagId: "all", tagName: "All tags", color: "#27b3a8", minutes: totalMinutes }]
       };
     });
+}
+
+function base64urlToArrayBuffer(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+function arrayBufferToBase64url(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function mapCredentialDescriptors(credentials?: PublicKeyCredentialDescriptorJSON[]) {
+  return credentials?.map((credential) => ({
+    ...credential,
+    id: base64urlToArrayBuffer(credential.id)
+  }));
+}
+
+function toCredentialCreationOptions(options: PublicKeyCredentialCreationOptionsJSON): PublicKeyCredentialCreationOptions {
+  return {
+    ...options,
+    challenge: base64urlToArrayBuffer(options.challenge),
+    user: {
+      ...options.user,
+      id: base64urlToArrayBuffer(options.user.id)
+    },
+    excludeCredentials: mapCredentialDescriptors(options.excludeCredentials)
+  };
+}
+
+function toCredentialRequestOptions(options: PublicKeyCredentialRequestOptionsJSON): PublicKeyCredentialRequestOptions {
+  return {
+    ...options,
+    challenge: base64urlToArrayBuffer(options.challenge),
+    allowCredentials: mapCredentialDescriptors(options.allowCredentials)
+  };
+}
+
+function passkeyEnvironmentWarning() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  if (!window.isSecureContext) {
+    return "Passkeys require HTTPS or localhost. Open this app in a secure context before using a passkey.";
+  }
+  if (!("PublicKeyCredential" in window) || !navigator.credentials) {
+    return "This browser does not support passkeys. Use a current browser with WebAuthn support.";
+  }
+  return null;
+}
+
+function assertPasskeysAvailable() {
+  const warning = passkeyEnvironmentWarning();
+  if (warning) {
+    throw new Error(warning);
+  }
+}
+
+function webAuthnErrorMessage(error: unknown, action: "login" | "registration") {
+  if (!(error instanceof DOMException)) {
+    return error instanceof Error ? error.message : "Passkey operation failed.";
+  }
+
+  if (error.name === "NotAllowedError") {
+    return "Passkey operation was canceled or timed out.";
+  }
+  if (error.name === "InvalidStateError" && action === "registration") {
+    return "This authenticator is already registered for the account.";
+  }
+  if (error.name === "SecurityError") {
+    return "Passkey operation is blocked for this origin. Use the configured HTTPS or localhost address.";
+  }
+  if (error.name === "NotSupportedError") {
+    return "This authenticator or browser does not support the requested passkey options.";
+  }
+  if (error.name === "AbortError") {
+    return "Passkey operation was interrupted. Try again.";
+  }
+  return error.message || "Passkey operation failed.";
+}
+
+async function createPasskey(options: PublicKeyCredentialCreationOptionsJSON): Promise<RegistrationResponseJSON> {
+  assertPasskeysAvailable();
+  try {
+    const credential = await navigator.credentials.create({
+      publicKey: toCredentialCreationOptions(options)
+    });
+    if (!(credential instanceof PublicKeyCredential)) {
+      throw new Error("The browser did not return a passkey credential.");
+    }
+    const response = credential.response as AuthenticatorAttestationResponse & {
+      getPublicKey?: () => ArrayBuffer | null;
+      getPublicKeyAlgorithm?: () => number;
+      getTransports?: () => string[];
+    };
+    const publicKey = response.getPublicKey?.();
+
+    return {
+      id: credential.id,
+      rawId: arrayBufferToBase64url(credential.rawId),
+      response: {
+        attestationObject: arrayBufferToBase64url(response.attestationObject),
+        clientDataJSON: arrayBufferToBase64url(response.clientDataJSON),
+        transports: response.getTransports?.(),
+        publicKey: publicKey ? arrayBufferToBase64url(publicKey) : undefined,
+        publicKeyAlgorithm: response.getPublicKeyAlgorithm?.()
+      },
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment
+    };
+  } catch (error) {
+    throw new Error(webAuthnErrorMessage(error, "registration"));
+  }
+}
+
+async function getPasskey(options: PublicKeyCredentialRequestOptionsJSON): Promise<AuthenticationResponseJSON> {
+  assertPasskeysAvailable();
+  try {
+    const credential = await navigator.credentials.get({
+      publicKey: toCredentialRequestOptions(options)
+    });
+    if (!(credential instanceof PublicKeyCredential)) {
+      throw new Error("The browser did not return a passkey credential.");
+    }
+    const response = credential.response as AuthenticatorAssertionResponse;
+
+    return {
+      id: credential.id,
+      rawId: arrayBufferToBase64url(credential.rawId),
+      response: {
+        authenticatorData: arrayBufferToBase64url(response.authenticatorData),
+        clientDataJSON: arrayBufferToBase64url(response.clientDataJSON),
+        signature: arrayBufferToBase64url(response.signature),
+        userHandle: response.userHandle ? arrayBufferToBase64url(response.userHandle) : null
+      },
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment
+    };
+  } catch (error) {
+    throw new Error(webAuthnErrorMessage(error, "login"));
+  }
 }
 
 async function fetchDashboard() {
@@ -159,6 +355,7 @@ async function fetchDashboard() {
 }
 
 export const api = {
+  passkeyEnvironmentWarning,
   currentUser: () => requestOptional<{ user: BackendUser }>("/api/auth/me"),
   login: (username: string, password: string, totpCode?: string, recoveryCode?: string) =>
     request<{ requiresTotp?: boolean; user?: BackendUser }>("/api/auth/login", {
@@ -171,11 +368,11 @@ export const api = {
       body: JSON.stringify({ displayName: name, username, password })
     }),
   passkeyLogin: async (username: string) => {
-    const options = await request<Parameters<typeof startAuthentication>[0]["optionsJSON"]>(
+    const options = await request<PublicKeyCredentialRequestOptionsJSON>(
       "/api/auth/passkeys/login/options",
       { method: "POST", body: JSON.stringify({ username }) }
     );
-    const response = await startAuthentication({ optionsJSON: options });
+    const response = await getPasskey(options);
     return request<{ ok: true }>("/api/auth/passkeys/login/verify", {
       method: "POST",
       body: JSON.stringify({ username, response })
@@ -223,11 +420,11 @@ export const api = {
       body: JSON.stringify({ code })
     }),
   registerPasskey: async (label: string) => {
-    const options = await request<Parameters<typeof startRegistration>[0]["optionsJSON"]>(
+    const options = await request<PublicKeyCredentialCreationOptionsJSON>(
       "/api/auth/passkeys/register/options",
       { method: "POST", body: JSON.stringify({ label }) }
     );
-    const response = await startRegistration({ optionsJSON: options });
+    const response = await createPasskey(options);
     return request<void>("/api/auth/passkeys/register/verify", {
       method: "POST",
       body: JSON.stringify({ label, response })
