@@ -1,0 +1,4 @@
+your.domain.com {
+    tls /certs/cert.pem /certs/key.pem
+    reverse_proxy frontend:5173
+}
