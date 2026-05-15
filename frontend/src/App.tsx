@@ -1,4 +1,22 @@
 import { FormEvent, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
+import {
+  BarChart3,
+  Download,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Plus,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  Square,
+  Tags,
+  TimerReset,
+  UploadCloud,
+  UserRound,
+  Zap
+} from "lucide-react";
 import { api } from "./api";
 import type { AuthMode, ChartBucket, DashboardData, Tag, Toast } from "./types";
 
@@ -184,9 +202,15 @@ function AuthPanel({
   return (
     <main className="auth-layout">
       <section className="auth-copy">
+        <BrandMark />
         <p className="eyebrow">Multi-user time tracking</p>
-        <h1>emiTMachine</h1>
-        <p>Track work sessions, tags, reports, exports, recovery options, and secure sign-in from one responsive workspace.</p>
+        <h1>Make time feel lighter.</h1>
+        <p>Clock in, follow your rhythm, collect focused sessions, and keep reports tidy from one calm little workspace.</p>
+        <div className="auth-sparks" aria-label="Highlights">
+          <span><Sparkles size={16} /> Passkeys</span>
+          <span><BarChart3 size={16} /> Tiny charts</span>
+          <span><Zap size={16} /> Fast punches</span>
+        </div>
       </section>
       <section className="panel auth-panel" aria-label="Authentication">
         <div className="tabs" role="tablist" aria-label="Authentication options">
@@ -197,7 +221,7 @@ function AuthPanel({
             Register
           </button>
           <button className={mode === "passkey" ? "active" : ""} onClick={() => setMode("passkey")} type="button">
-            Passkey
+            <KeyRound size={15} /> Passkey
           </button>
           <button className={mode === "recovery" ? "active" : ""} onClick={() => setMode("recovery")} type="button">
             Recovery
@@ -226,6 +250,7 @@ function AuthPanel({
           {mode === "recovery" ? <TextField label="Recovery code" value={recoveryCode} onChange={setRecoveryCode} autoComplete="one-time-code" /> : null}
           {mode === "recovery" || mode === "totp" ? <TextField label="TOTP code" value={totpCode} onChange={setTotpCode} inputMode="numeric" autoComplete="one-time-code" /> : null}
           <button className="primary-action" type="submit" disabled={busy || (mode === "passkey" && Boolean(passkeyWarning))}>
+            <Sparkles size={18} />
             {busy ? "Please wait..." : authButton(mode)}
           </button>
           {mode === "login" ? (
@@ -237,6 +262,15 @@ function AuthPanel({
         </form>
       </section>
     </main>
+  );
+}
+
+function BrandMark() {
+  return (
+    <div className="brand-mark" aria-label="emiTMachine">
+      <span className="brand-script">emiT</span>
+      <span className="brand-dot">Machine</span>
+    </div>
   );
 }
 
@@ -289,27 +323,27 @@ function Dashboard({
       <header className="topbar">
         <div>
           <p className="eyebrow">Signed in as {data.user.username || data.user.name}</p>
-          <h1>Work dashboard</h1>
+          <h1>Today feels workable.</h1>
         </div>
         <div className="topbar-actions">
           <button type="button" onClick={onRefresh} disabled={loading}>
-            Refresh
+            <RefreshCw size={16} /> Refresh
           </button>
           <button type="button" onClick={onLogout}>
-            Sign out
+            <LogOut size={16} /> Sign out
           </button>
         </div>
       </header>
 
       <nav className="section-nav" aria-label="Workspace sections">
         <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")} type="button">
-          Dashboard
+          <LayoutDashboard size={16} /> Dashboard
         </button>
         <button className={view === "tags" ? "active" : ""} onClick={() => setView("tags")} type="button">
-          Tags
+          <Tags size={16} /> Tags
         </button>
         <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")} type="button">
-          Profile
+          <UserRound size={16} /> Profile
         </button>
       </nav>
 
@@ -318,19 +352,6 @@ function Dashboard({
 
       {view === "dashboard" ? (
         <>
-          <section className="summary-grid" aria-label="Summary">
-            <Metric label="Total hours" value={minutesLabel(data.summary.totalMinutes)} />
-            <Metric label="Daily average" value={minutesLabel(data.summary.averageDailyMinutes)} />
-            <Metric label="Worked days" value={String(data.summary.workedDays)} />
-            <Metric label="Presence vs smart working" value={`${minutesLabel(data.summary.presenceMinutes)} / ${minutesLabel(data.summary.smartWorkingMinutes)}`} />
-          </section>
-
-          <section className="chart-grid" aria-label="Time charts">
-            <Chart title="Daily hours" buckets={data.charts.daily} />
-            <Chart title="Weekly hours" buckets={data.charts.weekly} />
-            <Chart title="Monthly hours" buckets={data.charts.monthly} />
-          </section>
-
           <section className={`work-band ${data.activeSession ? "open" : ""}`}>
             <div className={`session-state ${data.activeSession ? "open" : ""}`}>
               <span>{data.activeSession ? "Session active" : "No active session"}</span>
@@ -338,8 +359,22 @@ function Dashboard({
               {activeTagNames ? <small>{activeTagNames}</small> : null}
             </div>
             <button className="clock-action" type="button" onClick={() => setConfirming(data.activeSession ? "out" : "in")}>
+              {data.activeSession ? <Square size={18} /> : <Zap size={18} />}
               {data.activeSession ? "Clock out" : "Clock in"}
             </button>
+          </section>
+
+          <section className="summary-grid" aria-label="Summary">
+            <Metric label="Total hours" value={minutesLabel(data.summary.totalMinutes)} icon={<TimerReset size={18} />} />
+            <Metric label="Daily average" value={minutesLabel(data.summary.averageDailyMinutes)} icon={<Sparkles size={18} />} />
+            <Metric label="Worked days" value={String(data.summary.workedDays)} icon={<Zap size={18} />} />
+            <Metric label="Presence / smart" value={`${minutesLabel(data.summary.presenceMinutes)} / ${minutesLabel(data.summary.smartWorkingMinutes)}`} icon={<BarChart3 size={18} />} />
+          </section>
+
+          <section className="chart-grid" aria-label="Time charts">
+            <Chart title="Daily hours" buckets={data.charts.daily} />
+            <Chart title="Weekly hours" buckets={data.charts.weekly} />
+            <Chart title="Monthly hours" buckets={data.charts.monthly} />
           </section>
 
           <Countdowns countdowns={data.countdowns} />
@@ -366,10 +401,10 @@ function Dashboard({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
     <article className="metric">
-      <span>{label}</span>
+      <span><i>{icon}</i>{label}</span>
       <strong>{value}</strong>
     </article>
   );
@@ -478,6 +513,7 @@ function PunchDialog({
             Cancel
           </button>
           <button className="primary-action" type="button" onClick={submit} disabled={busy}>
+            <Save size={18} />
             {busy ? "Saving..." : "Confirm"}
           </button>
         </div>
@@ -521,7 +557,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
           <input type="color" value={color} onChange={(event) => setColor(event.target.value)} />
         </label>
         <button className="primary-action" type="submit">
-          Add tag
+          <Plus size={18} /> Add tag
         </button>
       </form>
       <section className="panel stack">
@@ -534,7 +570,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
               <input value={draft.name} onChange={(event) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, name: event.target.value } }))} />
               <input type="color" value={draft.color} onChange={(event) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, color: event.target.value } }))} />
               <button type="button" onClick={() => save(draft)}>
-                Save
+                <Save size={16} /> Save
               </button>
             </div>
           );
@@ -584,7 +620,7 @@ function ProfileSettings({
         <TextField label="New password" value={newPassword} onChange={setNewPassword} type="password" autoComplete="new-password" minLength={8} />
         <PasswordHints password={newPassword} />
         <button className="primary-action" type="submit">
-          Change password
+          <ShieldCheck size={18} /> Change password
         </button>
       </form>
 
@@ -592,7 +628,7 @@ function ProfileSettings({
         <h2>TOTP</h2>
         <p className="muted">{data.user.totpEnabled ? "TOTP is enabled for this account." : "Set up an authenticator app with a QR code."}</p>
         <button type="button" onClick={async () => setTotp(await api.setupTotp())}>
-          Show QR setup
+          <KeyRound size={16} /> Show QR setup
         </button>
         {totp ? (
           <>
@@ -607,7 +643,7 @@ function ProfileSettings({
                 onToast("success", "TOTP enabled.");
               }}
             >
-              Enable TOTP
+              <ShieldCheck size={18} /> Enable TOTP
             </button>
           </>
         ) : null}
@@ -636,7 +672,8 @@ function ProfileSettings({
         {passkeyWarning ? <p className="form-message error">{passkeyWarning}</p> : null}
         <TextField label="Passkey label" value={passkeyLabel} onChange={setPasskeyLabel} placeholder="Work laptop" />
         <button className="primary-action" type="submit" disabled={passkeyBusy || Boolean(passkeyWarning)}>
-          {passkeyBusy ? "Waiting for authenticator…" : "Register passkey"}
+          <KeyRound size={18} />
+          {passkeyBusy ? "Waiting for authenticator..." : "Register passkey"}
         </button>
       </form>
 
@@ -677,7 +714,7 @@ function ProfileSettings({
             </p>
             <pre className="codes">{recoveryCodes.join("\n")}</pre>
             <a className="download-link" href={recoveryUrl} download="emitmachine-recovery-codes.txt">
-              Download recovery codes
+              <Download size={16} /> Download recovery codes
             </a>
             <button type="button" onClick={() => setRecoveryCodes([])}>
               Done — I have saved my codes
@@ -690,10 +727,10 @@ function ProfileSettings({
         <h2>CSV export and restore</h2>
         <div className="csv-actions">
           <a className="download-link" href={api.exportCsvUrl}>
-            Download CSV export
+            <Download size={16} /> Download CSV export
           </a>
           <label className="file-input">
-            <span>Upload CSV restore</span>
+            <span><UploadCloud size={16} /> Upload CSV restore</span>
             <input
               type="file"
               accept=".csv,text/csv"
