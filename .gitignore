@@ -9,6 +9,7 @@ upload.sh
 Caddyfile
 
 docker-compose-reverse.yml
+docker-compose-reverse.*.env
 
 
 *.pem
