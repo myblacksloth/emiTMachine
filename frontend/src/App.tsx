@@ -1,8 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
 import {
+  AlarmClock,
   BarChart3,
   CalendarClock,
+  Clock,
   Download,
+  Hourglass,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -13,6 +16,7 @@ import {
   Sparkles,
   Square,
   Tags,
+  Timer,
   TimerReset,
   Trash2,
   UploadCloud,
@@ -356,7 +360,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "tags" | "profile" | "admin">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "tags" | "tools" | "profile" | "admin">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -388,6 +392,9 @@ function Dashboard({
         </button>
         <button className={view === "tags" ? "active" : ""} onClick={() => setView("tags")} type="button">
           <Tags size={16} /> Tags
+        </button>
+        <button className={view === "tools" ? "active" : ""} onClick={() => setView("tools")} type="button">
+          <Clock size={16} /> Tools
         </button>
         <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")} type="button">
           <UserRound size={16} /> Profile
@@ -435,6 +442,7 @@ function Dashboard({
 
       {view === "activities" ? <ActivityPanel tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
+      {view === "tools" ? <TimeTools /> : null}
       {view === "profile" ? <ProfileSettings data={data} onToast={onToast} onRefresh={onRefresh} /> : null}
       {view === "admin" && data.user.role !== "user" ? <AdminPanel currentRole={data.user.role} onToast={onToast} /> : null}
 
@@ -1075,6 +1083,178 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
           );
         })}
       </section>
+    </section>
+  );
+}
+
+function TimeTools() {
+  const [diffFrom, setDiffFrom] = useState("");
+  const [diffTo, setDiffTo] = useState("");
+
+  const [addBase, setAddBase] = useState("");
+  const [addH, setAddH] = useState("0");
+  const [addM, setAddM] = useState("0");
+
+  const [shiftStart, setShiftStart] = useState(() => {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
+  });
+  const [shiftWorkH, setShiftWorkH] = useState("8");
+  const [shiftBreakM, setShiftBreakM] = useState("30");
+
+  const [liveTarget, setLiveTarget] = useState("");
+  const [, tick] = useState(0);
+
+  useEffect(() => {
+    const t = window.setInterval(() => tick((v) => v + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  function parseHHMM(s: string): number | null {
+    if (!s) return null;
+    const [h, m] = s.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  function toHHMM(totalMinutes: number): string {
+    const norm = ((totalMinutes % 1440) + 1440) % 1440;
+    return `${String(Math.floor(norm / 60)).padStart(2, "0")}:${String(norm % 60).padStart(2, "0")}`;
+  }
+
+  function fmtDiff(minutes: number): string {
+    const h = Math.floor(Math.abs(minutes) / 60);
+    const m = Math.abs(minutes) % 60;
+    return `${h}h ${String(m).padStart(2, "0")}m`;
+  }
+
+  const diffResult = useMemo(() => {
+    const from = parseHHMM(diffFrom);
+    const to = parseHHMM(diffTo);
+    if (from === null || to === null) return null;
+    let diff = to - from;
+    if (diff < 0) diff += 1440;
+    return fmtDiff(diff);
+  }, [diffFrom, diffTo]);
+
+  const addResult = useMemo(() => {
+    const base = parseHHMM(addBase);
+    if (base === null) return null;
+    const dH = parseInt(addH) || 0;
+    const dM = parseInt(addM) || 0;
+    const total = base + dH * 60 + dM;
+    const days = Math.floor(total / 1440);
+    return days !== 0 ? `${toHHMM(total)} (${days > 0 ? "+" : ""}${days}g)` : toHHMM(total);
+  }, [addBase, addH, addM]);
+
+  const shiftEndTime = useMemo(() => {
+    const start = parseHHMM(shiftStart);
+    if (start === null) return null;
+    return toHHMM(start + Math.round((parseFloat(shiftWorkH) || 0) * 60) + (parseInt(shiftBreakM) || 0));
+  }, [shiftStart, shiftWorkH, shiftBreakM]);
+
+  // recomputes every second via tick
+  const shiftEndMinutes = (() => {
+    const start = parseHHMM(shiftStart);
+    if (start === null) return null;
+    const total = start + Math.round((parseFloat(shiftWorkH) || 0) * 60) + (parseInt(shiftBreakM) || 0);
+    return ((total % 1440) + 1440) % 1440;
+  })();
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const shiftRemaining = shiftEndMinutes !== null ? (() => {
+    let r = shiftEndMinutes - nowMinutes;
+    if (r < 0) r += 1440;
+    return r;
+  })() : null;
+
+  // live countdown — recomputes every second via tick
+  let liveResult: string | null = null;
+  const liveT = parseHHMM(liveTarget);
+  if (liveT !== null) {
+    const n = new Date();
+    const nowSec = n.getHours() * 3600 + n.getMinutes() * 60 + n.getSeconds();
+    let diff = liveT * 60 - nowSec;
+    if (diff < 0) diff += 86400;
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    liveResult =
+      diff === 0 ? "Adesso!"
+      : h > 0 ? `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
+      : m > 0 ? `${m}m ${String(s).padStart(2, "0")}s`
+      : `${s}s`;
+  }
+
+  return (
+    <section className="panel stack wide">
+      <h2><Clock size={18} /> Time Tools</h2>
+      <div className="time-tools-grid">
+
+        <div className="time-tool-card">
+          <div className="tool-header"><Timer size={15} /><strong>Elapsed time</strong></div>
+          <p className="muted small">How long between two times of day</p>
+          <div className="tool-row">
+            <label className="tool-label">From</label>
+            <input type="time" value={diffFrom} onChange={(e) => setDiffFrom(e.target.value)} />
+            <label className="tool-label">To</label>
+            <input type="time" value={diffTo} onChange={(e) => setDiffTo(e.target.value)} />
+          </div>
+          <div className="time-result">{diffResult ?? "—"}</div>
+        </div>
+
+        <div className="time-tool-card">
+          <div className="tool-header"><Plus size={15} /><strong>Target time</strong></div>
+          <p className="muted small">Add hours and minutes to a start time</p>
+          <div className="tool-row">
+            <label className="tool-label">Start</label>
+            <input type="time" value={addBase} onChange={(e) => setAddBase(e.target.value)} />
+            <label className="tool-label">+</label>
+            <input type="number" value={addH} min="0" max="99" onChange={(e) => setAddH(e.target.value)} className="tool-num" />
+            <span className="muted">h</span>
+            <input type="number" value={addM} min="0" max="59" onChange={(e) => setAddM(e.target.value)} className="tool-num" />
+            <span className="muted">m</span>
+          </div>
+          <div className="time-result">{addResult ?? "—"}</div>
+        </div>
+
+        <div className="time-tool-card">
+          <div className="tool-header"><Hourglass size={15} /><strong>Shift end</strong></div>
+          <p className="muted small">When will your shift end — and how much is left now?</p>
+          <div className="tool-row">
+            <label className="tool-label">Start</label>
+            <input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
+            <label className="tool-label">Work</label>
+            <input type="number" value={shiftWorkH} min="0" max="24" step="0.5" onChange={(e) => setShiftWorkH(e.target.value)} className="tool-num" />
+            <span className="muted">h</span>
+            <label className="tool-label">Break</label>
+            <input type="number" value={shiftBreakM} min="0" max="120" onChange={(e) => setShiftBreakM(e.target.value)} className="tool-num" />
+            <span className="muted">m</span>
+          </div>
+          <div className="time-result">
+            {shiftEndTime ? (
+              <>
+                {shiftEndTime}
+                {shiftRemaining !== null && (
+                  <small className="tool-remaining">
+                    {shiftRemaining === 0 ? " — finito!" : ` — ${fmtDiff(shiftRemaining)} rimasti`}
+                  </small>
+                )}
+              </>
+            ) : "—"}
+          </div>
+        </div>
+
+        <div className="time-tool-card">
+          <div className="tool-header"><AlarmClock size={15} /><strong>Live countdown</strong></div>
+          <p className="muted small">Real-time countdown to any time today</p>
+          <div className="tool-row">
+            <label className="tool-label">Target</label>
+            <input type="time" value={liveTarget} onChange={(e) => setLiveTarget(e.target.value)} />
+          </div>
+          <div className={`time-result${liveTarget ? " live" : ""}`}>{liveResult ?? "—"}</div>
+        </div>
+
+      </div>
     </section>
   );
 }
