@@ -89,6 +89,8 @@ services:
     build:
       context: ./frontend
     user: node
+    env_file:
+      - ./docker-compose-reverse.frontend.env
     environment:
       VITE_BACKEND_PROXY_TARGET: http://backend:4000
     depends_on:

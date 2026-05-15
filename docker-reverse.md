@@ -8,8 +8,10 @@ This guide explains how to run emiTMachine behind the included Caddy reverse pro
 - `docker-compose-reverse.yml`: private local compose file, ignored by Git.
 - `docker-compose-reverse.postgres.env.example`: public placeholder Postgres environment file.
 - `docker-compose-reverse.backend.env.example`: public placeholder backend environment file.
+- `docker-compose-reverse.frontend.env.example`: public placeholder frontend environment file.
 - `docker-compose-reverse.postgres.env`: private local Postgres environment file, ignored by Git.
 - `docker-compose-reverse.backend.env`: private local backend environment file, ignored by Git.
+- `docker-compose-reverse.frontend.env`: private local frontend environment file, ignored by Git.
 - `caddy/config/Caddyfile.example`: public placeholder Caddy config.
 - `caddy/config/Caddyfile`: private local Caddy config, ignored by Git.
 - `caddy/certs/*.pem`: private TLS certificates, ignored by Git.
@@ -22,6 +24,7 @@ Copy the placeholders:
 cp docker-compose-reverse.example.yml docker-compose-reverse.yml
 cp docker-compose-reverse.postgres.env.example docker-compose-reverse.postgres.env
 cp docker-compose-reverse.backend.env.example docker-compose-reverse.backend.env
+cp docker-compose-reverse.frontend.env.example docker-compose-reverse.frontend.env
 cp caddy/config/Caddyfile.example caddy/config/Caddyfile
 ```
 
@@ -90,6 +93,14 @@ LOG_FORMAT=json
 
 For passkeys, `RP_ID`, `RP_ORIGIN`, and the browser URL must use the same HTTPS domain.
 Keep the password in `DATABASE_URL` aligned with `POSTGRES_PASSWORD`.
+
+Edit `docker-compose-reverse.frontend.env`:
+
+```dotenv
+VITE_ALLOWED_HOSTS=your.domain.com
+```
+
+This allows the Vite dev server inside the frontend container to accept requests proxied from your public domain.
 
 ## 4. Start The Stack
 
@@ -167,5 +178,6 @@ Common issues:
 
 - `network gotproxed declared as external, but could not be found`: create the external network or remove `external: true`.
 - Passkeys fail: verify that `PUBLIC_DOMAIN`, `RP_ID`, `RP_ORIGIN`, and the browser URL use the same HTTPS domain.
+- `Blocked request. This host is not allowed`: set `VITE_ALLOWED_HOSTS` in `docker-compose-reverse.frontend.env` to the public domain used in the browser.
 - Browser cannot reach the app: verify DNS, router port forwarding, firewall rules, and that Caddy is listening on ports `80` and `443`.
 - Backend CORS/session errors: verify `CORS_ORIGIN=https://your.domain.com` and `COOKIE_SECURE=true`.
