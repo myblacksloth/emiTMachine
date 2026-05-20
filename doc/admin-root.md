@@ -42,6 +42,7 @@ Admins/root can:
 
 - list all users;
 - update the application-level User ID for users they are allowed to manage;
+- update name and email for users they are allowed to manage;
 - inspect a selected user's session summary;
 - inspect a selected user's sessions;
 - reset credentials for users they are allowed to manage;
@@ -61,6 +62,7 @@ Admin/root endpoints:
 ```text
 GET    /api/admin/users
 PATCH  /api/admin/users/:id/public-id
+PATCH  /api/admin/users/:id/profile
 PATCH  /api/admin/users/:id/edit-permission
 POST   /api/admin/users/:id/reset-password
 DELETE /api/admin/users/:id

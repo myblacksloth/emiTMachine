@@ -6,7 +6,7 @@ import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getOvertimeReport } from "./overtime.js";
 import { hashPassword, randomToken } from "../utils/crypto.js";
-import { paginationSchema, uuidSchema } from "../utils/validators.js";
+import { emailSchema, paginationSchema, uuidSchema } from "../utils/validators.js";
 
 const router = Router();
 
@@ -20,6 +20,11 @@ const editPermissionSchema = z.object({
 
 const publicIdSchema = z.object({
   publicId: z.string().trim().min(1).max(120)
+});
+
+const userProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(120),
+  email: emailSchema.nullable().optional()
 });
 
 const overtimePermissionSchema = z.object({
@@ -98,6 +103,33 @@ router.patch("/users/:id/public-id", async (req, res, next) => {
   } catch (error) {
     if ((error as { code?: string }).code === "23505") {
       next(new HttpError(409, "This user ID is already assigned"));
+      return;
+    }
+    next(error);
+  }
+});
+
+router.patch("/users/:id/profile", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const input = userProfileSchema.parse(req.body);
+    const result = await pool.query(
+      `update users
+       set display_name = $3,
+           name = $3,
+           email = $4,
+           updated_at = now()
+       where id = $1 and ($2::text = 'root' or role = 'user')
+       returning id, email, display_name`,
+      [userId, req.user!.role, input.displayName, input.email ?? null]
+    );
+    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    req.log?.info("user profile updated by admin", { actorUserId: req.user!.id, userId });
+    res.json({ user: { email: result.rows[0].email, displayName: result.rows[0].display_name } });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      next(new HttpError(409, "This email is already assigned"));
       return;
     }
     next(error);

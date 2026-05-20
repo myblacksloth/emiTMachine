@@ -59,6 +59,7 @@ export type DashboardData = {
   user: {
     name: string;
     username: string;
+    email?: string | null;
     publicId?: string;
     role: UserRole;
     adminApproved: boolean;

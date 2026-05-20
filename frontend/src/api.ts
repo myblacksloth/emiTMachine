@@ -416,6 +416,7 @@ async function fetchDashboard() {
     user: {
       name: me.user.displayName,
       username: me.user.username,
+      email: me.user.email ?? null,
       publicId: me.user.publicId,
       role: me.user.role,
       adminApproved: me.user.adminApproved ?? true,
@@ -544,6 +545,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ publicId })
     }),
+  setUserProfile: (id: string, displayName: string, email: string) =>
+    request<{ user: { displayName: string; email: string | null } }>(`/api/admin/users/${id}/profile`, {
+      method: "PATCH",
+      body: JSON.stringify({ displayName, email: email.trim() ? email.trim() : null })
+    }),
   setUserEditPermission: (id: string, canEditSessions: boolean) =>
     request<void>(`/api/admin/users/${id}/edit-permission`, {
       method: "PATCH",
@@ -593,6 +599,11 @@ export const api = {
     request<void>("/api/profile/password", {
       method: "PATCH",
       body: JSON.stringify({ currentPassword, newPassword })
+    }),
+  updateProfile: (displayName: string, email: string) =>
+    request<{ user: BackendUser }>("/api/profile", {
+      method: "PATCH",
+      body: JSON.stringify({ displayName, email: email.trim() ? email.trim() : null })
     }),
   setupTotp: async () => {
     const result = await request<{ qrCodeDataUrl: string; secret: string }>("/api/auth/totp/setup", { method: "POST" });

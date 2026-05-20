@@ -27,7 +27,7 @@ import { api } from "./api";
 import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, OvertimeReport, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
-  user: { name: "User", username: "", publicId: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
+  user: { name: "User", username: "", email: null, publicId: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
   activeSession: null,
   tags: [],
   charts: { daily: [], weekly: [], monthly: [] },
@@ -740,6 +740,22 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", "User ID updated.");
   };
 
+  const updateUserProfile = async (user: AdminUser) => {
+    const displayName = window.prompt(`Name for ${user.username}`, user.displayName || user.username);
+    if (displayName === null) return;
+    const trimmedName = displayName.trim();
+    if (!trimmedName) {
+      setMessage("Name cannot be empty.");
+      return;
+    }
+    const email = window.prompt(`Email for ${user.username}`, user.email ?? "");
+    if (email === null) return;
+    await api.setUserProfile(user.id, trimmedName, email);
+    await loadUsers();
+    await loadSelectedUserData(user.id);
+    onToast("success", "User profile updated.");
+  };
+
   const toggleOvertimePermission = async (user: AdminUser) => {
     await api.setUserOvertimePermission(user.id, !user.overtimeEnabled, user.overtimeMode);
     await loadUsers();
@@ -820,6 +836,9 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 {currentRole === "root" || user.role === "user" ? (
                   <button type="button" onClick={() => updatePublicId(user)}>Edit user ID</button>
                 ) : null}
+                {currentRole === "root" || user.role === "user" ? (
+                  <button type="button" onClick={() => updateUserProfile(user)}>Edit name/email</button>
+                ) : null}
                 {user.role !== "root" ? (
                   <button type="button" onClick={() => toggleEditPermission(user)}>
                     {user.canEditSessions ? "Disable edits" : "Enable edits"}
@@ -861,6 +880,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             <p className="eyebrow">Selected user</p>
             <h2>{selectedUser?.username ?? "No user selected"}</h2>
             {selectedUser ? <p className="muted">User ID: {selectedUser.publicId}</p> : null}
+            {selectedUser ? <p className="muted">Name: {selectedUser.displayName || selectedUser.username} · Email: {selectedUser.email || "not set"}</p> : null}
           </div>
         </div>
         {summary ? (
@@ -1532,6 +1552,8 @@ function ProfileSettings({
 }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [profileName, setProfileName] = useState(data.user.name || data.user.username);
+  const [profileEmail, setProfileEmail] = useState(data.user.email ?? "");
   const [totp, setTotp] = useState<{ qrCodeUrl: string; secretLabel: string } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [passkeyLabel, setPasskeyLabel] = useState("");
@@ -1551,6 +1573,23 @@ function ProfileSettings({
         <p className="muted">User ID: <strong>{data.user.publicId || "Not assigned"}</strong></p>
         <p className="muted">This identifier is generated automatically and can be changed by an admin.</p>
       </section>
+
+      <form
+        className="panel stack"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          await api.updateProfile(profileName, profileEmail);
+          await onRefresh();
+          onToast("success", "Profile updated.");
+        }}
+      >
+        <h2>Name and email</h2>
+        <TextField label="Name" value={profileName} onChange={setProfileName} autoComplete="name" />
+        <TextField label="Email" value={profileEmail} onChange={setProfileEmail} type="email" autoComplete="email" />
+        <button className="primary-action" type="submit">
+          <Save size={18} /> Save profile
+        </button>
+      </form>
 
       <form
         className="panel stack"

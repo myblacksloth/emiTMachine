@@ -4,11 +4,51 @@ import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { hashPassword, verifyPassword } from "../utils/crypto.js";
-import { passwordSchema } from "../utils/validators.js";
+import { emailSchema, passwordSchema } from "../utils/validators.js";
 
 const router = Router();
 
 router.use(requireAuth);
+
+const profileSchema = z.object({
+  displayName: z.string().trim().min(1).max(120),
+  email: emailSchema.nullable().optional()
+});
+
+router.patch("/", async (req, res, next) => {
+  try {
+    const input = profileSchema.parse(req.body);
+    const result = await pool.query(
+      `update users
+       set display_name = $2,
+           name = $2,
+           email = $3,
+           updated_at = now()
+       where id = $1
+       returning id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions, totp_enabled`,
+      [req.user!.id, input.displayName, input.email ?? null]
+    );
+    res.json({
+      user: {
+        id: result.rows[0].id,
+        publicId: result.rows[0].public_id,
+        username: result.rows[0].username,
+        email: result.rows[0].email,
+        displayName: result.rows[0].display_name,
+        role: result.rows[0].role,
+        adminApproved: result.rows[0].admin_approved,
+        canEditSessions: result.rows[0].can_edit_sessions,
+        totpEnabled: result.rows[0].totp_enabled
+      }
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      next(new HttpError(409, "This email is already assigned"));
+      return;
+    }
+    next(error);
+  }
+});
 
 router.patch("/password", async (req, res, next) => {
   try {
