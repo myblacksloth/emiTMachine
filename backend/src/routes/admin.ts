@@ -36,6 +36,19 @@ const registrationSchema = z.object({
   enabled: z.boolean()
 });
 
+async function assertCanManageResponsibleUser(req: Request, userId: string) {
+  if (req.user?.role === "root") {
+    return;
+  }
+  const result = await pool.query(
+    "select 1 from user_managers where user_id = $1 and manager_user_id = $2",
+    [userId, req.user!.id]
+  );
+  if (!result.rows[0]) {
+    throw new HttpError(403, "You can manage only users assigned to you");
+  }
+}
+
 function requireAdmin(req: Request) {
   if (!req.user || (req.user.role !== "admin" && req.user.role !== "root")) {
     throw new HttpError(403, "Admin access required");
@@ -175,6 +188,79 @@ router.patch("/users/:id/overtime-permission", async (req, res, next) => {
       await pool.query("delete from overtime_payments where user_id = $1", [userId]);
     }
     req.log?.info("overtime permission updated", { actorUserId: req.user!.id, userId, enabled: input.enabled, mode: input.mode });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/manager-assignments", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const result = await pool.query(
+      req.user!.role === "root"
+        ? `select user_id, manager_user_id, assigned_by_user_id, created_at
+           from user_managers
+           order by created_at desc`
+        : `select user_id, manager_user_id, assigned_by_user_id, created_at
+           from user_managers
+           where user_id in (select user_id from user_managers where manager_user_id = $1)
+              or manager_user_id = $1
+           order by created_at desc`,
+      req.user!.role === "root" ? [] : [req.user!.id]
+    );
+    res.json({ assignments: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/users/:managerId/managed-users", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const managerId = uuidSchema.parse(req.params.managerId);
+    const input = z.object({ userId: uuidSchema }).parse(req.body);
+    if (managerId === input.userId) {
+      throw new HttpError(400, "A user cannot be responsible for themselves");
+    }
+    await assertCanManageResponsibleUser(req, input.userId);
+
+    const managerResult = await pool.query(
+      `select id from users
+       where id = $1 and role = 'admin' and admin_approved = true and disabled_at is null`,
+      [managerId]
+    );
+    if (!managerResult.rows[0]) throw new HttpError(400, "Manager must be an approved admin user");
+
+    const userResult = await pool.query("select id from users where id = $1 and role <> 'root' and disabled_at is null", [input.userId]);
+    if (!userResult.rows[0]) throw new HttpError(404, "Managed user not found");
+
+    const result = await pool.query(
+      `insert into user_managers (user_id, manager_user_id, assigned_by_user_id)
+       values ($1, $2, $3)
+       on conflict (user_id, manager_user_id) do nothing
+       returning user_id, manager_user_id, assigned_by_user_id, created_at`,
+      [input.userId, managerId, req.user!.id]
+    );
+    req.log?.info("manager assigned", { actorUserId: req.user!.id, userId: input.userId, managerId });
+    res.status(result.rows[0] ? 201 : 200).json({ assignment: result.rows[0] ?? { user_id: input.userId, manager_user_id: managerId } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/users/:managerId/managed-users/:userId", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const managerId = uuidSchema.parse(req.params.managerId);
+    const userId = uuidSchema.parse(req.params.userId);
+    await assertCanManageResponsibleUser(req, userId);
+    const result = await pool.query(
+      "delete from user_managers where user_id = $1 and manager_user_id = $2 returning user_id",
+      [userId, managerId]
+    );
+    if (!result.rows[0]) throw new HttpError(404, "Manager assignment not found");
+    req.log?.info("manager assignment removed", { actorUserId: req.user!.id, userId, managerId });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -346,7 +432,7 @@ router.get("/users/:id/overtime", async (req, res, next) => {
 router.get("/dump", async (req, res, next) => {
   try {
     requireRoot(req);
-    const tables = ["users", "tags", "time_sessions", "session_tags", "time_events", "countdowns", "overtime_payments", "recovery_codes", "passkeys"] as const;
+    const tables = ["users", "user_managers", "tags", "time_sessions", "session_tags", "time_events", "countdowns", "overtime_payments", "recovery_codes", "passkeys"] as const;
     const dump: Record<string, unknown[]> = {};
     for (const table of tables) {
       const result = await pool.query(`select * from ${table}`);

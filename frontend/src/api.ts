@@ -1,4 +1,4 @@
-import type { ActivitySession, AdminUser, Countdown, DashboardData, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
+import type { ActivitySession, AdminUser, Countdown, DashboardData, ManagerAssignment, ManagerSummary, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -90,6 +90,23 @@ type BackendAdminUser = {
   disabled_at: string | null;
   created_at: string;
   last_login_at: string | null;
+};
+
+type BackendManagerAssignment = {
+  user_id: string;
+  manager_user_id: string;
+  assigned_by_user_id: string | null;
+  created_at: string;
+};
+
+type BackendManagerSummary = {
+  id: string;
+  publicId?: string;
+  public_id?: string;
+  username: string;
+  email: string | null;
+  displayName?: string;
+  display_name?: string;
 };
 
 type BackendTag = Tag & { is_default?: boolean };
@@ -231,6 +248,25 @@ function mapAdminUser(user: BackendAdminUser): AdminUser {
     disabledAt: user.disabled_at,
     createdAt: user.created_at,
     lastLoginAt: user.last_login_at
+  };
+}
+
+function mapManagerAssignment(assignment: BackendManagerAssignment): ManagerAssignment {
+  return {
+    userId: assignment.user_id,
+    managerUserId: assignment.manager_user_id,
+    assignedByUserId: assignment.assigned_by_user_id,
+    createdAt: assignment.created_at
+  };
+}
+
+function mapManagerSummary(manager: BackendManagerSummary): ManagerSummary {
+  return {
+    id: manager.id,
+    publicId: manager.publicId ?? manager.public_id ?? "",
+    username: manager.username,
+    email: manager.email,
+    displayName: manager.displayName ?? manager.display_name ?? manager.username
   };
 }
 
@@ -539,6 +575,15 @@ export const api = {
       body: JSON.stringify({ weekStart })
     }),
   adminUsers: () => request<{ users: BackendAdminUser[] }>("/api/admin/users").then((payload) => payload.users.map(mapAdminUser)),
+  managerAssignments: () =>
+    request<{ assignments: BackendManagerAssignment[] }>("/api/admin/manager-assignments").then((payload) => payload.assignments.map(mapManagerAssignment)),
+  addManagedUser: (managerId: string, userId: string) =>
+    request<{ assignment: BackendManagerAssignment }>(`/api/admin/users/${managerId}/managed-users`, {
+      method: "POST",
+      body: JSON.stringify({ userId })
+    }),
+  removeManagedUser: (managerId: string, userId: string) =>
+    request<void>(`/api/admin/users/${managerId}/managed-users/${userId}`, { method: "DELETE" }),
   approveAdmin: (id: string) => request<void>(`/api/admin/users/${id}/approve-admin`, { method: "POST" }),
   setUserPublicId: (id: string, publicId: string) =>
     request<{ publicId: string }>(`/api/admin/users/${id}/public-id`, {
@@ -605,6 +650,8 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ displayName, email: email.trim() ? email.trim() : null })
     }),
+  myManagers: () =>
+    request<{ managers: BackendManagerSummary[] }>("/api/profile/managers").then((payload) => payload.managers.map(mapManagerSummary)),
   setupTotp: async () => {
     const result = await request<{ qrCodeDataUrl: string; secret: string }>("/api/auth/totp/setup", { method: "POST" });
     return { qrCodeUrl: result.qrCodeDataUrl, secretLabel: result.secret };

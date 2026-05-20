@@ -24,7 +24,7 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
-import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, OvertimeReport, Tag, Toast } from "./types";
+import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, ManagerAssignment, ManagerSummary, OvertimeReport, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
   user: { name: "User", username: "", email: null, publicId: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
@@ -667,6 +667,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
 
 function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; onToast: (tone: Toast["tone"], message: string) => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [managerAssignments, setManagerAssignments] = useState<ManagerAssignment[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedSessions, setSelectedSessions] = useState<ActivitySession[]>([]);
   const [selectedOvertime, setSelectedOvertime] = useState<OvertimeReport | null>(null);
@@ -680,8 +681,9 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const loadUsers = async () => {
     setMessage("");
     try {
-      const loaded = await api.adminUsers();
+      const [loaded, assignments] = await Promise.all([api.adminUsers(), api.managerAssignments()]);
       setUsers(loaded);
+      setManagerAssignments(assignments);
       setSelectedUserId((current) => current || loaded.find((user) => user.role === "user")?.id || loaded[0]?.id || "");
       if (currentRole === "root") {
         setRegistrationEnabled((await api.registrationSetting()).enabled);
@@ -754,6 +756,36 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     await loadUsers();
     await loadSelectedUserData(user.id);
     onToast("success", "User profile updated.");
+  };
+
+  const findUserForManagerInput = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    return users.find(
+      (user) =>
+        user.id.toLowerCase() === normalized ||
+        user.publicId.toLowerCase() === normalized ||
+        user.username.toLowerCase() === normalized
+    );
+  };
+
+  const addManagedUser = async (manager: AdminUser) => {
+    const value = window.prompt(`Username or User ID to assign to ${manager.username}`);
+    if (value === null) return;
+    const target = findUserForManagerInput(value);
+    if (!target) {
+      setMessage("User not found. Use username or User ID.");
+      return;
+    }
+    await api.addManagedUser(manager.id, target.id);
+    setManagerAssignments(await api.managerAssignments());
+    onToast("success", "Responsible user assigned.");
+  };
+
+  const removeManagedUser = async (manager: AdminUser, target: AdminUser) => {
+    if (!window.confirm(`Remove ${manager.username} as responsible for ${target.username}?`)) return;
+    await api.removeManagedUser(manager.id, target.id);
+    setManagerAssignments(await api.managerAssignments());
+    onToast("success", "Responsible user removed.");
   };
 
   const toggleOvertimePermission = async (user: AdminUser) => {
@@ -833,6 +865,9 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 {currentRole === "root" && user.role === "admin" && !user.adminApproved ? (
                   <button type="button" onClick={() => approveAdmin(user)}>Approve</button>
                 ) : null}
+                {user.role === "admin" && user.adminApproved ? (
+                  <button type="button" onClick={() => addManagedUser(user)}>Add managed user</button>
+                ) : null}
                 {currentRole === "root" || user.role === "user" ? (
                   <button type="button" onClick={() => updatePublicId(user)}>Edit user ID</button>
                 ) : null}
@@ -864,6 +899,22 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                   </>
                 ) : null}
               </div>
+              {user.role === "admin" && user.adminApproved ? (
+                <div className="manager-chip-list">
+                  {managerAssignments.filter((assignment) => assignment.managerUserId === user.id).map((assignment) => {
+                    const target = users.find((candidate) => candidate.id === assignment.userId);
+                    if (!target) return null;
+                    return (
+                      <span key={`${assignment.managerUserId}-${assignment.userId}`}>
+                        {target.username}
+                        <button type="button" aria-label={`Remove ${target.username}`} onClick={() => removeManagedUser(user, target)}>
+                          x
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
@@ -1554,6 +1605,7 @@ function ProfileSettings({
   const [newPassword, setNewPassword] = useState("");
   const [profileName, setProfileName] = useState(data.user.name || data.user.username);
   const [profileEmail, setProfileEmail] = useState(data.user.email ?? "");
+  const [managers, setManagers] = useState<ManagerSummary[]>([]);
   const [totp, setTotp] = useState<{ qrCodeUrl: string; secretLabel: string } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [passkeyLabel, setPasskeyLabel] = useState("");
@@ -1566,12 +1618,28 @@ function ProfileSettings({
   const recoveryBlob = useMemo(() => new Blob([recoveryCodes.join("\n")], { type: "text/plain" }), [recoveryCodes]);
   const recoveryUrl = useMemo(() => (recoveryCodes.length ? URL.createObjectURL(recoveryBlob) : ""), [recoveryBlob, recoveryCodes.length]);
 
+  useEffect(() => {
+    api.myManagers()
+      .then(setManagers)
+      .catch(() => setManagers([]));
+  }, []);
+
   return (
     <section className="settings-grid">
       <section className="panel stack">
         <h2>Account</h2>
         <p className="muted">User ID: <strong>{data.user.publicId || "Not assigned"}</strong></p>
         <p className="muted">This identifier is generated automatically and can be changed by an admin.</p>
+        {managers.length > 0 ? (
+          <div className="manager-list">
+            <h3>Responsabili</h3>
+            {managers.map((manager) => (
+              <p className="muted" key={manager.id}>
+                <strong>{manager.displayName}</strong> ({manager.username}){manager.email ? ` · ${manager.email}` : ""}
+              </p>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <form

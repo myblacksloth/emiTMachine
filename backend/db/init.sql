@@ -62,6 +62,18 @@ INSERT INTO users (username, name, display_name, password_hash, role, admin_appr
 VALUES ('root', 'root', 'root', crypt('goodlife', gen_salt('bf', 12)), 'root', true, true)
 ON CONFLICT (username) DO NOTHING;
 
+CREATE TABLE user_managers (
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  manager_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assigned_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, manager_user_id),
+  CONSTRAINT user_managers_no_self_assignment CHECK (user_id <> manager_user_id)
+);
+
+CREATE INDEX user_managers_user_idx ON user_managers (user_id);
+CREATE INDEX user_managers_manager_idx ON user_managers (manager_user_id);
+
 CREATE TABLE tags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

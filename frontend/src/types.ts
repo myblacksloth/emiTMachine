@@ -98,6 +98,21 @@ export type AdminUser = {
   lastLoginAt: string | null;
 };
 
+export type ManagerAssignment = {
+  userId: string;
+  managerUserId: string;
+  assignedByUserId: string | null;
+  createdAt: string;
+};
+
+export type ManagerSummary = {
+  id: string;
+  publicId: string;
+  username: string;
+  email: string | null;
+  displayName: string;
+};
+
 export type OvertimeWeek = {
   weekStart: string;
   workedMinutes: number;

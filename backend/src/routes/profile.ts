@@ -50,6 +50,30 @@ router.patch("/", async (req, res, next) => {
   }
 });
 
+router.get("/managers", async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `select m.id, m.public_id, m.username, m.email, m.display_name
+       from user_managers um
+       join users m on m.id = um.manager_user_id
+       where um.user_id = $1 and m.role = 'admin' and m.admin_approved = true and m.disabled_at is null
+       order by lower(m.display_name), lower(m.username)`,
+      [req.user!.id]
+    );
+    res.json({
+      managers: result.rows.map((row) => ({
+        id: row.id,
+        publicId: row.public_id,
+        username: row.username,
+        email: row.email,
+        displayName: row.display_name
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch("/password", async (req, res, next) => {
   try {
     const input = z

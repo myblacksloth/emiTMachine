@@ -43,6 +43,7 @@ Admins/root can:
 - list all users;
 - update the application-level User ID for users they are allowed to manage;
 - update name and email for users they are allowed to manage;
+- assign users to approved admin responsibles according to the responsibility rules;
 - inspect a selected user's session summary;
 - inspect a selected user's sessions;
 - reset credentials for users they are allowed to manage;
@@ -55,6 +56,14 @@ Root can additionally:
 - lock or reopen new user registration;
 - download a JSON application dump.
 
+## Responsibles
+
+Users can have one or more responsible admins. A responsible can only be an approved `admin` user, not a standard user or root.
+
+Root can assign or remove any user/responsible association. Admins can assign or remove responsible associations only for users they already manage.
+
+Users see their assigned responsibles from their profile area when at least one responsible is configured.
+
 ## API
 
 Admin/root endpoints:
@@ -64,10 +73,14 @@ GET    /api/admin/users
 PATCH  /api/admin/users/:id/public-id
 PATCH  /api/admin/users/:id/profile
 PATCH  /api/admin/users/:id/edit-permission
+GET    /api/admin/manager-assignments
+POST   /api/admin/users/:managerId/managed-users
+DELETE /api/admin/users/:managerId/managed-users/:userId
 POST   /api/admin/users/:id/reset-password
 DELETE /api/admin/users/:id
 GET    /api/admin/users/:id/summary
 GET    /api/admin/users/:id/sessions
+GET    /api/profile/managers
 ```
 
 Root-only endpoints:

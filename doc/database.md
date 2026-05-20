@@ -5,6 +5,7 @@
 ## Core Model
 
 - `users` stores multi-user accounts with role, status, timezone, name/email profile fields, password hash metadata, and a mutable `public_id`. The internal `id` remains the relational primary key; `public_id` is the admin-editable user-facing identifier generated as a UUID by default.
+- `user_managers` links users to one or more responsible admin users. The responsible user must be validated by backend policy as an approved admin.
 - `time_sessions` stores clocked work intervals. It enforces one open session per user and rejects overlapping sessions for the same user.
 - `time_events` stores clock-in, clock-out, break, and manual-adjustment events. Every event stores the client-submitted timestamp and explicit client timezone.
 - `tags` stores user-owned default and custom tags. Only `Presence` is marked as the default tag. `default_tag_templates` seeds `Presence`, `Smart working`, and `Not billable` with colors for registration-time tag creation; all tag colors are constrained to six-digit hex values.
