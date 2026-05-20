@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { assertNoApprovedAdministrativeRequestOverlap } from "../services/administrativeRequests.js";
 import { assertTagsAreCompatible, assertUserTags } from "../services/tags.js";
 import { isoDateTimeSchema, paginationSchema, uuidSchema } from "../utils/validators.js";
 
@@ -149,6 +150,7 @@ router.post("/sessions", async (req, res, next) => {
     const session = await withTransaction(async (client) => {
       await assertUserTags(client, req.user!.id, input.tagIds);
       await assertTagsAreCompatible(client, req.user!.id, input.tagIds);
+      await assertNoApprovedAdministrativeRequestOverlap(client, req.user!.id, startedAt, endedAt ?? new Date(startedAt.getTime() + 1));
 
       const sessionResult = await client.query(
         `insert into time_sessions (user_id, started_at, ended_at, start_timezone, end_timezone, note, source)
@@ -223,6 +225,7 @@ router.patch("/sessions/:id", async (req, res, next) => {
 
       await assertUserTags(client, req.user!.id, input.tagIds);
       await assertTagsAreCompatible(client, req.user!.id, input.tagIds);
+      await assertNoApprovedAdministrativeRequestOverlap(client, req.user!.id, startedAt, endedAt ?? new Date(startedAt.getTime() + 1));
 
       const updateResult = await client.query(
         `update time_sessions

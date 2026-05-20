@@ -432,7 +432,7 @@ router.get("/users/:id/overtime", async (req, res, next) => {
 router.get("/dump", async (req, res, next) => {
   try {
     requireRoot(req);
-    const tables = ["users", "user_managers", "tags", "time_sessions", "session_tags", "time_events", "countdowns", "overtime_payments", "recovery_codes", "passkeys"] as const;
+    const tables = ["users", "user_managers", "administrative_requests", "tags", "time_sessions", "session_tags", "time_events", "countdowns", "overtime_payments", "recovery_codes", "passkeys"] as const;
     const dump: Record<string, unknown[]> = {};
     for (const table of tables) {
       const result = await pool.query(`select * from ${table}`);

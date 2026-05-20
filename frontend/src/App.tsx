@@ -24,7 +24,20 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
-import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, ManagerAssignment, ManagerSummary, OvertimeReport, Tag, Toast } from "./types";
+import type {
+  ActivitySession,
+  AdminUser,
+  AdministrativeRequest,
+  AdministrativeRequestType,
+  AuthMode,
+  ChartBucket,
+  DashboardData,
+  ManagerAssignment,
+  ManagerSummary,
+  OvertimeReport,
+  Tag,
+  Toast
+} from "./types";
 
 const emptyDashboard: DashboardData = {
   user: { name: "User", username: "", email: null, publicId: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
@@ -405,7 +418,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "overtime" | "tags" | "tools" | "profile" | "admin">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "requests" | "overtime" | "tags" | "tools" | "profile" | "admin">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -434,6 +447,9 @@ function Dashboard({
         </button>
         <button className={view === "activities" ? "active" : ""} onClick={() => setView("activities")} type="button">
           <CalendarClock size={16} /> Activities
+        </button>
+        <button className={view === "requests" ? "active" : ""} onClick={() => setView("requests")} type="button">
+          <ShieldCheck size={16} /> Administrative Requests
         </button>
         <button className={view === "overtime" ? "active" : ""} onClick={() => setView("overtime")} type="button">
           <Hourglass size={16} /> Banca ore
@@ -489,6 +505,7 @@ function Dashboard({
       ) : null}
 
       {view === "activities" ? <ActivityPanel tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
+      {view === "requests" ? <AdministrativeRequestsPanel userRole={data.user.role} onToast={onToast} /> : null}
       {view === "overtime" ? <OvertimePanel onToast={onToast} /> : null}
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "tools" ? <TimeTools /> : null}
@@ -548,6 +565,166 @@ function Chart({ title, buckets }: { title: string; buckets: ChartBucket[] }) {
         </div>
       )}
     </article>
+  );
+}
+
+const administrativeRequestLabels: Record<AdministrativeRequestType, string> = {
+  vacation: "Vacation",
+  leave: "Leave",
+  smart_working: "Smart working"
+};
+
+function requestStatusLabel(status: AdministrativeRequest["status"]) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" | "admin" | "root"; onToast: (tone: Toast["tone"], message: string) => void }) {
+  const [requests, setRequests] = useState<AdministrativeRequest[]>([]);
+  const [reviewRequests, setReviewRequests] = useState<AdministrativeRequest[]>([]);
+  const [requestType, setRequestType] = useState<AdministrativeRequestType>("vacation");
+  const [startedAt, setStartedAt] = useState(defaultStartDateTimeValue());
+  const [endedAt, setEndedAt] = useState(defaultEndDateTimeValue());
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState("");
+  const canReview = userRole === "admin" || userRole === "root";
+
+  const loadRequests = async () => {
+    setMessage("");
+    try {
+      const [own, review] = await Promise.all([
+        api.administrativeRequests(),
+        canReview ? api.administrativeRequestsForReview() : Promise.resolve([])
+      ]);
+      setRequests(own);
+      setReviewRequests(review);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load administrative requests.");
+    }
+  };
+
+  useEffect(() => {
+    void loadRequests();
+  }, []);
+
+  const createRequest = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      await api.createAdministrativeRequest({
+        requestType,
+        startedAt: isoFromLocalValue(startedAt),
+        endedAt: isoFromLocalValue(endedAt),
+        note
+      });
+      setNote("");
+      await loadRequests();
+      onToast("success", "Administrative request created.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to create administrative request.");
+    }
+  };
+
+  const setStatus = async (request: AdministrativeRequest, status: "approved" | "revoked") => {
+    try {
+      await api.setAdministrativeRequestStatus(request.id, status);
+      await loadRequests();
+      onToast("success", `Request ${status}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update administrative request.");
+    }
+  };
+
+  const pending = reviewRequests.filter((request) => request.status === "pending");
+  const decided = reviewRequests.filter((request) => request.status !== "pending");
+
+  return (
+    <section className="request-grid">
+      <form className="panel stack" onSubmit={createRequest}>
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Administrative Requests</p>
+            <h2>New request</h2>
+          </div>
+        </div>
+        {message ? <p className="form-message error">{message}</p> : null}
+        <label className="field">
+          <span>Type</span>
+          <select value={requestType} onChange={(event) => setRequestType(event.target.value as AdministrativeRequestType)}>
+            <option value="vacation">Vacation</option>
+            <option value="leave">Leave</option>
+            <option value="smart_working">Smart working</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Start</span>
+          <input type="datetime-local" value={startedAt} onChange={(event) => setStartedAt(event.target.value)} />
+        </label>
+        <label className="field">
+          <span>End</span>
+          <input type="datetime-local" value={endedAt} onChange={(event) => setEndedAt(event.target.value)} />
+        </label>
+        <label className="field">
+          <span>Note</span>
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+        </label>
+        <button className="primary-action" type="submit">
+          <Save size={18} /> Submit request
+        </button>
+      </form>
+
+      <section className="panel stack">
+        <div className="panel-title">
+          <h2>My requests</h2>
+          <button type="button" onClick={loadRequests}><RefreshCw size={16} /> Refresh</button>
+        </div>
+        <RequestList requests={requests} />
+      </section>
+
+      {canReview ? (
+        <>
+          <section className="panel stack">
+            <div className="panel-title">
+              <h2>Requests to review</h2>
+            </div>
+            <RequestList requests={pending} onStatus={setStatus} />
+          </section>
+          <section className="panel stack">
+            <div className="panel-title">
+              <h2>Reviewed requests</h2>
+            </div>
+            <RequestList requests={decided} onStatus={setStatus} />
+          </section>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function RequestList({ requests, onStatus }: { requests: AdministrativeRequest[]; onStatus?: (request: AdministrativeRequest, status: "approved" | "revoked") => void }) {
+  if (requests.length === 0) {
+    return <p className="empty-state">No administrative requests.</p>;
+  }
+  return (
+    <div className="request-list">
+      {requests.map((request) => (
+        <article className={`request-card ${request.status}`} key={request.id}>
+          <div>
+            <p className="eyebrow">{request.requester ? `${request.requester.displayName} (${request.requester.username})` : requestStatusLabel(request.status)}</p>
+            <h3>{administrativeRequestLabels[request.requestType]}</h3>
+            <p className="muted">{new Date(request.startedAt).toLocaleString()} - {new Date(request.endedAt).toLocaleString()}</p>
+            {request.note ? <p className="muted">{request.note}</p> : null}
+          </div>
+          <div className="request-actions">
+            <strong>{requestStatusLabel(request.status)}</strong>
+            {onStatus ? (
+              <>
+                <button type="button" onClick={() => onStatus(request, "approved")}>Approve</button>
+                <button className="danger-action" type="button" onClick={() => onStatus(request, "revoked")}>Revoke</button>
+              </>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }
 

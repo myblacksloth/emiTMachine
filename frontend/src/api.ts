@@ -1,4 +1,4 @@
-import type { ActivitySession, AdminUser, Countdown, DashboardData, ManagerAssignment, ManagerSummary, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
+import type { ActivitySession, AdminUser, AdministrativeRequest, AdministrativeRequestStatus, AdministrativeRequestType, Countdown, DashboardData, ManagerAssignment, ManagerSummary, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -652,6 +652,19 @@ export const api = {
     }),
   myManagers: () =>
     request<{ managers: BackendManagerSummary[] }>("/api/profile/managers").then((payload) => payload.managers.map(mapManagerSummary)),
+  administrativeRequests: () => request<{ requests: AdministrativeRequest[] }>("/api/administrative-requests").then((payload) => payload.requests),
+  createAdministrativeRequest: (input: { requestType: AdministrativeRequestType; startedAt: string; endedAt: string; note: string }) =>
+    request<{ request: AdministrativeRequest }>("/api/administrative-requests", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }).then((payload) => payload.request),
+  administrativeRequestsForReview: () =>
+    request<{ requests: AdministrativeRequest[] }>("/api/administrative-requests/review").then((payload) => payload.requests),
+  setAdministrativeRequestStatus: (id: string, status: AdministrativeRequestStatus) =>
+    request<{ request: AdministrativeRequest }>(`/api/administrative-requests/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status })
+    }).then((payload) => payload.request),
   setupTotp: async () => {
     const result = await request<{ qrCodeDataUrl: string; secret: string }>("/api/auth/totp/setup", { method: "POST" });
     return { qrCodeUrl: result.qrCodeDataUrl, secretLabel: result.secret };

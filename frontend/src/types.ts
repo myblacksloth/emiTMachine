@@ -1,6 +1,8 @@
 export type AuthMode = "login" | "register" | "passkey" | "recovery" | "totp";
 export type UserRole = "user" | "admin" | "root";
 export type OvertimeMode = "overtime" | "time_bank";
+export type AdministrativeRequestType = "vacation" | "leave" | "smart_working";
+export type AdministrativeRequestStatus = "pending" | "approved" | "revoked";
 
 export type Tag = {
   id: string;
@@ -111,6 +113,24 @@ export type ManagerSummary = {
   username: string;
   email: string | null;
   displayName: string;
+};
+
+export type AdministrativeRequest = {
+  id: string;
+  userId: string;
+  requestType: AdministrativeRequestType;
+  startedAt: string;
+  endedAt: string;
+  status: AdministrativeRequestStatus;
+  note: string | null;
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+  requester?: {
+    username: string;
+    displayName: string;
+    publicId: string;
+  };
 };
 
 export type OvertimeWeek = {

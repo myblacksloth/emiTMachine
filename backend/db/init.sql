@@ -11,6 +11,8 @@ CREATE TYPE csv_import_status AS ENUM ('uploaded', 'validated', 'imported', 'fai
 CREATE TYPE auth_challenge_type AS ENUM ('registration', 'login', 'authentication', 'totp_setup', 'totp_login', 'password_recovery');
 CREATE TYPE countdown_status AS ENUM ('active', 'completed', 'cancelled');
 CREATE TYPE overtime_mode AS ENUM ('overtime', 'time_bank');
+CREATE TYPE administrative_request_type AS ENUM ('vacation', 'leave', 'smart_working');
+CREATE TYPE administrative_request_status AS ENUM ('pending', 'approved', 'revoked');
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,6 +75,32 @@ CREATE TABLE user_managers (
 
 CREATE INDEX user_managers_user_idx ON user_managers (user_id);
 CREATE INDEX user_managers_manager_idx ON user_managers (manager_user_id);
+
+CREATE TABLE administrative_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  request_type administrative_request_type NOT NULL,
+  started_at timestamptz NOT NULL,
+  ended_at timestamptz NOT NULL,
+  status administrative_request_status NOT NULL DEFAULT 'pending',
+  note text,
+  decided_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  decided_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT administrative_requests_end_after_start CHECK (ended_at > started_at),
+  CONSTRAINT administrative_requests_decision_state CHECK ((status = 'pending') = (decided_at IS NULL))
+);
+
+ALTER TABLE administrative_requests
+  ADD CONSTRAINT administrative_requests_no_overlap
+  EXCLUDE USING gist (
+    user_id WITH =,
+    (tstzrange(started_at, ended_at, '[)')) WITH &&
+  );
+
+CREATE INDEX administrative_requests_user_status_idx ON administrative_requests (user_id, status, started_at DESC);
+CREATE INDEX administrative_requests_status_idx ON administrative_requests (status, started_at DESC);
 
 CREATE TABLE tags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -462,6 +490,8 @@ CREATE TRIGGER user_totp_factors_set_updated_at BEFORE UPDATE ON user_totp_facto
 CREATE TRIGGER passkeys_set_updated_at BEFORE UPDATE ON passkeys
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER countdowns_set_updated_at BEFORE UPDATE ON countdowns
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER administrative_requests_set_updated_at BEFORE UPDATE ON administrative_requests
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE OR REPLACE FUNCTION normalize_time_session_status()

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { assertNoApprovedAdministrativeRequestOverlap } from "../services/administrativeRequests.js";
 import { assertTagsAreCompatible, assertUserTags } from "../services/tags.js";
 import { isoDateTimeSchema, uuidSchema } from "../utils/validators.js";
 
@@ -64,6 +65,7 @@ router.post("/in", async (req, res, next) => {
 
       await assertUserTags(client, req.user!.id, input.tagIds);
       await assertTagsAreCompatible(client, req.user!.id, input.tagIds);
+      await assertNoApprovedAdministrativeRequestOverlap(client, req.user!.id, occurredAt, new Date(occurredAt.getTime() + 1));
 
       const sessionResult = await client.query(
         `insert into time_sessions (user_id, started_at, start_timezone, note)
@@ -109,6 +111,7 @@ router.post("/out", async (req, res, next) => {
       if (occurredAt <= new Date(current.started_at)) {
         throw new HttpError(400, "Clock out time must be after clock in time");
       }
+      await assertNoApprovedAdministrativeRequestOverlap(client, req.user!.id, new Date(current.started_at), occurredAt);
 
       await client.query(
         `insert into time_events (user_id, session_id, event_type, occurred_at, timezone, note)

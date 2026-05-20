@@ -44,6 +44,7 @@ Admins/root can:
 - update the application-level User ID for users they are allowed to manage;
 - update name and email for users they are allowed to manage;
 - assign users to approved admin responsibles according to the responsibility rules;
+- review administrative requests for users they are responsible for;
 - inspect a selected user's session summary;
 - inspect a selected user's sessions;
 - reset credentials for users they are allowed to manage;
@@ -81,6 +82,10 @@ DELETE /api/admin/users/:id
 GET    /api/admin/users/:id/summary
 GET    /api/admin/users/:id/sessions
 GET    /api/profile/managers
+GET    /api/administrative-requests
+POST   /api/administrative-requests
+GET    /api/administrative-requests/review
+PATCH  /api/administrative-requests/:id/status
 ```
 
 Root-only endpoints:
