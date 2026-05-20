@@ -429,6 +429,35 @@ router.get("/users/:id/overtime", async (req, res, next) => {
   }
 });
 
+router.delete("/administrative-requests/cleanup", async (req, res, next) => {
+  try {
+    requireRoot(req);
+    // Only fully closed past-month requests are deleted; requests touching the current month stay available.
+    const result = await pool.query(
+      `with cutoff as (
+         select date_trunc('month', now()) as month_start
+       ),
+       deleted as (
+         delete from administrative_requests ar
+         using cutoff
+         where ar.ended_at < cutoff.month_start
+         returning ar.id
+       )
+       select (select month_start from cutoff) as cutoff, count(*)::int as deleted_count
+       from deleted`
+    );
+    const payload = result.rows[0] ?? { cutoff: new Date().toISOString(), deleted_count: 0 };
+    req.log?.info("old administrative requests cleaned", {
+      actorUserId: req.user!.id,
+      cutoff: payload.cutoff,
+      deletedCount: payload.deleted_count
+    });
+    res.json({ cutoff: payload.cutoff, deletedCount: payload.deleted_count });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/dump", async (req, res, next) => {
   try {
     requireRoot(req);

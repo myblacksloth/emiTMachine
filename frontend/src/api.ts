@@ -619,6 +619,8 @@ export const api = {
   adminUserSessions: (id: string) =>
     request<{ sessions: BackendSession[] }>(`/api/admin/users/${id}/sessions?limit=100`).then((payload) => payload.sessions.map(mapSession)),
   adminUserOvertime: (id: string) => request<OvertimeReport>(`/api/admin/users/${id}/overtime`),
+  cleanupAdministrativeRequests: () =>
+    request<{ cutoff: string; deletedCount: number }>("/api/admin/administrative-requests/cleanup", { method: "DELETE" }),
   adminDumpUrl: `${apiBaseUrl}/api/admin/dump`,
   clockIn: (occurredAt: string, tagIds: string[], note: string) =>
     request<{ session: unknown }>("/api/punch/in", {

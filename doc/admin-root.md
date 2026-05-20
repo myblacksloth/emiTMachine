@@ -55,7 +55,8 @@ Root can additionally:
 
 - approve pending admin registrations;
 - lock or reopen new user registration;
-- download a JSON application dump.
+- download a JSON application dump;
+- clean administrative requests that ended before the current month.
 
 ## Responsibles
 
@@ -94,6 +95,7 @@ Root-only endpoints:
 POST   /api/admin/users/:id/approve-admin
 GET    /api/admin/settings/registration
 PATCH  /api/admin/settings/registration
+DELETE /api/admin/administrative-requests/cleanup
 GET    /api/admin/dump
 GET    /api/admin/dump/users.csv
 ```
@@ -118,6 +120,8 @@ Root can download an application-level JSON dump from:
 GET /api/admin/dump
 ```
 
+The JSON dump includes the current operational tables, including users, responsible assignments, administrative requests, tags, work sessions, session tags, time events, countdowns, overtime payments, recovery code metadata, and passkeys.
+
 Full restore is intentionally not implemented in the web UI yet. A safe restore flow should include:
 
 - upload validation;
@@ -128,3 +132,15 @@ Full restore is intentionally not implemented in the web UI yet. A safe restore 
 - clear rollback instructions.
 
 Until that is implemented, restore should be handled as a controlled PostgreSQL operation by an operator.
+
+## Administrative Request Cleanup
+
+Root can remove old administrative requests from the Admin dashboard after an explicit browser confirmation.
+
+The cleanup endpoint deletes only requests whose `ended_at` timestamp is before the first day of the current month:
+
+```text
+DELETE /api/admin/administrative-requests/cleanup
+```
+
+Requests that overlap or belong to the current month are kept.

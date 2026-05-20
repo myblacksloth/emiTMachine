@@ -1583,6 +1583,12 @@ button svg,
   font-weight: 700;
 }
 
+.admin-maintenance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .admin-user-list {
   display: grid;
   gap: 0.75rem;

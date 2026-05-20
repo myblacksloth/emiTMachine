@@ -1007,6 +1007,13 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", "Registration setting updated.");
   };
 
+  const cleanupAdministrativeRequests = async () => {
+    // Root confirmation keeps cleanup explicit because the deleted requests are not restored by the UI.
+    if (!window.confirm("Delete administrative requests completed before the current month? This cannot be undone.")) return;
+    const result = await api.cleanupAdministrativeRequests();
+    onToast("success", `${result.deletedCount} old administrative request${result.deletedCount === 1 ? "" : "s"} deleted.`);
+  };
+
   return (
     <section className="admin-grid">
       <section className="panel stack">
@@ -1096,9 +1103,14 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           ))}
         </div>
         {currentRole === "root" ? (
-          <a className="download-link" href={api.adminDumpUrl}>
-            <Download size={16} /> Download JSON dump
-          </a>
+          <div className="admin-maintenance-actions">
+            <a className="download-link" href={api.adminDumpUrl}>
+              <Download size={16} /> Download JSON dump
+            </a>
+            <button className="danger-action" type="button" onClick={cleanupAdministrativeRequests}>
+              <Trash2 size={16} /> Clean old requests
+            </button>
+          </div>
         ) : null}
       </section>
 
