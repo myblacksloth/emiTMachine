@@ -4,6 +4,7 @@ import { z } from "zod";
 import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { getOvertimeReport } from "./overtime.js";
 import { hashPassword, randomToken } from "../utils/crypto.js";
 import { paginationSchema, uuidSchema } from "../utils/validators.js";
 
@@ -15,6 +16,11 @@ const resetPasswordSchema = z.object({
 
 const editPermissionSchema = z.object({
   canEditSessions: z.boolean()
+});
+
+const overtimePermissionSchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(["overtime", "time_bank"])
 });
 
 const registrationSchema = z.object({
@@ -39,7 +45,9 @@ router.get("/users", async (req, res, next) => {
   try {
     requireAdmin(req);
     const result = await pool.query(
-      `select id, username, email, display_name, role, admin_approved, can_edit_sessions, status, disabled_at, created_at, last_login_at
+      `select id, username, email, display_name, role, admin_approved, can_edit_sessions,
+              overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
+              status, disabled_at, created_at, last_login_at
        from users
        order by case role when 'root' then 0 when 'admin' then 1 else 2 end, created_at desc`
     );
@@ -80,6 +88,57 @@ router.patch("/users/:id/edit-permission", async (req, res, next) => {
       [userId, req.user!.role, input.canEditSessions]
     );
     if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/users/:id/overtime-permission", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const input = overtimePermissionSchema.parse(req.body);
+    const result = await pool.query(
+      `update users
+       set overtime_enabled = $3,
+           overtime_mode = $4,
+           weekly_work_minutes = case when $3::boolean then weekly_work_minutes else null end,
+           weekly_work_minutes_set_at = case when $3::boolean then weekly_work_minutes_set_at else null end,
+           updated_at = now()
+       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')
+       returning id`,
+      [userId, req.user!.role, input.enabled, input.mode]
+    );
+    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    if (!input.enabled) {
+      await pool.query("delete from overtime_payments where user_id = $1", [userId]);
+    }
+    req.log?.info("overtime permission updated", { actorUserId: req.user!.id, userId, enabled: input.enabled, mode: input.mode });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/users/:id/overtime-payments/:weekStart", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const weekStart = z.string().date().parse(req.params.weekStart);
+    const result = await pool.query(
+      `delete from overtime_payments op
+       using users u
+       where op.user_id = u.id
+         and op.user_id = $1
+         and op.week_start = $3::date
+         and u.role <> 'root'
+         and ($2::text = 'root' or u.role = 'user')
+       returning op.id`,
+      [userId, req.user!.role, weekStart]
+    );
+    if (!result.rows[0]) throw new HttpError(404, "Payment status not found or cannot be changed by this admin");
+    req.log?.info("overtime payment removed by admin", { actorUserId: req.user!.id, userId, weekStart });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -208,10 +267,26 @@ router.get("/users/:id/sessions", async (req, res, next) => {
   }
 });
 
+router.get("/users/:id/overtime", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const userResult = await pool.query(
+      `select id from users
+       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')`,
+      [userId, req.user!.role]
+    );
+    if (!userResult.rows[0]) throw new HttpError(404, "User not found or cannot be viewed by this admin");
+    res.json(await getOvertimeReport(userId));
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/dump", async (req, res, next) => {
   try {
     requireRoot(req);
-    const tables = ["users", "tags", "time_sessions", "session_tags", "time_events", "countdowns", "recovery_codes", "passkeys"] as const;
+    const tables = ["users", "tags", "time_sessions", "session_tags", "time_events", "countdowns", "overtime_payments", "recovery_codes", "passkeys"] as const;
     const dump: Record<string, unknown[]> = {};
     for (const table of tables) {
       const result = await pool.query(`select * from ${table}`);
@@ -228,7 +303,13 @@ router.get("/dump", async (req, res, next) => {
 router.get("/dump/users.csv", async (req, res, next) => {
   try {
     requireRoot(req);
-    const result = await pool.query("select id, username, email, display_name, role, admin_approved, can_edit_sessions, status, created_at from users order by created_at");
+    const result = await pool.query(
+      `select id, username, email, display_name, role, admin_approved, can_edit_sessions,
+              overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
+              status, created_at
+       from users
+       order by created_at`
+    );
     res.header("Content-Type", "text/csv; charset=utf-8");
     res.header("Content-Disposition", "attachment; filename=\"emitmachine-users.csv\"");
     res.send(stringify(result.rows, { header: true }));

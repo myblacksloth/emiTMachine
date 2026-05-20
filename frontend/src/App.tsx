@@ -24,7 +24,7 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
-import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, Tag, Toast } from "./types";
+import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, OvertimeReport, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
   user: { name: "User", username: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
@@ -44,9 +44,26 @@ const emptyDashboard: DashboardData = {
 const palette = ["#27b3a8", "#ff8a4c", "#7c6ee6", "#e14f77", "#3f8cff", "#8abf45"];
 
 function minutesLabel(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return `${hours}h ${String(rest).padStart(2, "0")}m`;
+  const sign = minutes < 0 ? "-" : "";
+  const absolute = Math.abs(minutes);
+  const hours = Math.floor(absolute / 60);
+  const rest = absolute % 60;
+  return `${sign}${hours}h ${String(rest).padStart(2, "0")}m`;
+}
+
+function dateFromDateOnly(value: string) {
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function weekRangeLabel(weekStart: string) {
+  const start = dateFromDateOnly(weekStart);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const startLabel = start.toLocaleDateString(undefined, sameMonth ? { day: "numeric" } : { day: "numeric", month: "short" });
+  const endLabel = end.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return `${startLabel} - ${endLabel}`;
 }
 
 function clientDateTimeValue() {
@@ -360,7 +377,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "tags" | "tools" | "profile" | "admin">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "overtime" | "tags" | "tools" | "profile" | "admin">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -389,6 +406,9 @@ function Dashboard({
         </button>
         <button className={view === "activities" ? "active" : ""} onClick={() => setView("activities")} type="button">
           <CalendarClock size={16} /> Activities
+        </button>
+        <button className={view === "overtime" ? "active" : ""} onClick={() => setView("overtime")} type="button">
+          <Hourglass size={16} /> Banca ore
         </button>
         <button className={view === "tags" ? "active" : ""} onClick={() => setView("tags")} type="button">
           <Tags size={16} /> Tags
@@ -441,6 +461,7 @@ function Dashboard({
       ) : null}
 
       {view === "activities" ? <ActivityPanel tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
+      {view === "overtime" ? <OvertimePanel onToast={onToast} /> : null}
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "tools" ? <TimeTools /> : null}
       {view === "profile" ? <ProfileSettings data={data} onToast={onToast} onRefresh={onRefresh} /> : null}
@@ -502,10 +523,125 @@ function Chart({ title, buckets }: { title: string; buckets: ChartBucket[] }) {
   );
 }
 
+function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: string) => void }) {
+  const [report, setReport] = useState<OvertimeReport | null>(null);
+  const [targetHours, setTargetHours] = useState("40");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const loadOvertime = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      setReport(await api.overtime());
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load overtime data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadOvertime();
+  }, []);
+
+  const saveWeeklyTarget = async () => {
+    const minutes = Math.round((Number(targetHours) || 0) * 60);
+    if (minutes <= 0) {
+      setMessage("Enter a weekly target greater than zero.");
+      return;
+    }
+    try {
+      setReport(await api.setWeeklyWorkMinutes(minutes));
+      onToast("success", "Weekly target saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save weekly target.");
+    }
+  };
+
+  const markPaid = async (weekStart: string) => {
+    try {
+      setReport(await api.markOvertimePaid(weekStart));
+      onToast("success", "Payment marked as received.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to mark payment.");
+    }
+  };
+
+  const settings = report?.settings;
+
+  return (
+    <section className="panel overtime-panel">
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">Banca ore straordinari</p>
+          <h2>Overtime balance</h2>
+        </div>
+        <button type="button" onClick={loadOvertime} disabled={loading}>
+          <RefreshCw size={16} /> Refresh
+        </button>
+      </div>
+      {message ? <p className="form-message error">{message}</p> : null}
+      {loading ? <div className="loading-line">Loading overtime data...</div> : null}
+      {!settings?.enabled ? (
+        <p className="empty-state">This feature is not enabled for your user yet.</p>
+      ) : null}
+      {settings?.enabled && settings.weeklyWorkMinutes === null ? (
+        <div className="overtime-setup">
+          <TextField label="Weekly target hours" value={targetHours} onChange={setTargetHours} type="number" min="1" step="0.25" />
+          <p className="muted">This value can be set once. If an admin disables the feature later, the target is cleared.</p>
+          <button className="primary-action" type="button" onClick={saveWeeklyTarget}>
+            <Save size={18} /> Save weekly target
+          </button>
+        </div>
+      ) : null}
+      {settings?.enabled && settings.weeklyWorkMinutes !== null && report ? (
+        <>
+          <section className="summary-grid compact overtime-summary" aria-label="Overtime summary">
+            <Metric label="Mode" value={settings.mode === "time_bank" ? "Banca ore" : "Straordinari"} icon={<Hourglass size={18} />} />
+            <Metric label="Weekly target" value={minutesLabel(settings.weeklyWorkMinutes)} icon={<TimerReset size={18} />} />
+            <Metric label="Residual bank" value={settings.mode === "time_bank" ? minutesLabel(report.residualMinutes) : "—"} icon={<BarChart3 size={18} />} />
+            <Metric label="Weeks" value={String(report.weeks.length)} icon={<CalendarClock size={18} />} />
+          </section>
+          <div className="overtime-week-list">
+            {report.weeks.map((week) => (
+              <article className="overtime-week" key={week.weekStart}>
+                <div>
+                  <p className="eyebrow">{week.isClosed ? "Closed week" : "Current week"}</p>
+                  <h3>{weekRangeLabel(week.weekStart)}</h3>
+                  <p className="muted">
+                    Worked {minutesLabel(week.workedMinutes)} · target {minutesLabel(week.targetMinutes)}
+                  </p>
+                </div>
+                <div className="overtime-week-stats">
+                  <strong className={week.deltaMinutes >= 0 ? "positive" : "negative"}>
+                    {week.deltaMinutes >= 0 ? "+" : "-"}{minutesLabel(Math.abs(week.deltaMinutes))}
+                  </strong>
+                  <span>Overtime {minutesLabel(week.overtimeMinutes)}</span>
+                  {settings.mode === "overtime" && week.isClosed && week.overtimeMinutes > 0 ? (
+                    week.paidAt ? (
+                      <span className="paid-chip">Paid {new Date(week.paidAt).toLocaleDateString()}</span>
+                    ) : (
+                      <button type="button" onClick={() => markPaid(week.weekStart)}>
+                        Mark paid
+                      </button>
+                    )
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; onToast: (tone: Toast["tone"], message: string) => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedSessions, setSelectedSessions] = useState<ActivitySession[]>([]);
+  const [selectedOvertime, setSelectedOvertime] = useState<OvertimeReport | null>(null);
   const [summary, setSummary] = useState<{ sessions: number; total_seconds: string | number; average_session_seconds: string | number; days_worked: number } | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [temporaryPassword, setTemporaryPassword] = useState("");
@@ -530,9 +666,14 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const loadSelectedUserData = async (userId: string) => {
     if (!userId) return;
     try {
-      const [summaryPayload, sessions] = await Promise.all([api.adminUserSummary(userId), api.adminUserSessions(userId)]);
+      const [summaryPayload, sessions, overtime] = await Promise.all([
+        api.adminUserSummary(userId),
+        api.adminUserSessions(userId),
+        api.adminUserOvertime(userId).catch(() => null)
+      ]);
       setSummary(summaryPayload.summary);
       setSelectedSessions(sessions);
+      setSelectedOvertime(overtime);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load selected user data.");
     }
@@ -556,6 +697,27 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     await api.setUserEditPermission(user.id, !user.canEditSessions);
     await loadUsers();
     onToast("success", "Session edit permission updated.");
+  };
+
+  const toggleOvertimePermission = async (user: AdminUser) => {
+    await api.setUserOvertimePermission(user.id, !user.overtimeEnabled, user.overtimeMode);
+    await loadUsers();
+    await loadSelectedUserData(user.id);
+    onToast("success", "Overtime feature updated.");
+  };
+
+  const changeOvertimeMode = async (user: AdminUser, mode: "overtime" | "time_bank") => {
+    await api.setUserOvertimePermission(user.id, true, mode);
+    await loadUsers();
+    await loadSelectedUserData(user.id);
+    onToast("success", "Overtime mode updated.");
+  };
+
+  const deleteOvertimePayment = async (weekStart: string) => {
+    if (!selectedUserId) return;
+    await api.deleteUserOvertimePayment(selectedUserId, weekStart);
+    await loadSelectedUserData(selectedUserId);
+    onToast("success", "Payment status removed.");
   };
 
   const resetPassword = async (user: AdminUser) => {
@@ -619,6 +781,19 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                     {user.canEditSessions ? "Disable edits" : "Enable edits"}
                   </button>
                 ) : null}
+                {user.role !== "root" ? (
+                  <>
+                    <button type="button" onClick={() => toggleOvertimePermission(user)}>
+                      {user.overtimeEnabled ? "Disable overtime" : "Enable overtime"}
+                    </button>
+                    {user.overtimeEnabled ? (
+                      <select value={user.overtimeMode} onChange={(event) => changeOvertimeMode(user, event.target.value as "overtime" | "time_bank")}>
+                        <option value="overtime">Straordinari</option>
+                        <option value="time_bank">Banca ore</option>
+                      </select>
+                    ) : null}
+                  </>
+                ) : null}
                 {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
                   <>
                     <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
@@ -649,6 +824,33 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             <Metric label="Total" value={minutesLabel(Math.round(Number(summary.total_seconds ?? 0) / 60))} icon={<TimerReset size={18} />} />
             <Metric label="Average" value={minutesLabel(Math.round(Number(summary.average_session_seconds ?? 0) / 60))} icon={<BarChart3 size={18} />} />
             <Metric label="Days" value={String(summary.days_worked ?? 0)} icon={<Sparkles size={18} />} />
+          </section>
+        ) : null}
+        {selectedOvertime?.settings.enabled ? (
+          <section className="overtime-admin-box">
+            <div className="panel-title compact-title">
+              <div>
+                <p className="eyebrow">Banca ore straordinari</p>
+                <h2>{selectedOvertime.settings.mode === "time_bank" ? "Banca ore" : "Straordinari"}</h2>
+              </div>
+              <strong>{selectedOvertime.settings.weeklyWorkMinutes ? minutesLabel(selectedOvertime.settings.weeklyWorkMinutes) : "Target missing"}</strong>
+            </div>
+            {selectedOvertime.settings.mode === "time_bank" ? (
+              <p className="form-message">Residual bank: <strong>{minutesLabel(selectedOvertime.residualMinutes)}</strong></p>
+            ) : null}
+            <div className="overtime-week-list compact">
+              {selectedOvertime.weeks.filter((week) => week.paidAt).map((week) => (
+                <article className="overtime-week" key={week.weekStart}>
+                  <div>
+                    <h3>{weekRangeLabel(week.weekStart)}</h3>
+                    <p className="muted">Paid overtime: {minutesLabel(week.overtimeMinutes)}</p>
+                  </div>
+                  <button className="danger-action" type="button" onClick={() => deleteOvertimePayment(week.weekStart)}>
+                    Remove paid status
+                  </button>
+                </article>
+              ))}
+            </div>
           </section>
         ) : null}
         <div className="activity-list">
@@ -1565,7 +1767,9 @@ function TextField({
   autoComplete,
   inputMode,
   placeholder,
-  minLength
+  minLength,
+  min,
+  step
 }: {
   label: string;
   value: string;
@@ -1575,11 +1779,23 @@ function TextField({
   inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
   placeholder?: string;
   minLength?: number;
+  min?: string;
+  step?: string;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} autoComplete={autoComplete} inputMode={inputMode} placeholder={placeholder} minLength={minLength} />
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        minLength={minLength}
+        min={min}
+        step={step}
+      />
     </label>
   );
 }

@@ -1,5 +1,6 @@
 export type AuthMode = "login" | "register" | "passkey" | "recovery" | "totp";
 export type UserRole = "user" | "admin" | "root";
+export type OvertimeMode = "overtime" | "time_bank";
 
 export type Tag = {
   id: string;
@@ -84,10 +85,35 @@ export type AdminUser = {
   role: UserRole;
   adminApproved: boolean;
   canEditSessions: boolean;
+  overtimeEnabled: boolean;
+  overtimeMode: OvertimeMode;
+  weeklyWorkMinutes: number | null;
+  weeklyWorkMinutesSetAt: string | null;
   status: "active" | "disabled" | "locked";
   disabledAt: string | null;
   createdAt: string;
   lastLoginAt: string | null;
+};
+
+export type OvertimeWeek = {
+  weekStart: string;
+  workedMinutes: number;
+  targetMinutes: number;
+  deltaMinutes: number;
+  overtimeMinutes: number;
+  isClosed: boolean;
+  paidAt: string | null;
+};
+
+export type OvertimeReport = {
+  settings: {
+    enabled: boolean;
+    mode: OvertimeMode;
+    weeklyWorkMinutes: number | null;
+    weeklyWorkMinutesSetAt: string | null;
+  };
+  residualMinutes: number;
+  weeks: OvertimeWeek[];
 };
 
 export type Toast = {

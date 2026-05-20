@@ -9,6 +9,7 @@ import adminRoutes from "./routes/admin.js";
 import countdownRoutes from "./routes/countdowns.js";
 import csvRoutes from "./routes/csv.js";
 import healthRoutes from "./routes/health.js";
+import overtimeRoutes from "./routes/overtime.js";
 import passkeyRoutes from "./routes/passkeys.js";
 import profileRoutes from "./routes/profile.js";
 import punchRoutes from "./routes/punch.js";
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/auth/recovery", recoveryRoutes);
   app.use("/api/auth/passkeys", passkeyRoutes);
   app.use("/api/countdowns", countdownRoutes);
+  app.use("/api/overtime", overtimeRoutes);
   app.use("/api/profile", profileRoutes);
   app.use("/api/punch", punchRoutes);
   app.use("/api/tags", tagRoutes);

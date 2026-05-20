@@ -19,6 +19,8 @@ docker-compose-reverse.*.env
 .DS_Store
 ._*
 
+.priv*
+
 
 todo.txt
 done.txt

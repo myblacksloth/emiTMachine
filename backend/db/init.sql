@@ -10,6 +10,7 @@ CREATE TYPE time_event_source AS ENUM ('manual', 'user_confirmed', 'manual_edit'
 CREATE TYPE csv_import_status AS ENUM ('uploaded', 'validated', 'imported', 'failed', 'cancelled');
 CREATE TYPE auth_challenge_type AS ENUM ('registration', 'login', 'authentication', 'totp_setup', 'totp_login', 'password_recovery');
 CREATE TYPE countdown_status AS ENUM ('active', 'completed', 'cancelled');
+CREATE TYPE overtime_mode AS ENUM ('overtime', 'time_bank');
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,6 +23,10 @@ CREATE TABLE users (
   status account_status NOT NULL DEFAULT 'active',
   admin_approved boolean NOT NULL DEFAULT true,
   can_edit_sessions boolean NOT NULL DEFAULT true,
+  overtime_enabled boolean NOT NULL DEFAULT false,
+  overtime_mode overtime_mode NOT NULL DEFAULT 'overtime',
+  weekly_work_minutes integer,
+  weekly_work_minutes_set_at timestamptz,
   disabled_at timestamptz,
   timezone text NOT NULL DEFAULT 'UTC',
   totp_secret text,
@@ -36,7 +41,9 @@ CREATE TABLE users (
   CONSTRAINT users_email_not_blank CHECK (email IS NULL OR length(btrim(email::text)) > 3),
   CONSTRAINT users_password_hash_not_blank CHECK (length(btrim(password_hash)) > 0),
   CONSTRAINT users_timezone_not_blank CHECK (length(btrim(timezone)) > 0),
-  CONSTRAINT users_disabled_state CHECK ((status = 'disabled') = (disabled_at IS NOT NULL))
+  CONSTRAINT users_disabled_state CHECK ((status = 'disabled') = (disabled_at IS NOT NULL)),
+  CONSTRAINT users_weekly_work_minutes_positive CHECK (weekly_work_minutes IS NULL OR weekly_work_minutes > 0),
+  CONSTRAINT users_weekly_work_minutes_state CHECK ((weekly_work_minutes IS NULL) = (weekly_work_minutes_set_at IS NULL))
 );
 
 CREATE TABLE system_settings (
@@ -237,6 +244,21 @@ CREATE TABLE app_sessions (
 
 CREATE INDEX app_sessions_user_active_idx ON app_sessions (user_id, expires_at DESC) WHERE revoked_at IS NULL;
 CREATE INDEX app_sessions_expires_idx ON app_sessions (expires_at);
+
+CREATE TABLE overtime_payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  week_start date NOT NULL,
+  overtime_minutes integer NOT NULL,
+  paid_at timestamptz NOT NULL DEFAULT now(),
+  paid_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT overtime_payments_week_start_monday CHECK (extract(isodow from week_start) = 1),
+  CONSTRAINT overtime_payments_minutes_positive CHECK (overtime_minutes > 0),
+  UNIQUE (user_id, week_start)
+);
+
+CREATE INDEX overtime_payments_user_week_idx ON overtime_payments (user_id, week_start DESC);
 
 CREATE TABLE user_totp_factors (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

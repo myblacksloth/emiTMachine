@@ -1,4 +1,4 @@
-import type { ActivitySession, AdminUser, Countdown, DashboardData, Tag, UserRole } from "./types";
+import type { ActivitySession, AdminUser, Countdown, DashboardData, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -80,6 +80,10 @@ type BackendAdminUser = {
   role: UserRole;
   admin_approved: boolean;
   can_edit_sessions: boolean;
+  overtime_enabled: boolean;
+  overtime_mode: OvertimeMode;
+  weekly_work_minutes: number | null;
+  weekly_work_minutes_set_at: string | null;
   status: "active" | "disabled" | "locked";
   disabled_at: string | null;
   created_at: string;
@@ -216,6 +220,10 @@ function mapAdminUser(user: BackendAdminUser): AdminUser {
     role: user.role,
     adminApproved: user.admin_approved,
     canEditSessions: user.can_edit_sessions,
+    overtimeEnabled: user.overtime_enabled,
+    overtimeMode: user.overtime_mode,
+    weeklyWorkMinutes: user.weekly_work_minutes,
+    weeklyWorkMinutesSetAt: user.weekly_work_minutes_set_at,
     status: user.status,
     disabledAt: user.disabled_at,
     createdAt: user.created_at,
@@ -514,6 +522,17 @@ export const api = {
       body: JSON.stringify({ status: "completed" })
     }),
   deleteCountdown: (id: string) => request<void>(`/api/countdowns/${id}`, { method: "DELETE" }),
+  overtime: () => request<OvertimeReport>("/api/overtime"),
+  setWeeklyWorkMinutes: (weeklyWorkMinutes: number) =>
+    request<OvertimeReport>("/api/overtime/weekly-target", {
+      method: "POST",
+      body: JSON.stringify({ weeklyWorkMinutes })
+    }),
+  markOvertimePaid: (weekStart: string) =>
+    request<OvertimeReport>("/api/overtime/payments", {
+      method: "POST",
+      body: JSON.stringify({ weekStart })
+    }),
   adminUsers: () => request<{ users: BackendAdminUser[] }>("/api/admin/users").then((payload) => payload.users.map(mapAdminUser)),
   approveAdmin: (id: string) => request<void>(`/api/admin/users/${id}/approve-admin`, { method: "POST" }),
   setUserEditPermission: (id: string, canEditSessions: boolean) =>
@@ -521,6 +540,13 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ canEditSessions })
     }),
+  setUserOvertimePermission: (id: string, enabled: boolean, mode: OvertimeMode) =>
+    request<void>(`/api/admin/users/${id}/overtime-permission`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled, mode })
+    }),
+  deleteUserOvertimePayment: (id: string, weekStart: string) =>
+    request<void>(`/api/admin/users/${id}/overtime-payments/${weekStart}`, { method: "DELETE" }),
   resetUserPassword: (id: string) => request<{ temporaryPassword: string }>(`/api/admin/users/${id}/reset-password`, { method: "POST" }),
   deleteUser: (id: string) => request<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
   registrationSetting: () => request<{ enabled: boolean }>("/api/admin/settings/registration"),
@@ -532,6 +558,7 @@ export const api = {
   adminUserSummary: (id: string) => request<{ summary: BackendSummary }>(`/api/admin/users/${id}/summary`),
   adminUserSessions: (id: string) =>
     request<{ sessions: BackendSession[] }>(`/api/admin/users/${id}/sessions?limit=100`).then((payload) => payload.sessions.map(mapSession)),
+  adminUserOvertime: (id: string) => request<OvertimeReport>(`/api/admin/users/${id}/overtime`),
   adminDumpUrl: `${apiBaseUrl}/api/admin/dump`,
   clockIn: (occurredAt: string, tagIds: string[], note: string) =>
     request<{ session: unknown }>("/api/punch/in", {

@@ -8,16 +8,17 @@
 | ------------ | ------------ |
 | ![](./stuff/i/SCR-20260515-oemn.png)  | ![](./stuff/i/SCR-20260515-oeyo.png)  |
 | ![](./stuff/i/SCR-20260515-offp.png)  |  ![](./stuff/i/SCR-20260515-oflv.png) |
-| ![](./stuff/i/SCR-20260515-ofrs.png) | |
+| ![](./stuff/i/SCR-20260515-ofrs.png) | ![](./stuff/i/SCR-20260520-otwy.png) |
 
 <!-- 
 ![](./stuff/i/.png)
 -->
 
-
 emiTMachine is a multi-user time tracking webapp for work sessions, tags, reports, TOTP, passkeys, recovery codes, and CSV history.
 
 Activity history can be manually inserted, reviewed, edited, and deleted from the frontend. See `doc/activity-management.md` for the current default behavior and the planned admin-controlled permission model. Countdown behavior is documented in `doc/countdowns.md`.
+
+The overtime/time-bank feature is documented in `doc/overtime-bank.md`. It is enabled per user by an admin, supports both overtime payment tracking and residual time-bank calculation, and lets users set their weekly target only once.
 
 Root/admin behavior is documented in `doc/admin-root.md`.
 
