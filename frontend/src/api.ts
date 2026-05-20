@@ -61,6 +61,7 @@ async function requestOptional<T>(path: string, options: RequestInit = {}): Prom
 
 type BackendUser = {
   id: string;
+  publicId?: string;
   username: string;
   email?: string | null;
   displayName: string;
@@ -74,6 +75,7 @@ type BackendUser = {
 
 type BackendAdminUser = {
   id: string;
+  public_id: string;
   username: string;
   email: string | null;
   display_name: string;
@@ -214,6 +216,7 @@ function mapSession(session: BackendSession): ActivitySession {
 function mapAdminUser(user: BackendAdminUser): AdminUser {
   return {
     id: user.id,
+    publicId: user.public_id,
     username: user.username,
     email: user.email,
     displayName: user.display_name,
@@ -413,6 +416,7 @@ async function fetchDashboard() {
     user: {
       name: me.user.displayName,
       username: me.user.username,
+      publicId: me.user.publicId,
       role: me.user.role,
       adminApproved: me.user.adminApproved ?? true,
       canEditSessions: me.user.canEditSessions ?? true,
@@ -535,6 +539,11 @@ export const api = {
     }),
   adminUsers: () => request<{ users: BackendAdminUser[] }>("/api/admin/users").then((payload) => payload.users.map(mapAdminUser)),
   approveAdmin: (id: string) => request<void>(`/api/admin/users/${id}/approve-admin`, { method: "POST" }),
+  setUserPublicId: (id: string, publicId: string) =>
+    request<{ publicId: string }>(`/api/admin/users/${id}/public-id`, {
+      method: "PATCH",
+      body: JSON.stringify({ publicId })
+    }),
   setUserEditPermission: (id: string, canEditSessions: boolean) =>
     request<void>(`/api/admin/users/${id}/edit-permission`, {
       method: "PATCH",

@@ -59,6 +59,7 @@ export type DashboardData = {
   user: {
     name: string;
     username: string;
+    publicId?: string;
     role: UserRole;
     adminApproved: boolean;
     canEditSessions: boolean;
@@ -79,6 +80,7 @@ export type DashboardData = {
 
 export type AdminUser = {
   id: string;
+  publicId: string;
   username: string;
   email: string | null;
   displayName: string;

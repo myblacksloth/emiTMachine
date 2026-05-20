@@ -14,6 +14,7 @@ CREATE TYPE overtime_mode AS ENUM ('overtime', 'time_bank');
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  public_id text NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
   username citext NOT NULL UNIQUE,
   email citext UNIQUE,
   name text NOT NULL DEFAULT '',
@@ -36,6 +37,7 @@ CREATE TABLE users (
   locked_until timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT users_public_id_not_blank CHECK (length(btrim(public_id)) > 0),
   CONSTRAINT users_username_not_blank CHECK (length(btrim(username::text)) >= 3),
   CONSTRAINT users_username_format CHECK (username::text ~ '^[A-Za-z0-9_][A-Za-z0-9_.-]{2,31}$'),
   CONSTRAINT users_email_not_blank CHECK (email IS NULL OR length(btrim(email::text)) > 3),

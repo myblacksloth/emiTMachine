@@ -27,7 +27,7 @@ import { api } from "./api";
 import type { ActivitySession, AdminUser, AuthMode, ChartBucket, DashboardData, OvertimeReport, Tag, Toast } from "./types";
 
 const emptyDashboard: DashboardData = {
-  user: { name: "User", username: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
+  user: { name: "User", username: "", publicId: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
   activeSession: null,
   tags: [],
   charts: { daily: [], weekly: [], monthly: [] },
@@ -727,6 +727,19 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", "Session edit permission updated.");
   };
 
+  const updatePublicId = async (user: AdminUser) => {
+    const nextPublicId = window.prompt(`User ID for ${user.username}`, user.publicId);
+    if (nextPublicId === null) return;
+    const trimmed = nextPublicId.trim();
+    if (!trimmed) {
+      setMessage("User ID cannot be empty.");
+      return;
+    }
+    await api.setUserPublicId(user.id, trimmed);
+    await loadUsers();
+    onToast("success", "User ID updated.");
+  };
+
   const toggleOvertimePermission = async (user: AdminUser) => {
     await api.setUserOvertimePermission(user.id, !user.overtimeEnabled, user.overtimeMode);
     await loadUsers();
@@ -798,11 +811,14 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             <article className={`admin-user ${selectedUserId === user.id ? "active" : ""}`} key={user.id}>
               <button type="button" onClick={() => setSelectedUserId(user.id)}>
                 <strong>{user.username}</strong>
-                <span>{user.role}{user.role === "admin" && !user.adminApproved ? " · pending" : ""}</span>
+                <span>{user.publicId} · {user.role}{user.role === "admin" && !user.adminApproved ? " · pending" : ""}</span>
               </button>
               <div className="admin-user-actions">
                 {currentRole === "root" && user.role === "admin" && !user.adminApproved ? (
                   <button type="button" onClick={() => approveAdmin(user)}>Approve</button>
+                ) : null}
+                {currentRole === "root" || user.role === "user" ? (
+                  <button type="button" onClick={() => updatePublicId(user)}>Edit user ID</button>
                 ) : null}
                 {user.role !== "root" ? (
                   <button type="button" onClick={() => toggleEditPermission(user)}>
@@ -844,6 +860,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           <div>
             <p className="eyebrow">Selected user</p>
             <h2>{selectedUser?.username ?? "No user selected"}</h2>
+            {selectedUser ? <p className="muted">User ID: {selectedUser.publicId}</p> : null}
           </div>
         </div>
         {summary ? (
@@ -1529,6 +1546,12 @@ function ProfileSettings({
 
   return (
     <section className="settings-grid">
+      <section className="panel stack">
+        <h2>Account</h2>
+        <p className="muted">User ID: <strong>{data.user.publicId || "Not assigned"}</strong></p>
+        <p className="muted">This identifier is generated automatically and can be changed by an admin.</p>
+      </section>
+
       <form
         className="panel stack"
         onSubmit={async (event) => {

@@ -34,6 +34,7 @@ const recoverPasswordSchema = z.object({
 
 function publicUser(row: {
   id: string;
+  public_id?: string;
   username: string;
   email?: string | null;
   display_name: string;
@@ -44,6 +45,7 @@ function publicUser(row: {
 }) {
   return {
     id: row.id,
+    publicId: row.public_id,
     username: row.username,
     email: row.email,
     displayName: row.display_name,
@@ -67,7 +69,7 @@ router.post("/register", async (req, res, next) => {
       const result = await client.query(
         `insert into users (username, email, password_hash, display_name, role, admin_approved)
          values ($1, $2, $3, $4, $5, $6)
-         returning id, username, email, display_name, role, admin_approved, can_edit_sessions, totp_enabled`,
+         returning id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions, totp_enabled`,
         [input.username, input.email ?? null, passwordHash, input.displayName || input.username, input.role, input.role !== "admin"]
       );
 
@@ -103,7 +105,7 @@ router.post("/login", async (req, res, next) => {
   try {
     const input = loginSchema.parse(req.body);
     const result = await pool.query(
-      `select id, username, email, password_hash, display_name, role, admin_approved, can_edit_sessions, totp_enabled, totp_secret, disabled_at
+      `select id, public_id, username, email, password_hash, display_name, role, admin_approved, can_edit_sessions, totp_enabled, totp_secret, disabled_at
        from users
        where username = $1`,
       [input.username]

@@ -18,6 +18,10 @@ const editPermissionSchema = z.object({
   canEditSessions: z.boolean()
 });
 
+const publicIdSchema = z.object({
+  publicId: z.string().trim().min(1).max(120)
+});
+
 const overtimePermissionSchema = z.object({
   enabled: z.boolean(),
   mode: z.enum(["overtime", "time_bank"])
@@ -45,7 +49,7 @@ router.get("/users", async (req, res, next) => {
   try {
     requireAdmin(req);
     const result = await pool.query(
-      `select id, username, email, display_name, role, admin_approved, can_edit_sessions,
+      `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
               overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
               status, disabled_at, created_at, last_login_at
        from users
@@ -72,6 +76,30 @@ router.post("/users/:id/approve-admin", async (req, res, next) => {
     req.log?.info("admin approved", { actorUserId: req.user!.id, userId });
     res.status(204).send();
   } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/users/:id/public-id", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const input = publicIdSchema.parse(req.body);
+    const result = await pool.query(
+      `update users
+       set public_id = $3, updated_at = now()
+       where id = $1 and ($2::text = 'root' or role = 'user')
+       returning id, public_id`,
+      [userId, req.user!.role, input.publicId]
+    );
+    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    req.log?.info("user public id updated", { actorUserId: req.user!.id, userId, publicId: input.publicId });
+    res.json({ publicId: result.rows[0].public_id });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      next(new HttpError(409, "This user ID is already assigned"));
+      return;
+    }
     next(error);
   }
 });
@@ -304,7 +332,7 @@ router.get("/dump/users.csv", async (req, res, next) => {
   try {
     requireRoot(req);
     const result = await pool.query(
-      `select id, username, email, display_name, role, admin_approved, can_edit_sessions,
+      `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
               overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
               status, created_at
        from users

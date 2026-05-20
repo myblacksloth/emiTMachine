@@ -88,6 +88,7 @@ async function consumeChallenge(userId: string | null, challenge: string, type: 
 
 function publicUser(row: {
   user_id: string;
+  public_id?: string;
   username: string;
   email?: string | null;
   display_name: string;
@@ -98,6 +99,7 @@ function publicUser(row: {
 }) {
   return {
     id: row.user_id,
+    publicId: row.public_id,
     username: row.username,
     email: row.email,
     displayName: row.display_name,
@@ -278,7 +280,7 @@ router.post("/login/verify", async (req, res, next) => {
 
     const passkeyResult = await pool.query(
       `select p.id as passkey_id, p.credential_id, p.public_key_cose, p.counter, p.transports,
-              u.id as user_id, u.username, u.email, u.display_name, u.role, u.admin_approved, u.can_edit_sessions, u.totp_enabled, u.disabled_at
+              u.id as user_id, u.public_id, u.username, u.email, u.display_name, u.role, u.admin_approved, u.can_edit_sessions, u.totp_enabled, u.disabled_at
        from passkeys p
        join users u on u.id = p.user_id
        where p.credential_id = $1 and ($2::citext is null or u.username = $2::citext)`,
