@@ -13,6 +13,14 @@ Users can:
 - edit start time, end time, timezones, tags, note, and correction reason;
 - delete a session permanently.
 
+Default tags:
+
+- `Presence` is the only tag marked as default and is the initial selection for new manual or punch-in activities.
+- `Smart working` is available as a standard tag, but it is mutually exclusive with `Presence`.
+- `Not billable` is available as a standard tag and can be combined with either work mode.
+
+The backend rejects sessions that contain both `Presence` and `Smart working`, including manual activities, punch-in requests, and CSV imports.
+
 Backend endpoints:
 
 - `GET /api/reports/sessions`

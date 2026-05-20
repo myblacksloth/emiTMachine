@@ -66,6 +66,14 @@ export async function getOvertimeReport(userId: string) {
        join user_settings us on us.id = s.user_id
        where s.user_id = $1
          and s.ended_at is not null
+         -- Not billable sessions are recorded normally but do not affect overtime or time-bank balances.
+         and not exists (
+           select 1
+           from session_tags nbst
+           join tags nbt on nbt.id = nbst.tag_id
+           where nbst.session_id = s.id
+             and lower(nbt.name::text) = 'not billable'
+         )
        group by date_trunc('week', s.started_at at time zone us.timezone)::date
      ),
      weeks as (

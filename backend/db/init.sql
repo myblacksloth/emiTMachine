@@ -82,7 +82,11 @@ SELECT id, 'Presence', '#21A67A', true FROM users WHERE username = 'root'
 ON CONFLICT (user_id, name) DO NOTHING;
 
 INSERT INTO tags (user_id, name, color, is_default)
-SELECT id, 'Smart working', '#3B82F6', true FROM users WHERE username = 'root'
+SELECT id, 'Smart working', '#3B82F6', false FROM users WHERE username = 'root'
+ON CONFLICT (user_id, name) DO NOTHING;
+
+INSERT INTO tags (user_id, name, color, is_default)
+SELECT id, 'Not billable', '#8E8E93', false FROM users WHERE username = 'root'
 ON CONFLICT (user_id, name) DO NOTHING;
 
 CREATE TABLE default_tag_templates (
@@ -98,7 +102,8 @@ CREATE TABLE default_tag_templates (
 INSERT INTO default_tag_templates (name, color, sort_order)
 VALUES
   ('Presence', '#2563EB', 10),
-  ('Smart working', '#16A34A', 20);
+  ('Smart working', '#16A34A', 20),
+  ('Not billable', '#8E8E93', 30);
 
 CREATE TABLE csv_imports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

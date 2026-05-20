@@ -21,7 +21,7 @@ router.get("/", async (req, res, next) => {
       `select id, name, color, is_default, created_at, updated_at
        from tags
        where user_id = $1
-       order by lower(name)`,
+       order by is_default desc, lower(name)`,
       [req.user!.id]
     );
     res.json({ tags: result.rows });

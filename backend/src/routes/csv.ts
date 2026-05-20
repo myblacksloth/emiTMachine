@@ -5,6 +5,7 @@ import { z } from "zod";
 import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { assertTagsAreCompatible } from "../services/tags.js";
 import { isoDateTimeSchema } from "../utils/validators.js";
 
 const router = Router();
@@ -93,6 +94,7 @@ router.post("/import", async (req, res, next) => {
               throw new HttpError(400, `Unknown tag in CSV session ${row.session_external_id}`);
             }
             tagIds = tagRows.rows.map((tag: { id: string }) => tag.id);
+            await assertTagsAreCompatible(client, req.user!.id, tagIds);
           }
 
           const sessionResult = await client.query(

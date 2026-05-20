@@ -43,6 +43,34 @@ const emptyDashboard: DashboardData = {
 
 const palette = ["#27b3a8", "#ff8a4c", "#7c6ee6", "#e14f77", "#3f8cff", "#8abf45"];
 
+function normalizedTagName(tag?: Tag) {
+  return tag?.name.trim().toLowerCase() ?? "";
+}
+
+function presenceTag(tags: Tag[]) {
+  return tags.find((tag) => normalizedTagName(tag) === "presence") ?? tags[0] ?? null;
+}
+
+function withExclusiveWorkMode(tags: Tag[], selectedIds: string[], changedTagId: string, checked: boolean) {
+  const changedTag = tags.find((tag) => tag.id === changedTagId);
+  const changedName = normalizedTagName(changedTag);
+  let next = checked ? [...selectedIds, changedTagId] : selectedIds.filter((tagId) => tagId !== changedTagId);
+
+  // Presence and Smart working are mutually exclusive work modes in every entry form.
+  if (checked && changedName === "presence") {
+    next = next.filter((tagId) => normalizedTagName(tags.find((tag) => tag.id === tagId)) !== "smart working");
+  } else if (checked && changedName === "smart working") {
+    next = next.filter((tagId) => normalizedTagName(tags.find((tag) => tag.id === tagId)) !== "presence");
+  }
+
+  return Array.from(new Set(next));
+}
+
+function hasExclusiveWorkModeConflict(tags: Tag[], selectedIds: string[]) {
+  const selectedNames = new Set(selectedIds.map((tagId) => normalizedTagName(tags.find((tag) => tag.id === tagId))));
+  return selectedNames.has("presence") && selectedNames.has("smart working");
+}
+
 function minutesLabel(minutes: number) {
   const sign = minutes < 0 ? "-" : "";
   const absolute = Math.abs(minutes);
@@ -916,6 +944,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
 
   const startCreate = () => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const defaultTag = presenceTag(tags);
     setCreating(true);
     setEditingId(null);
     setDraft({
@@ -924,7 +953,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       startTimezone: timezone,
       endTimezone: timezone,
       note: "",
-      tagIds: tags[0] ? [tags[0].id] : [],
+      tagIds: defaultTag ? [defaultTag.id] : [],
       reason: "Manual activity insert"
     });
   };
@@ -933,6 +962,10 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
     if (!draft) return;
     if (draft.tagIds.length === 0) {
       setMessage("Select at least one tag before saving.");
+      return;
+    }
+    if (hasExclusiveWorkModeConflict(tags, draft.tagIds)) {
+      setMessage("Presence and Smart working cannot be selected together.");
       return;
     }
     try {
@@ -959,6 +992,10 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
     if (!draft) return;
     if (draft.tagIds.length === 0) {
       setMessage("Select at least one tag before creating the activity.");
+      return;
+    }
+    if (hasExclusiveWorkModeConflict(tags, draft.tagIds)) {
+      setMessage("Presence and Smart working cannot be selected together.");
       return;
     }
     try {
@@ -1123,7 +1160,7 @@ function ActivityEditor({
               onChange={(event) =>
                 onDraft({
                   ...draft,
-                  tagIds: event.target.checked ? [...draft.tagIds, tag.id] : draft.tagIds.filter((tagId) => tagId !== tag.id)
+                  tagIds: withExclusiveWorkMode(tags, draft.tagIds, tag.id, event.target.checked)
                 })
               }
             />
@@ -1163,7 +1200,8 @@ function PunchDialog({
   onSuccess: (data: DashboardData) => void;
 }) {
   const [occurredAt, setOccurredAt] = useState(clientDateTimeValue());
-  const [selectedTags, setSelectedTags] = useState<string[]>(defaultTagIds.length ? defaultTagIds : mode === "in" && tags[0] ? [tags[0].id] : []);
+  const defaultTag = presenceTag(tags);
+  const [selectedTags, setSelectedTags] = useState<string[]>(defaultTagIds.length ? defaultTagIds : mode === "in" && defaultTag ? [defaultTag.id] : []);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1173,6 +1211,11 @@ function PunchDialog({
     setError("");
     if (mode === "in" && selectedTags.length === 0) {
       setError("Select at least one tag before clocking in.");
+      setBusy(false);
+      return;
+    }
+    if (hasExclusiveWorkModeConflict(tags, selectedTags)) {
+      setError("Presence and Smart working cannot be selected together.");
       setBusy(false);
       return;
     }
@@ -1204,7 +1247,7 @@ function PunchDialog({
                 type="checkbox"
                 checked={selectedTags.includes(tag.id)}
                 onChange={(event) =>
-                  setSelectedTags((items) => (event.target.checked ? [...items, tag.id] : items.filter((tagId) => tagId !== tag.id)))
+                  setSelectedTags((items) => withExclusiveWorkMode(tags, items, tag.id, event.target.checked))
                 }
               />
               <span style={{ background: tag.color }} />
