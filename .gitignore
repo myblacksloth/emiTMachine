@@ -29,3 +29,8 @@ node_modules/
 dist/
 coverage/
 *.log
+
+backups/*
+!backups/postgres/
+backups/postgres/*
+!backups/postgres/.gitkeep

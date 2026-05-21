@@ -49,6 +49,22 @@ Services:
 
 The database is persisted in the `postgres_data` Docker volume. PostgreSQL schema initialization is mounted from `backend/db/init.sql` and runs when the database volume is first created.
 
+`postgres-backup` writes a PostgreSQL dump with `pg_dump` every 8 hours to:
+
+```text
+backups/postgres/emitmachine-latest.sql
+```
+
+Each run overwrites the previous backup atomically. The first dump is created as soon as PostgreSQL becomes healthy. Backup files are ignored by Git; only `backups/postgres/.gitkeep` is tracked so the host directory exists before Docker starts.
+
+The backup container runs as `${UID:-1000}:${GID:-1000}` so the generated file is writable by the host user on typical Linux deployments.
+
+For a manual restore into a running local stack, use `psql` from the Postgres container:
+
+```bash
+docker compose exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
+```
+
 ## Environment
 
 The Compose file provides development defaults:

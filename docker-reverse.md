@@ -143,6 +143,26 @@ Postgres runs as `postgres`; backend and frontend run as the non-root `node` use
 
 If Postgres fails with permission errors on an old local volume, the volume was probably initialized before the non-root setting. Fix the volume ownership or recreate the local database volume.
 
+## Database Backups
+
+The reverse stack includes `postgres-backup`, a sidecar based on the official Postgres image. It waits for Postgres to become healthy, then runs `pg_dump` immediately and every 8 hours.
+
+The latest dump is always overwritten at:
+
+```text
+backups/postgres/emitmachine-latest.sql
+```
+
+The dump is written through a temporary file and moved into place only after `pg_dump` succeeds. Backup files are ignored by Git; only `backups/postgres/.gitkeep` is tracked so the host directory exists before Docker starts.
+
+The backup container runs as `${UID:-1000}:${GID:-1000}` so the generated file is writable by the host user on typical Linux deployments. If your deploy user is not UID/GID `1000`, export `UID` and `GID` before starting Compose.
+
+For a manual restore into a running reverse stack, use `psql` from the Postgres container:
+
+```bash
+docker compose -f docker-compose-reverse.yml exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
+```
+
 With the current placeholder, Compose creates `gotproxed` automatically. If you need to share the same reverse proxy network with other Compose projects, change it to:
 
 ```yaml
