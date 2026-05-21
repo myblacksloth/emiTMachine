@@ -7,7 +7,7 @@
 - `users` stores multi-user accounts with role, status, timezone, name/email profile fields, password hash metadata, and a mutable `public_id`. The internal `id` remains the relational primary key; `public_id` is the admin-editable user-facing identifier generated as a UUID by default.
 - `user_managers` links users to one or more responsible admin users. The responsible user must be validated by backend policy as an approved admin.
 - `administrative_requests` stores Vacation, Leave, and Smart working requests. Requests cannot overlap other requests for the same user; backend policy also prevents overlaps with work sessions and prevents work sessions during approved requests. Root users can clean only requests that fully ended before the current month.
-- `time_sessions` stores clocked work intervals. It enforces one open session per user and rejects overlapping sessions for the same user.
+- `time_sessions` stores clocked work intervals. It enforces one open session per user and rejects overlapping sessions for the same user. `no_count_minutes` stores minutes excluded from effective report and overtime totals.
 - `time_events` stores clock-in, clock-out, break, and manual-adjustment events. Every event stores the client-submitted timestamp and explicit client timezone.
 - `tags` stores user-owned default and custom tags. `Presence`, `Smart working`, and `Not billable` are the protected default tags created for each user; additional tags are user-created custom tags. `default_tag_templates` seeds the protected defaults with colors for registration-time tag creation; all tag colors are constrained to six-digit hex values.
 - `session_tags` links sessions to tags. A trigger requires every tag to be owned by the same user as the time session.

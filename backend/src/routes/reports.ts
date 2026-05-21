@@ -18,7 +18,8 @@ const sessionUpdateSchema = z.object({
   endTimezone: z.string().trim().min(1).max(80).nullable().optional(),
   note: z.string().trim().max(1000).optional(),
   tagIds: z.array(uuidSchema).min(1).max(10),
-  reason: z.string().trim().min(3).max(500)
+  reason: z.string().trim().min(3).max(500),
+  noCountMinutes: z.number().int().min(0).max(10080).default(0)
 });
 
 const sessionCreateSchema = sessionUpdateSchema;
@@ -39,7 +40,7 @@ router.get("/summary", async (req, res, next) => {
     const sessions = await pool.query(
       `with filtered as (
          select s.id, s.started_at, s.ended_at,
-                extract(epoch from (s.ended_at - s.started_at))::bigint as duration_seconds
+                greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)::bigint as duration_seconds
          from time_sessions s
          left join session_tags st on st.session_id = s.id
          where s.user_id = $1
@@ -60,7 +61,7 @@ router.get("/summary", async (req, res, next) => {
     const buckets = await pool.query(
       `with filtered as (
          select distinct s.id, s.started_at, s.ended_at,
-                extract(epoch from (s.ended_at - s.started_at))::bigint as duration_seconds
+                greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)::bigint as duration_seconds
          from time_sessions s
          left join session_tags st on st.session_id = s.id
          where s.user_id = $1
@@ -82,7 +83,7 @@ router.get("/summary", async (req, res, next) => {
     );
 
     const byTag = await pool.query(
-      `select t.id, t.name, t.color, coalesce(sum(extract(epoch from (s.ended_at - s.started_at))), 0)::bigint as total_seconds
+      `select t.id, t.name, t.color, coalesce(sum(greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)), 0)::bigint as total_seconds
        from time_sessions s
        join session_tags st on st.session_id = s.id
        join tags t on t.id = st.tag_id
@@ -113,8 +114,8 @@ router.get("/sessions", async (req, res, next) => {
       .parse(req.query);
 
     const result = await pool.query(
-      `select s.id, s.started_at, s.ended_at, s.start_timezone, s.end_timezone, s.note,
-              case when s.ended_at is null then null else extract(epoch from (s.ended_at - s.started_at))::bigint end as duration_seconds,
+      `select s.id, s.started_at, s.ended_at, s.start_timezone, s.end_timezone, s.note, s.no_count_minutes,
+              case when s.ended_at is null then null else greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)::bigint end as duration_seconds,
               coalesce(json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color)) filter (where t.id is not null), '[]') as tags
        from time_sessions s
        left join session_tags st on st.session_id = s.id
@@ -146,6 +147,9 @@ router.post("/sessions", async (req, res, next) => {
     if (endedAt && endedAt <= startedAt) {
       throw new HttpError(400, "End time must be after start time");
     }
+    if (endedAt && input.noCountMinutes > Math.floor((endedAt.getTime() - startedAt.getTime()) / 60000)) {
+      throw new HttpError(400, "No count time cannot exceed session duration");
+    }
 
     const session = await withTransaction(async (client) => {
       await assertUserTags(client, req.user!.id, input.tagIds);
@@ -153,11 +157,11 @@ router.post("/sessions", async (req, res, next) => {
       await assertNoApprovedAdministrativeRequestOverlap(client, req.user!.id, startedAt, endedAt ?? new Date(startedAt.getTime() + 1));
 
       const sessionResult = await client.query(
-        `insert into time_sessions (user_id, started_at, ended_at, start_timezone, end_timezone, note, source)
-         values ($1, $2, $3, $4, $5, $6, 'manual_edit')
-         returning id, started_at, ended_at, start_timezone, end_timezone, note,
-                   case when ended_at is null then null else extract(epoch from (ended_at - started_at))::bigint end as duration_seconds`,
-        [req.user!.id, startedAt, endedAt, input.startTimezone, endTimezone, input.note ?? null]
+        `insert into time_sessions (user_id, started_at, ended_at, start_timezone, end_timezone, note, no_count_minutes, source)
+         values ($1, $2, $3, $4, $5, $6, $7, 'manual_edit')
+         returning id, started_at, ended_at, start_timezone, end_timezone, note, no_count_minutes,
+                   case when ended_at is null then null else greatest(extract(epoch from (ended_at - started_at)) - no_count_minutes * 60, 0)::bigint end as duration_seconds`,
+        [req.user!.id, startedAt, endedAt, input.startTimezone, endTimezone, input.note ?? null, input.noCountMinutes]
       );
       const sessionId = sessionResult.rows[0].id;
 
@@ -210,6 +214,9 @@ router.patch("/sessions/:id", async (req, res, next) => {
     if (endedAt && endedAt <= startedAt) {
       throw new HttpError(400, "End time must be after start time");
     }
+    if (endedAt && input.noCountMinutes > Math.floor((endedAt.getTime() - startedAt.getTime()) / 60000)) {
+      throw new HttpError(400, "No count time cannot exceed session duration");
+    }
 
     const session = await withTransaction(async (client) => {
       const currentResult = await client.query(
@@ -234,13 +241,14 @@ router.patch("/sessions/:id", async (req, res, next) => {
              start_timezone = $5,
              end_timezone = $6,
              note = $7,
+             no_count_minutes = $8,
              source = 'manual_edit',
              status = case when $4::timestamptz is null then 'open'::work_session_status else 'closed'::work_session_status end,
              updated_at = now()
          where id = $1 and user_id = $2
-         returning id, started_at, ended_at, start_timezone, end_timezone, note,
-                   case when ended_at is null then null else extract(epoch from (ended_at - started_at))::bigint end as duration_seconds`,
-        [sessionId, req.user!.id, startedAt, endedAt, input.startTimezone, endTimezone, input.note ?? null]
+         returning id, started_at, ended_at, start_timezone, end_timezone, note, no_count_minutes,
+                   case when ended_at is null then null else greatest(extract(epoch from (ended_at - started_at)) - no_count_minutes * 60, 0)::bigint end as duration_seconds`,
+        [sessionId, req.user!.id, startedAt, endedAt, input.startTimezone, endTimezone, input.note ?? null, input.noCountMinutes]
       );
 
       await client.query("delete from session_tags where session_id = $1", [sessionId]);

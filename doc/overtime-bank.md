@@ -23,7 +23,7 @@ Le settimane sono calcolate sulla timezone dell'utente. La settimana corrente re
 
 Il calcolo usa tutte le sessioni chiuse dell'utente. Il report mostra sempre la settimana corrente e ogni altra settimana in cui risulta almeno una sessione registrata.
 
-Le sessioni con il tag `Not billable` vengono registrate e restano visibili nello storico attivita' e nei report generali, ma non contribuiscono al calcolo di straordinari o banca ore. Se una sessione ha piu' tag e uno di questi e' `Not billable`, l'intera sessione viene esclusa dalla banca ore.
+Le sessioni con il tag `Not billable` vengono registrate e restano visibili nello storico attivita' e nei report generali, ma non contribuiscono al calcolo di straordinari o banca ore. Se una sessione ha piu' tag e uno di questi e' `Not billable`, l'intera sessione viene esclusa dalla banca ore. I minuti `No count` impostati su una sessione vengono sottratti dal totale effettivo prima del calcolo.
 
 ## Tabelle principali
 
@@ -33,7 +33,7 @@ Le sessioni con il tag `Not billable` vengono registrate e restano visibili nell
 - `users.weekly_work_minutes_set_at`: momento da cui parte il calcolo.
 - `overtime_payments`: settimane in modalita' straordinari marcate come pagate.
 
-Per database gia' esistenti, applicare `backend/db/migrations/20260520_overtime_bank.sql`, `backend/db/migrations/20260520_not_billable_tag.sql` e `backend/db/migrations/20260520_tag_defaults_and_exclusivity.sql`. `backend/db/init.sql` contiene gia' lo schema completo per installazioni pulite.
+Per database gia' esistenti, applicare `backend/db/migrations/20260520_overtime_bank.sql`, `backend/db/migrations/20260520_not_billable_tag.sql`, `backend/db/migrations/20260520_tag_defaults_and_exclusivity.sql` e `backend/db/migrations/20260521_no_count_minutes.sql`. `backend/db/init.sql` contiene gia' lo schema completo per installazioni pulite.
 
 ## API
 

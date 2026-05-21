@@ -131,6 +131,7 @@ type BackendSession = {
   start_timezone: string;
   end_timezone: string | null;
   note: string | null;
+  no_count_minutes?: number | null;
   duration_seconds: string | number | null;
   tags: BackendTag[];
 };
@@ -225,6 +226,7 @@ function mapSession(session: BackendSession): ActivitySession {
     endTimezone: session.end_timezone,
     note: session.note ?? "",
     durationMinutes: session.duration_seconds === null ? null : secondsToMinutes(session.duration_seconds),
+    noCountMinutes: Number(session.no_count_minutes ?? 0),
     tagIds: session.tags.map((tag) => tag.id),
     tags: session.tags.map(mapTag)
   };
@@ -537,6 +539,7 @@ export const api = {
     note: string;
     tagIds: string[];
     reason: string;
+    noCountMinutes: number;
   }) =>
     request<{ session: BackendSession }>("/api/reports/sessions", {
       method: "POST",
@@ -550,6 +553,7 @@ export const api = {
     note: string;
     tagIds: string[];
     reason: string;
+    noCountMinutes: number;
   }) =>
     request<{ session: BackendSession }>(`/api/reports/sessions/${id}`, {
       method: "PATCH",

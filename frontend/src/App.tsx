@@ -1245,7 +1245,10 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 <div>
                   <p className="eyebrow">{session.endedAt ? "Closed session" : "Open session"}</p>
                   <h3>{new Date(session.startedAt).toLocaleString()} - {session.endedAt ? new Date(session.endedAt).toLocaleString() : "now"}</h3>
-                  <p className="muted">{session.note || "No note"}</p>
+                  <p className="muted">
+                    {session.note || "No note"}
+                    {session.noCountMinutes > 0 ? ` · No count ${minutesLabel(session.noCountMinutes)}` : ""}
+                  </p>
                 </div>
                 <strong>{session.durationMinutes === null ? "Live" : minutesLabel(session.durationMinutes)}</strong>
               </div>
@@ -1295,7 +1298,8 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       endTimezone: activity.endTimezone || activity.startTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       note: activity.note,
       tagIds: activity.tagIds,
-      reason: "User correction"
+      reason: "User correction",
+      noCountMinutes: activity.noCountMinutes
     });
   };
 
@@ -1311,7 +1315,8 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       endTimezone: timezone,
       note: "",
       tagIds: defaultTag ? [defaultTag.id] : [],
-      reason: "Manual activity insert"
+      reason: "Manual activity insert",
+      noCountMinutes: 0
     });
   };
 
@@ -1334,7 +1339,8 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
         endTimezone: draft.endedAt ? draft.endTimezone : null,
         note: draft.note,
         tagIds: draft.tagIds,
-        reason: draft.reason
+        reason: draft.reason,
+        noCountMinutes: draft.noCountMinutes
       });
       setEditingId(null);
       setDraft(null);
@@ -1365,7 +1371,8 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
         endTimezone: draft.endedAt ? draft.endTimezone : null,
         note: draft.note,
         tagIds: draft.tagIds,
-        reason: draft.reason
+        reason: draft.reason,
+        noCountMinutes: draft.noCountMinutes
       });
       setCreating(false);
       setDraft(null);
@@ -1442,7 +1449,11 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
                     <div>
                       <p className="eyebrow">{activity.endedAt ? "Closed session" : "Open session"}</p>
                       <h3>{new Date(activity.startedAt).toLocaleString()} - {activity.endedAt ? new Date(activity.endedAt).toLocaleString() : "now"}</h3>
-                      <p className="muted">{activity.durationMinutes === null ? "Running" : minutesLabel(activity.durationMinutes)} · {activity.note || "No note"}</p>
+                      <p className="muted">
+                        {activity.durationMinutes === null ? "Running" : minutesLabel(activity.durationMinutes)}
+                        {activity.noCountMinutes > 0 ? ` · No count ${minutesLabel(activity.noCountMinutes)}` : ""}
+                        {" · "}{activity.note || "No note"}
+                      </p>
                     </div>
                     <strong>{activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</strong>
                   </div>
@@ -1477,6 +1488,7 @@ type ActivityDraft = {
   note: string;
   tagIds: string[];
   reason: string;
+  noCountMinutes: number;
 };
 
 function ActivityEditor({
@@ -1502,6 +1514,10 @@ function ActivityEditor({
         <TextField label="Start timezone" value={draft.startTimezone} onChange={(value) => onDraft({ ...draft, startTimezone: value })} />
         <TextField label="End timezone" value={draft.endTimezone} onChange={(value) => onDraft({ ...draft, endTimezone: value })} />
       </div>
+      <NoCountField
+        minutes={draft.noCountMinutes}
+        onChange={(minutes) => onDraft({ ...draft, noCountMinutes: minutes })}
+      />
       <fieldset className="tag-picker">
         <legend>Tags</legend>
         {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}
@@ -2416,6 +2432,42 @@ function TimeField({ label, value, onChange }: { label: string; value: string; o
         pattern="\\d{2}:\\d{2}"
       />
     </>
+  );
+}
+
+function NoCountField({ minutes, onChange }: { minutes: number; onChange: (minutes: number) => void }) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const update = (nextHours: string, nextMinutes: string) => {
+    onChange(Math.max(0, (Number(nextHours) || 0) * 60 + (Number(nextMinutes) || 0)));
+  };
+  return (
+    <div className="no-count-control">
+      <div>
+        <span>No count</span>
+        <small>Excluded from the effective session total.</small>
+      </div>
+      <div className="no-count-inputs">
+        <input
+          aria-label="No count hours"
+          type="number"
+          min="0"
+          max="168"
+          value={String(hours)}
+          onChange={(event) => update(event.target.value, String(rest))}
+        />
+        <span>h</span>
+        <input
+          aria-label="No count minutes"
+          type="number"
+          min="0"
+          max="59"
+          value={String(rest)}
+          onChange={(event) => update(String(hours), event.target.value)}
+        />
+        <span>m</span>
+      </div>
+    </div>
   );
 }
 

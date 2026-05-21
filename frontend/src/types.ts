@@ -54,6 +54,7 @@ export type ActivitySession = {
   endTimezone: string | null;
   note: string;
   durationMinutes: number | null;
+  noCountMinutes: number;
   tagIds: string[];
   tags: Tag[];
 };

@@ -365,7 +365,7 @@ router.get("/users/:id/summary", async (req, res, next) => {
     const summary = await pool.query(
       `with filtered as (
          select s.id, s.started_at, s.ended_at,
-                extract(epoch from (s.ended_at - s.started_at))::bigint as duration_seconds
+                greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)::bigint as duration_seconds
          from time_sessions s
          left join session_tags st on st.session_id = s.id
          where s.user_id = $1 and s.ended_at is not null
@@ -395,8 +395,8 @@ router.get("/users/:id/sessions", async (req, res, next) => {
       .parse(req.query);
     const userId = uuidSchema.parse(req.params.id);
     const result = await pool.query(
-      `select s.id, s.started_at, s.ended_at, s.start_timezone, s.end_timezone, s.note,
-              case when s.ended_at is null then null else extract(epoch from (s.ended_at - s.started_at))::bigint end as duration_seconds,
+      `select s.id, s.started_at, s.ended_at, s.start_timezone, s.end_timezone, s.note, s.no_count_minutes,
+              case when s.ended_at is null then null else greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)::bigint end as duration_seconds,
               coalesce(json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color)) filter (where t.id is not null), '[]') as tags
        from time_sessions s
        left join session_tags st on st.session_id = s.id

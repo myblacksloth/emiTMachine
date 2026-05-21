@@ -61,7 +61,7 @@ export async function getOvertimeReport(userId: string) {
      ),
      worked as (
        select date_trunc('week', s.started_at at time zone us.timezone)::date as week_start,
-              coalesce(sum(extract(epoch from (s.ended_at - s.started_at)) / 60), 0)::integer as worked_minutes
+              coalesce(sum(greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0) / 60), 0)::integer as worked_minutes
        from time_sessions s
        join user_settings us on us.id = s.user_id
        where s.user_id = $1

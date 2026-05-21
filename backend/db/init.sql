@@ -197,6 +197,7 @@ CREATE TABLE time_sessions (
   start_timezone text NOT NULL DEFAULT 'UTC',
   end_timezone text,
   note text,
+  no_count_minutes integer NOT NULL DEFAULT 0,
   anomaly_reason text,
   csv_import_id uuid REFERENCES csv_imports(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -204,6 +205,10 @@ CREATE TABLE time_sessions (
   CONSTRAINT time_sessions_start_timezone_not_blank CHECK (length(btrim(start_timezone)) > 0),
   CONSTRAINT time_sessions_end_timezone_not_blank CHECK (end_timezone IS NULL OR length(btrim(end_timezone)) > 0),
   CONSTRAINT time_sessions_end_after_start CHECK (ended_at IS NULL OR ended_at > started_at),
+  CONSTRAINT time_sessions_no_count_non_negative CHECK (no_count_minutes >= 0),
+  CONSTRAINT time_sessions_no_count_within_duration CHECK (
+    ended_at IS NULL OR no_count_minutes <= floor(extract(epoch from (ended_at - started_at)) / 60)::integer
+  ),
   CONSTRAINT time_sessions_import_source_has_import CHECK (source <> 'csv_import' OR csv_import_id IS NOT NULL)
 );
 
@@ -552,7 +557,7 @@ SELECT
   date_trunc('day', s.started_at)::date AS day,
   t.name AS tag_name,
   t.color,
-  sum(extract(epoch from (s.ended_at - s.started_at)) / 60)::integer AS minutes
+  sum(greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0) / 60)::integer AS minutes
 FROM time_sessions s
 LEFT JOIN session_tags st ON st.session_id = s.id
 LEFT JOIN tags t ON t.id = st.tag_id

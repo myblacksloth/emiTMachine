@@ -11,6 +11,7 @@ Users can:
 - insert a manual activity from the `Activities` panel;
 - view their latest recorded sessions in the `Activities` panel;
 - edit start time, end time, timezones, tags, note, and correction reason;
+- set a `No count` duration in hours and minutes when creating or editing an activity;
 - delete a session permanently.
 
 Critical actions are intentionally guarded in the UI. Clock-in and clock-out require a slide-to-confirm gesture after the user opens the confirmation dialog. Manual inserts, edits, deletes, administrative decisions, profile/security changes, imports, and other state-changing dashboard actions ask for explicit confirmation before the API call is sent.
@@ -33,6 +34,8 @@ Backend endpoints:
 - `DELETE /api/tags/:id?deleteSessions=true|false`
 
 Manual inserts create `time_sessions`, `session_tags`, and related `clock_in` / `clock_out` events. Updates keep those records aligned. Manual inserts and edits use `source = 'manual_edit'`; updates write event revisions to `time_event_revisions` when existing events are changed.
+
+`time_sessions.no_count_minutes` stores minutes excluded from effective totals. Report, tag, admin, and overtime/time-bank calculations subtract this value from the raw interval duration and never return a negative duration.
 
 Deletes currently remove the session physically. Because `time_events` and `session_tags` reference `time_sessions` with `ON DELETE CASCADE`, deleting a session also deletes its events and tag links.
 
