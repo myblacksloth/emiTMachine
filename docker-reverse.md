@@ -181,3 +181,22 @@ Common issues:
 - `Blocked request. This host is not allowed`: set `VITE_ALLOWED_HOSTS` in `docker-compose-reverse.frontend.env` to the public domain used in the browser.
 - Browser cannot reach the app: verify DNS, router port forwarding, firewall rules, and that Caddy is listening on ports `80` and `443`.
 - Backend CORS/session errors: verify `CORS_ORIGIN=https://your.domain.com` and `COOKIE_SECURE=true`.
+
+<!-- 
+sudo systemctl stop docker
+sudo systemctl stop containerd
+sudo systemctl disable docker
+sudo systemctl disable containerd
+sudo apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt purge -y docker.io docker-compose containerd runc
+sudo rm -rf /var/lib/docker
+sudo rm -rf /var/lib/containerd
+sudo rm -rf /etc/docker
+sudo rm -rf ~/.docker
+sudo rm -f /var/run/docker.sock
+sudo rm -rf /run/docker
+sudo rm -rf /run/containerd
+sudo groupdel docker
+sudo apt autoremove -y
+sudo apt autoclean
+-->

@@ -13,6 +13,8 @@ Users can:
 - edit start time, end time, timezones, tags, note, and correction reason;
 - delete a session permanently.
 
+Critical actions are intentionally guarded in the UI. Clock-in and clock-out require a slide-to-confirm gesture after the user opens the confirmation dialog. Manual inserts, edits, deletes, administrative decisions, profile/security changes, imports, and other state-changing dashboard actions ask for explicit confirmation before the API call is sent.
+
 Default tags:
 
 - `Presence` is the only tag marked as default and is the initial selection for new manual or punch-in activities.

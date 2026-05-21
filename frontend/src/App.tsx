@@ -144,6 +144,10 @@ function localValueFromIso(value: string | null) {
   return date.toISOString().slice(0, 16);
 }
 
+function confirmCritical(message: string) {
+  return window.confirm(message);
+}
+
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
@@ -267,6 +271,7 @@ function AuthPanel({
         const result = await api.login(username, password);
         await onAuthenticated(result.requiresTotp);
       } else if (mode === "register") {
+        if (!confirmCritical("Create this account?")) return;
         const result = await api.register(name, username, password, requestedRole);
         if (result.requiresApproval) {
           setMessage("Admin registration submitted. A root user must approve it before sign-in.");
@@ -282,6 +287,7 @@ function AuthPanel({
         await api.passkeyLogin(username);
         await onAuthenticated(false);
       } else if (mode === "recovery") {
+        if (!confirmCritical("Recover this account and change its password?")) return;
         await api.recoverAccount(username, recoveryCode, totpCode, password);
         setMessage("Recovery accepted. You can sign in with your updated credentials.");
         setMode("login");
@@ -608,6 +614,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
 
   const createRequest = async (event: FormEvent) => {
     event.preventDefault();
+    if (!confirmCritical("Submit this administrative request?")) return;
     try {
       await api.createAdministrativeRequest({
         requestType,
@@ -624,6 +631,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   };
 
   const setStatus = async (request: AdministrativeRequest, status: "approved" | "revoked") => {
+    if (!confirmCritical(`${requestStatusLabel(status)} this administrative request?`)) return;
     try {
       await api.setAdministrativeRequestStatus(request.id, status);
       await loadRequests();
@@ -756,6 +764,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
       setMessage("Enter a weekly target greater than zero.");
       return;
     }
+    if (!confirmCritical("Save this weekly target? This value can be set only once.")) return;
     try {
       setReport(await api.setWeeklyWorkMinutes(minutes));
       onToast("success", "Weekly target saved.");
@@ -765,6 +774,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
   };
 
   const markPaid = async (weekStart: string) => {
+    if (!confirmCritical("Mark this overtime week as paid? You will need an admin to remove this status.")) return;
     try {
       setReport(await api.markOvertimePaid(weekStart));
       onToast("success", "Payment marked as received.");
@@ -895,12 +905,14 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   }, [selectedUserId]);
 
   const approveAdmin = async (user: AdminUser) => {
+    if (!confirmCritical(`Approve ${user.username} as admin?`)) return;
     await api.approveAdmin(user.id);
     await loadUsers();
     onToast("success", `${user.username} approved.`);
   };
 
   const toggleEditPermission = async (user: AdminUser) => {
+    if (!confirmCritical(`${user.canEditSessions ? "Disable" : "Enable"} session editing for ${user.username}?`)) return;
     await api.setUserEditPermission(user.id, !user.canEditSessions);
     await loadUsers();
     onToast("success", "Session edit permission updated.");
@@ -914,6 +926,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
       setMessage("User ID cannot be empty.");
       return;
     }
+    if (!confirmCritical(`Change the User ID for ${user.username} to "${trimmed}"?`)) return;
     await api.setUserPublicId(user.id, trimmed);
     await loadUsers();
     onToast("success", "User ID updated.");
@@ -929,6 +942,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     }
     const email = window.prompt(`Email for ${user.username}`, user.email ?? "");
     if (email === null) return;
+    if (!confirmCritical(`Update name and email for ${user.username}?`)) return;
     await api.setUserProfile(user.id, trimmedName, email);
     await loadUsers();
     await loadSelectedUserData(user.id);
@@ -953,19 +967,21 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
       setMessage("User not found. Use username or User ID.");
       return;
     }
+    if (!confirmCritical(`Assign ${target.username} to responsible admin ${manager.username}?`)) return;
     await api.addManagedUser(manager.id, target.id);
     setManagerAssignments(await api.managerAssignments());
     onToast("success", "Responsible user assigned.");
   };
 
   const removeManagedUser = async (manager: AdminUser, target: AdminUser) => {
-    if (!window.confirm(`Remove ${manager.username} as responsible for ${target.username}?`)) return;
+    if (!confirmCritical(`Remove ${manager.username} as responsible for ${target.username}?`)) return;
     await api.removeManagedUser(manager.id, target.id);
     setManagerAssignments(await api.managerAssignments());
     onToast("success", "Responsible user removed.");
   };
 
   const toggleOvertimePermission = async (user: AdminUser) => {
+    if (!confirmCritical(`${user.overtimeEnabled ? "Disable" : "Enable"} overtime/time bank for ${user.username}?`)) return;
     await api.setUserOvertimePermission(user.id, !user.overtimeEnabled, user.overtimeMode);
     await loadUsers();
     await loadSelectedUserData(user.id);
@@ -973,6 +989,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const changeOvertimeMode = async (user: AdminUser, mode: "overtime" | "time_bank") => {
+    if (!confirmCritical(`Change overtime mode for ${user.username}?`)) return;
     await api.setUserOvertimePermission(user.id, true, mode);
     await loadUsers();
     await loadSelectedUserData(user.id);
@@ -981,20 +998,21 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
 
   const deleteOvertimePayment = async (weekStart: string) => {
     if (!selectedUserId) return;
+    if (!confirmCritical("Remove this paid status from the selected user?")) return;
     await api.deleteUserOvertimePayment(selectedUserId, weekStart);
     await loadSelectedUserData(selectedUserId);
     onToast("success", "Payment status removed.");
   };
 
   const resetPassword = async (user: AdminUser) => {
-    if (!window.confirm(`Reset password for ${user.username}? Active sessions will be revoked.`)) return;
+    if (!confirmCritical(`Reset password for ${user.username}? Active sessions will be revoked.`)) return;
     const result = await api.resetUserPassword(user.id);
     setTemporaryPassword(result.temporaryPassword);
     onToast("success", "Temporary password generated.");
   };
 
   const deleteUser = async (user: AdminUser) => {
-    if (!window.confirm(`Delete ${user.username} permanently?`)) return;
+    if (!confirmCritical(`Delete ${user.username} permanently?`)) return;
     await api.deleteUser(user.id);
     setSelectedUserId("");
     await loadUsers();
@@ -1002,6 +1020,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const toggleRegistration = async () => {
+    if (!confirmCritical(`${registrationEnabled ? "Lock" : "Open"} user registration?`)) return;
     await api.setRegistrationSetting(!registrationEnabled);
     setRegistrationEnabled(!registrationEnabled);
     onToast("success", "Registration setting updated.");
@@ -1009,7 +1028,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
 
   const cleanupAdministrativeRequests = async () => {
     // Root confirmation keeps cleanup explicit because the deleted requests are not restored by the UI.
-    if (!window.confirm("Delete administrative requests completed before the current month? This cannot be undone.")) return;
+    if (!confirmCritical("Delete administrative requests completed before the current month? This cannot be undone.")) return;
     const result = await api.cleanupAdministrativeRequests();
     onToast("success", `${result.deletedCount} old administrative request${result.deletedCount === 1 ? "" : "s"} deleted.`);
   };
@@ -1245,6 +1264,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       setMessage("Presence and Smart working cannot be selected together.");
       return;
     }
+    if (!confirmCritical("Save changes to this activity?")) return;
     try {
       await api.updateActivity(activityId, {
         startedAt: isoFromLocalValue(draft.startedAt),
@@ -1275,6 +1295,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       setMessage("Presence and Smart working cannot be selected together.");
       return;
     }
+    if (!confirmCritical("Create this manual activity?")) return;
     try {
       await api.createActivity({
         startedAt: isoFromLocalValue(draft.startedAt),
@@ -1296,7 +1317,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   };
 
   const deleteActivity = async (activity: ActivitySession) => {
-    if (!window.confirm("Delete this activity permanently? This cannot be undone.")) return;
+    if (!confirmCritical("Delete this activity permanently? This cannot be undone.")) return;
     try {
       await api.deleteActivity(activity.id);
       await loadActivities();
@@ -1537,16 +1558,57 @@ function PunchDialog({
           <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for this session" />
         </label>
         {error ? <p className="form-message error">{error}</p> : null}
+        <SlideToConfirm
+          label={busy ? "Saving..." : `Slide to ${mode === "in" ? "clock in" : "clock out"}`}
+          disabled={busy}
+          onConfirm={submit}
+        />
         <div className="modal-actions">
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={busy}>
             Cancel
-          </button>
-          <button className="primary-action" type="button" onClick={submit} disabled={busy}>
-            <Save size={18} />
-            {busy ? "Saving..." : "Confirm"}
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+function SlideToConfirm({ label, disabled, onConfirm }: { label: string; disabled?: boolean; onConfirm: () => Promise<void> | void }) {
+  const [value, setValue] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const unlocked = value >= 96;
+  const isDisabled = disabled || submitting;
+
+  const change = async (nextValue: number) => {
+    if (isDisabled) return;
+    if (nextValue < 96) {
+      setValue(nextValue);
+      return;
+    }
+    setValue(100);
+    setSubmitting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSubmitting(false);
+      setValue(0);
+    }
+  };
+
+  return (
+    <div className={`slide-confirm ${unlocked ? "unlocked" : ""} ${isDisabled ? "disabled" : ""}`}>
+      <span>{label}</span>
+      <input
+        aria-label={label}
+        type="range"
+        min="0"
+        max="100"
+        value={value}
+        disabled={isDisabled}
+        onChange={(event) => void change(Number(event.target.value))}
+        onMouseUp={() => setValue((current) => (current >= 96 ? current : 0))}
+        onTouchEnd={() => setValue((current) => (current >= 96 ? current : 0))}
+      />
     </div>
   );
 }
@@ -1558,6 +1620,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
 
   const create = async (event: FormEvent) => {
     event.preventDefault();
+    if (!confirmCritical(`Create tag "${name.trim()}"?`)) return;
     await api.createTag(name, color);
     setName("");
     setColor(palette[(palette.indexOf(color) + 1) % palette.length]);
@@ -1566,6 +1629,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
   };
 
   const save = async (tag: Tag) => {
+    if (!confirmCritical(`Save changes to tag "${tag.name}"?`)) return;
     await api.updateTag(tag.id, tag.name, tag.color);
     setEditing((items) => {
       const next = { ...items };
@@ -1835,6 +1899,7 @@ function ProfileSettings({
         className="panel stack"
         onSubmit={async (event) => {
           event.preventDefault();
+          if (!confirmCritical("Save these profile changes?")) return;
           await api.updateProfile(profileName, profileEmail);
           await onRefresh();
           onToast("success", "Profile updated.");
@@ -1852,6 +1917,7 @@ function ProfileSettings({
         className="panel stack"
         onSubmit={async (event) => {
           event.preventDefault();
+          if (!confirmCritical("Change your password?")) return;
           await api.changePassword(currentPassword, newPassword);
           setCurrentPassword("");
           setNewPassword("");
@@ -1870,7 +1936,13 @@ function ProfileSettings({
       <section className="panel stack">
         <h2>TOTP</h2>
         <p className="muted">{data.user.totpEnabled ? "TOTP is enabled for this account." : "Set up an authenticator app with a QR code."}</p>
-        <button type="button" onClick={async () => setTotp(await api.setupTotp())}>
+        <button
+          type="button"
+          onClick={async () => {
+            if (!confirmCritical("Start TOTP setup for this account?")) return;
+            setTotp(await api.setupTotp());
+          }}
+        >
           <KeyRound size={16} /> Show QR setup
         </button>
         {totp ? (
@@ -1882,6 +1954,7 @@ function ProfileSettings({
               className="primary-action"
               type="button"
               onClick={async () => {
+                if (!confirmCritical("Enable TOTP for this account?")) return;
                 await api.confirmTotp(totpCode);
                 onToast("success", "TOTP enabled.");
               }}
@@ -1897,6 +1970,7 @@ function ProfileSettings({
         onSubmit={async (event) => {
           event.preventDefault();
           if (passkeyBusy) return;
+          if (!confirmCritical("Register this passkey for your account?")) return;
           setPasskeyBusy(true);
           try {
             await api.registerPasskey(passkeyLabel);
@@ -1937,10 +2011,11 @@ function ProfileSettings({
             <button
               type="button"
               onClick={async () => {
-                if (
-                  remainingCount > 0 &&
-                  !window.confirm("This will permanently invalidate all existing recovery codes. Continue?")
-                ) return;
+                if (!confirmCritical(
+                  remainingCount > 0
+                    ? "This will permanently invalidate all existing recovery codes. Continue?"
+                    : "Generate recovery codes for this account?"
+                )) return;
                 const result = await api.generateRecoveryCodes();
                 setRecoveryCodes(result.codes);
                 setRemainingCount(result.codes.length);
@@ -1980,6 +2055,10 @@ function ProfileSettings({
               onChange={async (event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
+                if (!confirmCritical(`Import CSV file "${file.name}"? This can create new records.`)) {
+                  event.target.value = "";
+                  return;
+                }
                 const result = await api.importCsv(file);
                 setImportResult(`${result.importedRows} rows imported. ${result.invalidRows} rows need review.`);
               }}
@@ -2017,6 +2096,7 @@ function Countdowns({
 
   const create = async (event: FormEvent) => {
     event.preventDefault();
+    if (!confirmCritical("Create this countdown?")) return;
     setBusy(true);
     setMessage("");
     try {
@@ -2034,12 +2114,14 @@ function Countdowns({
   };
 
   const complete = async (id: string) => {
+    if (!confirmCritical("Mark this countdown as completed?")) return;
     await api.completeCountdown(id);
     await onRefresh();
     onToast("success", "Countdown completed.");
   };
 
   const remove = async (id: string) => {
+    if (!confirmCritical("Remove this countdown?")) return;
     await api.deleteCountdown(id);
     await onRefresh();
     onToast("success", "Countdown removed.");
