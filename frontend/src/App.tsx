@@ -144,8 +144,22 @@ function localValueFromIso(value: string | null) {
   return date.toISOString().slice(0, 16);
 }
 
-function confirmCritical(message: string) {
-  return window.confirm(message);
+type CriticalDialogRequest =
+  | { kind: "confirm"; title: string; message: string; resolve: (value: boolean) => void }
+  | { kind: "prompt"; title: string; message: string; defaultValue: string; resolve: (value: string | null) => void };
+
+let criticalDialogHandler: ((request: CriticalDialogRequest) => void) | null = null;
+
+function confirmCritical(message: string, title = "Confirm action") {
+  return new Promise<boolean>((resolve) => {
+    criticalDialogHandler?.({ kind: "confirm", title, message, resolve });
+  });
+}
+
+function promptCritical(message: string, defaultValue = "", title = "Edit value") {
+  return new Promise<string | null>((resolve) => {
+    criticalDialogHandler?.({ kind: "prompt", title, message, defaultValue, resolve });
+  });
 }
 
 function App() {
@@ -231,6 +245,7 @@ function App() {
 function Shell({ children, toasts }: { children: ReactNode; toasts: Toast[] }) {
   return (
     <div className="app-shell">
+      <CriticalDialogHost />
       <div className="toast-region" aria-live="polite">
         {toasts.map((toast) => (
           <div key={toast.id} className={`toast ${toast.tone}`}>
@@ -239,6 +254,58 @@ function Shell({ children, toasts }: { children: ReactNode; toasts: Toast[] }) {
         ))}
       </div>
       {children}
+    </div>
+  );
+}
+
+function CriticalDialogHost() {
+  const [dialog, setDialog] = useState<CriticalDialogRequest | null>(null);
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    criticalDialogHandler = (request) => {
+      setInputValue(request.kind === "prompt" ? request.defaultValue : "");
+      setDialog(request);
+    };
+    return () => {
+      criticalDialogHandler = null;
+    };
+  }, []);
+
+  if (!dialog) return null;
+
+  const close = (confirmed: boolean) => {
+    if (dialog.kind === "confirm") {
+      dialog.resolve(confirmed);
+    } else {
+      dialog.resolve(confirmed ? inputValue : null);
+    }
+    setDialog(null);
+  };
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="modal critical-modal" role="dialog" aria-modal="true" aria-labelledby="critical-title">
+        <div>
+          <p className="eyebrow">Action required</p>
+          <h2 id="critical-title">{dialog.title}</h2>
+        </div>
+        <p className="muted">{dialog.message}</p>
+        {dialog.kind === "prompt" ? (
+          <label className="field">
+            <span>Value</span>
+            <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} autoFocus />
+          </label>
+        ) : null}
+        <div className="modal-actions">
+          <button type="button" onClick={() => close(false)}>
+            Cancel
+          </button>
+          <button className="primary-action" type="button" onClick={() => close(true)}>
+            Confirm
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -271,7 +338,7 @@ function AuthPanel({
         const result = await api.login(username, password);
         await onAuthenticated(result.requiresTotp);
       } else if (mode === "register") {
-        if (!confirmCritical("Create this account?")) return;
+        if (!(await confirmCritical("Create this account?"))) return;
         const result = await api.register(name, username, password, requestedRole);
         if (result.requiresApproval) {
           setMessage("Admin registration submitted. A root user must approve it before sign-in.");
@@ -287,7 +354,7 @@ function AuthPanel({
         await api.passkeyLogin(username);
         await onAuthenticated(false);
       } else if (mode === "recovery") {
-        if (!confirmCritical("Recover this account and change its password?")) return;
+        if (!(await confirmCritical("Recover this account and change its password?"))) return;
         await api.recoverAccount(username, recoveryCode, totpCode, password);
         setMessage("Recovery accepted. You can sign in with your updated credentials.");
         setMode("login");
@@ -614,7 +681,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
 
   const createRequest = async (event: FormEvent) => {
     event.preventDefault();
-    if (!confirmCritical("Submit this administrative request?")) return;
+    if (!(await confirmCritical("Submit this administrative request?"))) return;
     try {
       await api.createAdministrativeRequest({
         requestType,
@@ -631,7 +698,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   };
 
   const setStatus = async (request: AdministrativeRequest, status: "approved" | "revoked") => {
-    if (!confirmCritical(`${requestStatusLabel(status)} this administrative request?`)) return;
+    if (!(await confirmCritical(`${requestStatusLabel(status)} this administrative request?`))) return;
     try {
       await api.setAdministrativeRequestStatus(request.id, status);
       await loadRequests();
@@ -662,14 +729,8 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
             <option value="smart_working">Smart working</option>
           </select>
         </label>
-        <label className="field">
-          <span>Start</span>
-          <input type="datetime-local" value={startedAt} onChange={(event) => setStartedAt(event.target.value)} />
-        </label>
-        <label className="field">
-          <span>End</span>
-          <input type="datetime-local" value={endedAt} onChange={(event) => setEndedAt(event.target.value)} />
-        </label>
+        <DateTimeField label="Start" value={startedAt} onChange={setStartedAt} />
+        <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
         <label className="field">
           <span>Note</span>
           <textarea value={note} onChange={(event) => setNote(event.target.value)} />
@@ -764,7 +825,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
       setMessage("Enter a weekly target greater than zero.");
       return;
     }
-    if (!confirmCritical("Save this weekly target? This value can be set only once.")) return;
+    if (!(await confirmCritical("Save this weekly target? This value can be set only once."))) return;
     try {
       setReport(await api.setWeeklyWorkMinutes(minutes));
       onToast("success", "Weekly target saved.");
@@ -774,7 +835,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
   };
 
   const markPaid = async (weekStart: string) => {
-    if (!confirmCritical("Mark this overtime week as paid? You will need an admin to remove this status.")) return;
+    if (!(await confirmCritical("Mark this overtime week as paid? You will need an admin to remove this status."))) return;
     try {
       setReport(await api.markOvertimePaid(weekStart));
       onToast("success", "Payment marked as received.");
@@ -905,44 +966,44 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   }, [selectedUserId]);
 
   const approveAdmin = async (user: AdminUser) => {
-    if (!confirmCritical(`Approve ${user.username} as admin?`)) return;
+    if (!(await confirmCritical(`Approve ${user.username} as admin?`))) return;
     await api.approveAdmin(user.id);
     await loadUsers();
     onToast("success", `${user.username} approved.`);
   };
 
   const toggleEditPermission = async (user: AdminUser) => {
-    if (!confirmCritical(`${user.canEditSessions ? "Disable" : "Enable"} session editing for ${user.username}?`)) return;
+    if (!(await confirmCritical(`${user.canEditSessions ? "Disable" : "Enable"} session editing for ${user.username}?`))) return;
     await api.setUserEditPermission(user.id, !user.canEditSessions);
     await loadUsers();
     onToast("success", "Session edit permission updated.");
   };
 
   const updatePublicId = async (user: AdminUser) => {
-    const nextPublicId = window.prompt(`User ID for ${user.username}`, user.publicId);
+    const nextPublicId = await promptCritical(`User ID for ${user.username}`, user.publicId, "Edit user ID");
     if (nextPublicId === null) return;
     const trimmed = nextPublicId.trim();
     if (!trimmed) {
       setMessage("User ID cannot be empty.");
       return;
     }
-    if (!confirmCritical(`Change the User ID for ${user.username} to "${trimmed}"?`)) return;
+    if (!(await confirmCritical(`Change the User ID for ${user.username} to "${trimmed}"?`))) return;
     await api.setUserPublicId(user.id, trimmed);
     await loadUsers();
     onToast("success", "User ID updated.");
   };
 
   const updateUserProfile = async (user: AdminUser) => {
-    const displayName = window.prompt(`Name for ${user.username}`, user.displayName || user.username);
+    const displayName = await promptCritical(`Name for ${user.username}`, user.displayName || user.username, "Edit name");
     if (displayName === null) return;
     const trimmedName = displayName.trim();
     if (!trimmedName) {
       setMessage("Name cannot be empty.");
       return;
     }
-    const email = window.prompt(`Email for ${user.username}`, user.email ?? "");
+    const email = await promptCritical(`Email for ${user.username}`, user.email ?? "", "Edit email");
     if (email === null) return;
-    if (!confirmCritical(`Update name and email for ${user.username}?`)) return;
+    if (!(await confirmCritical(`Update name and email for ${user.username}?`))) return;
     await api.setUserProfile(user.id, trimmedName, email);
     await loadUsers();
     await loadSelectedUserData(user.id);
@@ -960,28 +1021,28 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const addManagedUser = async (manager: AdminUser) => {
-    const value = window.prompt(`Username or User ID to assign to ${manager.username}`);
+    const value = await promptCritical(`Username or User ID to assign to ${manager.username}`, "", "Assign responsible");
     if (value === null) return;
     const target = findUserForManagerInput(value);
     if (!target) {
       setMessage("User not found. Use username or User ID.");
       return;
     }
-    if (!confirmCritical(`Assign ${target.username} to responsible admin ${manager.username}?`)) return;
+    if (!(await confirmCritical(`Assign ${target.username} to responsible admin ${manager.username}?`))) return;
     await api.addManagedUser(manager.id, target.id);
     setManagerAssignments(await api.managerAssignments());
     onToast("success", "Responsible user assigned.");
   };
 
   const removeManagedUser = async (manager: AdminUser, target: AdminUser) => {
-    if (!confirmCritical(`Remove ${manager.username} as responsible for ${target.username}?`)) return;
+    if (!(await confirmCritical(`Remove ${manager.username} as responsible for ${target.username}?`))) return;
     await api.removeManagedUser(manager.id, target.id);
     setManagerAssignments(await api.managerAssignments());
     onToast("success", "Responsible user removed.");
   };
 
   const toggleOvertimePermission = async (user: AdminUser) => {
-    if (!confirmCritical(`${user.overtimeEnabled ? "Disable" : "Enable"} overtime/time bank for ${user.username}?`)) return;
+    if (!(await confirmCritical(`${user.overtimeEnabled ? "Disable" : "Enable"} overtime/time bank for ${user.username}?`))) return;
     await api.setUserOvertimePermission(user.id, !user.overtimeEnabled, user.overtimeMode);
     await loadUsers();
     await loadSelectedUserData(user.id);
@@ -989,7 +1050,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const changeOvertimeMode = async (user: AdminUser, mode: "overtime" | "time_bank") => {
-    if (!confirmCritical(`Change overtime mode for ${user.username}?`)) return;
+    if (!(await confirmCritical(`Change overtime mode for ${user.username}?`))) return;
     await api.setUserOvertimePermission(user.id, true, mode);
     await loadUsers();
     await loadSelectedUserData(user.id);
@@ -998,21 +1059,21 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
 
   const deleteOvertimePayment = async (weekStart: string) => {
     if (!selectedUserId) return;
-    if (!confirmCritical("Remove this paid status from the selected user?")) return;
+    if (!(await confirmCritical("Remove this paid status from the selected user?"))) return;
     await api.deleteUserOvertimePayment(selectedUserId, weekStart);
     await loadSelectedUserData(selectedUserId);
     onToast("success", "Payment status removed.");
   };
 
   const resetPassword = async (user: AdminUser) => {
-    if (!confirmCritical(`Reset password for ${user.username}? Active sessions will be revoked.`)) return;
+    if (!(await confirmCritical(`Reset password for ${user.username}? Active sessions will be revoked.`))) return;
     const result = await api.resetUserPassword(user.id);
     setTemporaryPassword(result.temporaryPassword);
     onToast("success", "Temporary password generated.");
   };
 
   const deleteUser = async (user: AdminUser) => {
-    if (!confirmCritical(`Delete ${user.username} permanently?`)) return;
+    if (!(await confirmCritical(`Delete ${user.username} permanently?`))) return;
     await api.deleteUser(user.id);
     setSelectedUserId("");
     await loadUsers();
@@ -1020,7 +1081,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const toggleRegistration = async () => {
-    if (!confirmCritical(`${registrationEnabled ? "Lock" : "Open"} user registration?`)) return;
+    if (!(await confirmCritical(`${registrationEnabled ? "Lock" : "Open"} user registration?`))) return;
     await api.setRegistrationSetting(!registrationEnabled);
     setRegistrationEnabled(!registrationEnabled);
     onToast("success", "Registration setting updated.");
@@ -1028,7 +1089,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
 
   const cleanupAdministrativeRequests = async () => {
     // Root confirmation keeps cleanup explicit because the deleted requests are not restored by the UI.
-    if (!confirmCritical("Delete administrative requests completed before the current month? This cannot be undone.")) return;
+    if (!(await confirmCritical("Delete administrative requests completed before the current month? This cannot be undone."))) return;
     const result = await api.cleanupAdministrativeRequests();
     onToast("success", `${result.deletedCount} old administrative request${result.deletedCount === 1 ? "" : "s"} deleted.`);
   };
@@ -1264,7 +1325,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       setMessage("Presence and Smart working cannot be selected together.");
       return;
     }
-    if (!confirmCritical("Save changes to this activity?")) return;
+    if (!(await confirmCritical("Save changes to this activity?"))) return;
     try {
       await api.updateActivity(activityId, {
         startedAt: isoFromLocalValue(draft.startedAt),
@@ -1295,7 +1356,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       setMessage("Presence and Smart working cannot be selected together.");
       return;
     }
-    if (!confirmCritical("Create this manual activity?")) return;
+    if (!(await confirmCritical("Create this manual activity?"))) return;
     try {
       await api.createActivity({
         startedAt: isoFromLocalValue(draft.startedAt),
@@ -1317,7 +1378,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   };
 
   const deleteActivity = async (activity: ActivitySession) => {
-    if (!confirmCritical("Delete this activity permanently? This cannot be undone.")) return;
+    if (!(await confirmCritical("Delete this activity permanently? This cannot be undone."))) return;
     try {
       await api.deleteActivity(activity.id);
       await loadActivities();
@@ -1436,14 +1497,8 @@ function ActivityEditor({
   return (
     <div className="activity-editor activity-card-editing">
       <div className="activity-edit-grid">
-        <label className="field">
-          <span>Start</span>
-          <input type="datetime-local" value={draft.startedAt} onChange={(event) => onDraft({ ...draft, startedAt: event.target.value })} />
-        </label>
-        <label className="field">
-          <span>End</span>
-          <input type="datetime-local" value={draft.endedAt} onChange={(event) => onDraft({ ...draft, endedAt: event.target.value })} />
-        </label>
+        <DateTimeField label="Start" value={draft.startedAt} onChange={(value) => onDraft({ ...draft, startedAt: value })} />
+        <DateTimeField label="End" value={draft.endedAt} onChange={(value) => onDraft({ ...draft, endedAt: value })} />
         <TextField label="Start timezone" value={draft.startTimezone} onChange={(value) => onDraft({ ...draft, startTimezone: value })} />
         <TextField label="End timezone" value={draft.endTimezone} onChange={(value) => onDraft({ ...draft, endTimezone: value })} />
       </div>
@@ -1532,10 +1587,7 @@ function PunchDialog({
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="punch-title">
         <h2 id="punch-title">Confirm {mode === "in" ? "clock in" : "clock out"}</h2>
         <p className="muted">Review the client time before recording this event.</p>
-        <label className="field">
-          <span>Event time</span>
-          <input type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} />
-        </label>
+        <DateTimeField label="Event time" value={occurredAt} onChange={setOccurredAt} />
         <fieldset className="tag-picker">
           <legend>Tags</legend>
           {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}
@@ -1669,7 +1721,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
 
   const create = async (event: FormEvent) => {
     event.preventDefault();
-    if (!confirmCritical(`Create tag "${name.trim()}"?`)) return;
+    if (!(await confirmCritical(`Create tag "${name.trim()}"?`))) return;
     await api.createTag(name, color);
     setName("");
     setColor(palette[(palette.indexOf(color) + 1) % palette.length]);
@@ -1678,7 +1730,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
   };
 
   const save = async (tag: Tag) => {
-    if (!confirmCritical(`Save changes to tag "${tag.name}"?`)) return;
+    if (!(await confirmCritical(`Save changes to tag "${tag.name}"?`))) return;
     await api.updateTag(tag.id, tag.name, tag.color);
     setEditing((items) => {
       const next = { ...items };
@@ -1694,10 +1746,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
       <form className="panel stack" onSubmit={create}>
         <h2>Create tag</h2>
         <TextField label="Tag name" value={name} onChange={setName} />
-        <label className="field">
-          <span>Color</span>
-          <input type="color" value={color} onChange={(event) => setColor(event.target.value)} />
-        </label>
+        <ColorField label="Color" value={color} onChange={setColor} />
         <button className="primary-action" type="submit">
           <Plus size={18} /> Add tag
         </button>
@@ -1710,7 +1759,7 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
           return (
             <div className="tag-editor" key={tag.id}>
               <input value={draft.name} onChange={(event) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, name: event.target.value } }))} />
-              <input type="color" value={draft.color} onChange={(event) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, color: event.target.value } }))} />
+              <ColorField label="Color" value={draft.color} onChange={(value) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, color: value } }))} />
               <button type="button" onClick={() => save(draft)}>
                 <Save size={16} /> Save
               </button>
@@ -1829,10 +1878,8 @@ function TimeTools() {
           <div className="tool-header"><Timer size={15} /><strong>Elapsed time</strong></div>
           <p className="muted small">How long between two times of day</p>
           <div className="tool-row">
-            <label className="tool-label">From</label>
-            <input type="time" value={diffFrom} onChange={(e) => setDiffFrom(e.target.value)} />
-            <label className="tool-label">To</label>
-            <input type="time" value={diffTo} onChange={(e) => setDiffTo(e.target.value)} />
+            <TimeField label="From" value={diffFrom} onChange={setDiffFrom} />
+            <TimeField label="To" value={diffTo} onChange={setDiffTo} />
           </div>
           <div className="time-result">{diffResult ?? "—"}</div>
         </div>
@@ -1841,8 +1888,7 @@ function TimeTools() {
           <div className="tool-header"><Plus size={15} /><strong>Target time</strong></div>
           <p className="muted small">Add hours and minutes to a start time</p>
           <div className="tool-row">
-            <label className="tool-label">Start</label>
-            <input type="time" value={addBase} onChange={(e) => setAddBase(e.target.value)} />
+            <TimeField label="Start" value={addBase} onChange={setAddBase} />
             <label className="tool-label">+</label>
             <input type="number" value={addH} min="0" max="99" onChange={(e) => setAddH(e.target.value)} className="tool-num" />
             <span className="muted">h</span>
@@ -1856,8 +1902,7 @@ function TimeTools() {
           <div className="tool-header"><Hourglass size={15} /><strong>Shift end</strong></div>
           <p className="muted small">When will your shift end — and how much is left now?</p>
           <div className="tool-row">
-            <label className="tool-label">Start</label>
-            <input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
+            <TimeField label="Start" value={shiftStart} onChange={setShiftStart} />
             <label className="tool-label">Work</label>
             <input type="number" value={shiftWorkH} min="0" max="24" step="0.5" onChange={(e) => setShiftWorkH(e.target.value)} className="tool-num" />
             <span className="muted">h</span>
@@ -1883,8 +1928,7 @@ function TimeTools() {
           <div className="tool-header"><AlarmClock size={15} /><strong>Live countdown</strong></div>
           <p className="muted small">Real-time countdown to any time today</p>
           <div className="tool-row">
-            <label className="tool-label">Target</label>
-            <input type="time" value={liveTarget} onChange={(e) => setLiveTarget(e.target.value)} />
+            <TimeField label="Target" value={liveTarget} onChange={setLiveTarget} />
           </div>
           <div className={`time-result${liveTarget ? " live" : ""}`}>{liveResult ?? "—"}</div>
         </div>
@@ -1948,7 +1992,7 @@ function ProfileSettings({
         className="panel stack"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!confirmCritical("Save these profile changes?")) return;
+          if (!(await confirmCritical("Save these profile changes?"))) return;
           await api.updateProfile(profileName, profileEmail);
           await onRefresh();
           onToast("success", "Profile updated.");
@@ -1966,7 +2010,7 @@ function ProfileSettings({
         className="panel stack"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!confirmCritical("Change your password?")) return;
+          if (!(await confirmCritical("Change your password?"))) return;
           await api.changePassword(currentPassword, newPassword);
           setCurrentPassword("");
           setNewPassword("");
@@ -1988,7 +2032,7 @@ function ProfileSettings({
         <button
           type="button"
           onClick={async () => {
-            if (!confirmCritical("Start TOTP setup for this account?")) return;
+            if (!(await confirmCritical("Start TOTP setup for this account?"))) return;
             setTotp(await api.setupTotp());
           }}
         >
@@ -2003,7 +2047,7 @@ function ProfileSettings({
               className="primary-action"
               type="button"
               onClick={async () => {
-                if (!confirmCritical("Enable TOTP for this account?")) return;
+                if (!(await confirmCritical("Enable TOTP for this account?"))) return;
                 await api.confirmTotp(totpCode);
                 onToast("success", "TOTP enabled.");
               }}
@@ -2019,7 +2063,7 @@ function ProfileSettings({
         onSubmit={async (event) => {
           event.preventDefault();
           if (passkeyBusy) return;
-          if (!confirmCritical("Register this passkey for your account?")) return;
+          if (!(await confirmCritical("Register this passkey for your account?"))) return;
           setPasskeyBusy(true);
           try {
             await api.registerPasskey(passkeyLabel);
@@ -2060,11 +2104,11 @@ function ProfileSettings({
             <button
               type="button"
               onClick={async () => {
-                if (!confirmCritical(
+                if (!(await confirmCritical(
                   remainingCount > 0
                     ? "This will permanently invalidate all existing recovery codes. Continue?"
                     : "Generate recovery codes for this account?"
-                )) return;
+                ))) return;
                 const result = await api.generateRecoveryCodes();
                 setRecoveryCodes(result.codes);
                 setRemainingCount(result.codes.length);
@@ -2104,7 +2148,7 @@ function ProfileSettings({
               onChange={async (event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
-                if (!confirmCritical(`Import CSV file "${file.name}"? This can create new records.`)) {
+                if (!(await confirmCritical(`Import CSV file "${file.name}"? This can create new records.`))) {
                   event.target.value = "";
                   return;
                 }
@@ -2145,7 +2189,7 @@ function Countdowns({
 
   const create = async (event: FormEvent) => {
     event.preventDefault();
-    if (!confirmCritical("Create this countdown?")) return;
+    if (!(await confirmCritical("Create this countdown?"))) return;
     setBusy(true);
     setMessage("");
     try {
@@ -2163,14 +2207,14 @@ function Countdowns({
   };
 
   const complete = async (id: string) => {
-    if (!confirmCritical("Mark this countdown as completed?")) return;
+    if (!(await confirmCritical("Mark this countdown as completed?"))) return;
     await api.completeCountdown(id);
     await onRefresh();
     onToast("success", "Countdown completed.");
   };
 
   const remove = async (id: string) => {
-    if (!confirmCritical("Remove this countdown?")) return;
+    if (!(await confirmCritical("Remove this countdown?"))) return;
     await api.deleteCountdown(id);
     await onRefresh();
     onToast("success", "Countdown removed.");
@@ -2183,10 +2227,7 @@ function Countdowns({
       </div>
       <form className="countdown-form" onSubmit={create}>
         <TextField label="Title" value={title} onChange={setTitle} placeholder="End focus block" />
-        <label className="field">
-          <span>Target</span>
-          <input type="datetime-local" value={targetAt} onChange={(event) => setTargetAt(event.target.value)} />
-        </label>
+        <DateTimeField label="Target" value={targetAt} onChange={setTargetAt} />
         <label className="toggle-row">
           <input
             type="checkbox"
@@ -2289,6 +2330,74 @@ function TextField({
         min={min}
         step={step}
       />
+    </label>
+  );
+}
+
+function DateTimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [date = "", time = ""] = value.split("T");
+  const update = (nextDate: string, nextTime: string) => onChange(`${nextDate}T${nextTime}`);
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <div className="datetime-control">
+        <input
+          aria-label={`${label} date`}
+          value={date}
+          onChange={(event) => update(event.target.value, time)}
+          inputMode="numeric"
+          placeholder="YYYY-MM-DD"
+          pattern="\\d{4}-\\d{2}-\\d{2}"
+        />
+        <input
+          aria-label={`${label} time`}
+          value={time}
+          onChange={(event) => update(date, event.target.value)}
+          inputMode="numeric"
+          placeholder="HH:MM"
+          pattern="\\d{2}:\\d{2}"
+        />
+      </div>
+    </label>
+  );
+}
+
+function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <>
+      <label className="tool-label">{label}</label>
+      <input
+        className="time-text-input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode="numeric"
+        placeholder="HH:MM"
+        pattern="\\d{2}:\\d{2}"
+      />
+    </>
+  );
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const swatches = Array.from(new Set([...palette, value])).filter(Boolean);
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <div className="color-control">
+        <div className="color-swatches">
+          {swatches.map((swatch) => (
+            <button
+              key={swatch}
+              type="button"
+              className={swatch.toLowerCase() === value.toLowerCase() ? "active" : ""}
+              aria-label={`Use ${swatch}`}
+              style={{ background: swatch }}
+              onClick={() => onChange(swatch)}
+            />
+          ))}
+        </div>
+        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="#27b3a8" />
+      </div>
     </label>
   );
 }

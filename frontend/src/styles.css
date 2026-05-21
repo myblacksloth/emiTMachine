@@ -355,7 +355,10 @@ legend {
 .field input,
 .field textarea,
 .field select,
-.tag-editor input:not([type="color"]) {
+.tag-editor input,
+.datetime-control input,
+.color-control input,
+.time-text-input {
   width: 100%;
   border: 1px solid var(--border-input);
   border-radius: var(--r-sm);
@@ -374,7 +377,10 @@ legend {
 .field input:focus,
 .field textarea:focus,
 .field select:focus,
-.tag-editor input:not([type="color"]):focus {
+.tag-editor input:focus,
+.datetime-control input:focus,
+.color-control input:focus,
+.time-text-input:focus {
   border-color: var(--blue);
   background: var(--bg-input-focus);
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18);
@@ -403,6 +409,49 @@ input[type="color"] {
 
 input[type="datetime-local"] {
   font-family: var(--font);
+}
+
+.datetime-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(96px, 0.85fr);
+  gap: 0.5rem;
+  border-radius: 18px;
+  padding: 0.35rem;
+  background: rgba(120, 120, 128, 0.1);
+}
+
+.datetime-control input,
+.time-text-input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.color-control {
+  display: grid;
+  gap: 0.55rem;
+  border-radius: 18px;
+  padding: 0.55rem;
+  background: rgba(120, 120, 128, 0.1);
+}
+
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.color-swatches button {
+  width: 34px;
+  min-height: 34px;
+  border-radius: 50%;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(31, 35, 45, 0.14);
+}
+
+.color-swatches button.active {
+  outline: 3px solid rgba(0, 122, 255, 0.24);
+  border-color: rgba(255, 255, 255, 1);
 }
 
 /* ── Feedback messages ──────────────────────────────────────── */
@@ -720,7 +769,7 @@ input[type="datetime-local"] {
 /* ── Tag editor ─────────────────────────────────────────────── */
 .tag-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 42px auto;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.8fr) auto;
   gap: 0.5rem;
   align-items: center;
 }
@@ -800,6 +849,14 @@ input[type="datetime-local"] {
   display: grid;
   gap: 1rem;
   animation: modalIn 0.25s var(--ease);
+}
+
+.critical-modal {
+  width: min(460px, 100%);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(28px) saturate(1.2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
 }
 
 @keyframes modalIn {
@@ -1984,7 +2041,7 @@ button svg,
   white-space: nowrap;
 }
 
-.tool-row input[type="time"],
+.tool-row .time-text-input,
 .tool-row input[type="number"] {
   border: 1px solid var(--separator);
   border-radius: 8px;
@@ -1995,7 +2052,7 @@ button svg,
   padding: 0.35rem 0.5rem;
 }
 
-.tool-row input[type="time"] {
+.tool-row .time-text-input {
   flex: 1;
   min-width: 100px;
 }
