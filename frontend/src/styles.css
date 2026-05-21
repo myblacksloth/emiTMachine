@@ -823,6 +823,9 @@ input[type="datetime-local"] {
   border-radius: var(--r-pill);
   overflow: hidden;
   background: linear-gradient(90deg, rgba(52, 199, 89, 0.16), rgba(0, 122, 255, 0.14));
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
 }
 
 .slide-confirm span {
@@ -833,54 +836,44 @@ input[type="datetime-local"] {
   color: var(--text-primary);
   font-weight: 800;
   pointer-events: none;
+  z-index: 2;
 }
 
-.slide-confirm input[type="range"] {
-  width: 100%;
-  height: 54px;
-  margin: 0;
-  padding: 0 0.5rem;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: grab;
+.slide-confirm-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(52, 199, 89, 0.22);
+  pointer-events: none;
+  transition: width 0.22s var(--ease);
 }
 
-.slide-confirm input[type="range"]:active {
+.slide-confirm-thumb {
+  position: absolute;
+  top: 50%;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(242, 242, 247, 0.92));
+  box-shadow: 0 8px 22px rgba(31, 35, 45, 0.22);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: left 0.22s var(--ease);
+  z-index: 3;
+}
+
+.slide-confirm.dragging {
   cursor: grabbing;
 }
 
-.slide-confirm input[type="range"]::-webkit-slider-runnable-track {
-  height: 54px;
-  background: transparent;
+.slide-confirm.dragging .slide-confirm-fill,
+.slide-confirm.dragging .slide-confirm-thumb {
+  transition: none;
 }
 
-.slide-confirm input[type="range"]::-moz-range-track {
-  height: 54px;
-  background: transparent;
-}
-
-.slide-confirm input[type="range"]::-webkit-slider-thumb {
-  width: 44px;
-  height: 44px;
-  margin-top: 5px;
-  border: 0;
-  border-radius: 50%;
-  appearance: none;
-  -webkit-appearance: none;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(242, 242, 247, 0.92));
-  box-shadow: 0 8px 22px rgba(31, 35, 45, 0.22);
-}
-
-.slide-confirm input[type="range"]::-moz-range-thumb {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(242, 242, 247, 0.92));
-  box-shadow: 0 8px 22px rgba(31, 35, 45, 0.22);
+.slide-confirm.returning .slide-confirm-fill,
+.slide-confirm.returning .slide-confirm-thumb {
+  transition: width 0.24s var(--ease), left 0.24s var(--ease);
 }
 
 .slide-confirm.unlocked {

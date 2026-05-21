@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type HTMLAttributes, type PointerEvent, type ReactNode } from "react";
 import {
   AlarmClock,
   BarChart3,
@@ -1574,41 +1574,90 @@ function PunchDialog({
 }
 
 function SlideToConfirm({ label, disabled, onConfirm }: { label: string; disabled?: boolean; onConfirm: () => Promise<void> | void }) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const valueRef = useRef(0);
+  const draggingRef = useRef(false);
   const [value, setValue] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [returning, setReturning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const unlocked = value >= 96;
   const isDisabled = disabled || submitting;
 
-  const change = async (nextValue: number) => {
-    if (isDisabled) return;
-    if (nextValue < 96) {
-      setValue(nextValue);
-      return;
-    }
+  const setSlideValue = (nextValue: number) => {
+    valueRef.current = nextValue;
+    setValue(nextValue);
+  };
+
+  const valueFromPointer = (clientX: number) => {
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect) return valueRef.current;
+    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  };
+
+  const confirm = async () => {
     setValue(100);
     setSubmitting(true);
     try {
       await onConfirm();
     } finally {
       setSubmitting(false);
-      setValue(0);
+      setSlideValue(0);
     }
   };
 
+  const start = (event: PointerEvent<HTMLDivElement>) => {
+    if (isDisabled) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setReturning(false);
+    draggingRef.current = true;
+    setDragging(true);
+    setSlideValue(valueFromPointer(event.clientX));
+  };
+
+  const move = (event: PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current || isDisabled) return;
+    setSlideValue(valueFromPointer(event.clientX));
+  };
+
+  const finish = async () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    setDragging(false);
+    if (valueRef.current >= 96) {
+      await confirm();
+      return;
+    }
+    setReturning(true);
+    window.requestAnimationFrame(() => setSlideValue(0));
+    window.setTimeout(() => setReturning(false), 260);
+  };
+
   return (
-    <div className={`slide-confirm ${unlocked ? "unlocked" : ""} ${isDisabled ? "disabled" : ""}`}>
+    <div
+      ref={trackRef}
+      className={`slide-confirm ${unlocked ? "unlocked" : ""} ${dragging ? "dragging" : ""} ${returning ? "returning" : ""} ${isDisabled ? "disabled" : ""}`}
+      role="slider"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value)}
+      tabIndex={isDisabled ? -1 : 0}
+      onPointerDown={start}
+      onPointerMove={move}
+      onPointerUp={() => void finish()}
+      onPointerCancel={() => void finish()}
+      onKeyDown={(event) => {
+        if (isDisabled) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          void confirm();
+        }
+      }}
+    >
       <span>{label}</span>
-      <input
-        aria-label={label}
-        type="range"
-        min="0"
-        max="100"
-        value={value}
-        disabled={isDisabled}
-        onChange={(event) => void change(Number(event.target.value))}
-        onMouseUp={() => setValue((current) => (current >= 96 ? current : 0))}
-        onTouchEnd={() => setValue((current) => (current >= 96 ? current : 0))}
-      />
+      <i className="slide-confirm-fill" style={{ width: `${value}%` }} />
+      <b className="slide-confirm-thumb" style={{ left: `${value}%` }} />
     </div>
   );
 }
