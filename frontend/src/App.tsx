@@ -1741,31 +1741,72 @@ function TagManager({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: () =
     onToast("success", "Tag updated.");
   };
 
+  const remove = async (tag: Tag) => {
+    if (tag.isDefault) return;
+    if (!(await confirmCritical(`Delete tag "${tag.name}"? Activities can be kept by removing only this tag from them.`))) return;
+    let deleteSessions = false;
+    if (await confirmCritical(`Do you also want to delete every activity associated with "${tag.name}"?`)) {
+      if (!(await confirmCritical(`This will permanently delete all activities associated with "${tag.name}". Continue?`))) return;
+      deleteSessions = true;
+    }
+    const result = await api.deleteTag(tag.id, deleteSessions);
+    await onRefresh();
+    onToast("success", deleteSessions ? `Tag deleted with ${result.deletedSessions} associated activities.` : "Tag deleted. Associated activities were kept.");
+  };
+
   return (
-    <section className="two-column">
-      <form className="panel stack" onSubmit={create}>
-        <h2>Create tag</h2>
-        <TextField label="Tag name" value={name} onChange={setName} />
-        <ColorField label="Color" value={color} onChange={setColor} />
-        <button className="primary-action" type="submit">
-          <Plus size={18} /> Add tag
-        </button>
+    <section className="tag-manager-grid">
+      <form className="panel tag-create-panel" onSubmit={create}>
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Tags</p>
+            <h2>Create tag</h2>
+          </div>
+        </div>
+        <div className="tag-create-row">
+          <TextField label="Tag name" value={name} onChange={setName} />
+          <ColorField label="Color" value={color} onChange={setColor} />
+          <button className="primary-action" type="submit">
+            <Plus size={18} /> Add tag
+          </button>
+        </div>
       </form>
-      <section className="panel stack">
-        <h2>Manage tags</h2>
+      <section className="panel tag-list-panel">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Library</p>
+            <h2>Manage tags</h2>
+          </div>
+        </div>
         {tags.length === 0 ? <p className="empty-state">No tags have been created yet. Default tags will appear after the backend returns them.</p> : null}
-        {tags.map((tag) => {
-          const draft = editing[tag.id] ?? tag;
-          return (
-            <div className="tag-editor" key={tag.id}>
-              <input value={draft.name} onChange={(event) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, name: event.target.value } }))} />
-              <ColorField label="Color" value={draft.color} onChange={(value) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, color: value } }))} />
-              <button type="button" onClick={() => save(draft)}>
-                <Save size={16} /> Save
-              </button>
-            </div>
-          );
-        })}
+        <div className="tag-list">
+          {tags.map((tag) => {
+            const draft = editing[tag.id] ?? tag;
+            return (
+              <article className="tag-editor" key={tag.id}>
+                <div className="tag-editor-heading">
+                  <span className="tag-preview-dot" style={{ background: draft.color }} />
+                  <div>
+                    <strong>{tag.name}</strong>
+                    <small>{tag.isDefault ? "Default tag" : "Custom tag"}</small>
+                  </div>
+                </div>
+                <TextField label="Name" value={draft.name} onChange={(value) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, name: value } }))} />
+                <ColorField label="Color" value={draft.color} onChange={(value) => setEditing((items) => ({ ...items, [tag.id]: { ...draft, color: value } }))} />
+                <div className="tag-editor-actions">
+                  <button type="button" onClick={() => save(draft)}>
+                    <Save size={16} /> Save
+                  </button>
+                  {!tag.isDefault ? (
+                    <button className="danger-action" type="button" onClick={() => remove(tag)}>
+                      <Trash2 size={16} /> Delete
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
     </section>
   );
@@ -2381,7 +2422,7 @@ function TimeField({ label, value, onChange }: { label: string; value: string; o
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const swatches = Array.from(new Set([...palette, value])).filter(Boolean);
   return (
-    <label className="field">
+    <div className="field">
       <span>{label}</span>
       <div className="color-control">
         <div className="color-swatches">
@@ -2398,7 +2439,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         </div>
         <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="#27b3a8" />
       </div>
-    </label>
+    </div>
   );
 }
 

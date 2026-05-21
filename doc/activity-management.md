@@ -17,9 +17,10 @@ Critical actions are intentionally guarded in the UI. Clock-in and clock-out req
 
 Default tags:
 
-- `Presence` is the only tag marked as default and is the initial selection for new manual or punch-in activities.
-- `Smart working` is available as a standard tag, but it is mutually exclusive with `Presence`.
-- `Not billable` is available as a standard tag and can be combined with either work mode.
+- `Presence` is a protected default tag and is the initial selection for new manual or punch-in activities.
+- `Smart working` is a protected default tag, but it is mutually exclusive with `Presence`.
+- `Not billable` is a protected default tag and can be combined with either work mode.
+- User-created tags can be deleted from the Tags panel. Protected default tags cannot be deleted. When deleting a custom tag, the user can either keep associated activities by removing only the tag link, or explicitly confirm deletion of all activities associated with that tag.
 
 The backend rejects sessions that contain both `Presence` and `Smart working`, including manual activities, punch-in requests, and CSV imports.
 
@@ -29,6 +30,7 @@ Backend endpoints:
 - `POST /api/reports/sessions`
 - `PATCH /api/reports/sessions/:id`
 - `DELETE /api/reports/sessions/:id`
+- `DELETE /api/tags/:id?deleteSessions=true|false`
 
 Manual inserts create `time_sessions`, `session_tags`, and related `clock_in` / `clock_out` events. Updates keep those records aligned. Manual inserts and edits use `source = 'manual_edit'`; updates write event revisions to `time_event_revisions` when existing events are changed.
 

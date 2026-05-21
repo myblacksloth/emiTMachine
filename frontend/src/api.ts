@@ -226,7 +226,16 @@ function mapSession(session: BackendSession): ActivitySession {
     note: session.note ?? "",
     durationMinutes: session.duration_seconds === null ? null : secondsToMinutes(session.duration_seconds),
     tagIds: session.tags.map((tag) => tag.id),
-    tags: session.tags
+    tags: session.tags.map(mapTag)
+  };
+}
+
+function mapTag(tag: BackendTag): Tag {
+  return {
+    id: tag.id,
+    name: tag.name,
+    color: tag.color,
+    isDefault: tag.is_default
   };
 }
 
@@ -469,7 +478,7 @@ async function fetchDashboard() {
           note: status.activeSession.note
         }
       : null,
-    tags: tagsPayload.tags,
+    tags: tagsPayload.tags.map(mapTag),
     charts: {
       daily: mapBuckets(reports.buckets, "day"),
       weekly: mapBuckets(reports.buckets, "week"),
@@ -633,15 +642,17 @@ export const api = {
       body: JSON.stringify({ occurredAt, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, note: note || undefined })
     }).then(() => fetchDashboard()),
   createTag: (name: string, color: string) =>
-    request<Tag>("/api/tags", {
+    request<{ tag: BackendTag }>("/api/tags", {
       method: "POST",
       body: JSON.stringify({ name, color })
-    }),
+    }).then((payload) => mapTag(payload.tag)),
   updateTag: (id: string, name: string, color: string) =>
-    request<Tag>(`/api/tags/${id}`, {
+    request<{ tag: BackendTag }>(`/api/tags/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ name, color })
-    }),
+    }).then((payload) => mapTag(payload.tag)),
+  deleteTag: (id: string, deleteSessions: boolean) =>
+    request<{ deletedSessions: number }>(`/api/tags/${id}?deleteSessions=${deleteSessions ? "true" : "false"}`, { method: "DELETE" }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<void>("/api/profile/password", {
       method: "PATCH",

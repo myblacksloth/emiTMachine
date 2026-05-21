@@ -9,7 +9,7 @@
 - `administrative_requests` stores Vacation, Leave, and Smart working requests. Requests cannot overlap other requests for the same user; backend policy also prevents overlaps with work sessions and prevents work sessions during approved requests. Root users can clean only requests that fully ended before the current month.
 - `time_sessions` stores clocked work intervals. It enforces one open session per user and rejects overlapping sessions for the same user.
 - `time_events` stores clock-in, clock-out, break, and manual-adjustment events. Every event stores the client-submitted timestamp and explicit client timezone.
-- `tags` stores user-owned default and custom tags. Only `Presence` is marked as the default tag. `default_tag_templates` seeds `Presence`, `Smart working`, and `Not billable` with colors for registration-time tag creation; all tag colors are constrained to six-digit hex values.
+- `tags` stores user-owned default and custom tags. `Presence`, `Smart working`, and `Not billable` are the protected default tags created for each user; additional tags are user-created custom tags. `default_tag_templates` seeds the protected defaults with colors for registration-time tag creation; all tag colors are constrained to six-digit hex values.
 - `session_tags` links sessions to tags. A trigger requires every tag to be owned by the same user as the time session.
 - `csv_imports` and `csv_import_rows` track restore uploads, validation results, and imported rows. Imported time events are appended and linked back to their import metadata.
 - `countdowns` stores user countdowns, optionally linked to the current work session.

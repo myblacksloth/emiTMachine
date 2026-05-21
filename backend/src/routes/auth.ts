@@ -77,8 +77,8 @@ router.post("/register", async (req, res, next) => {
       await client.query(
         `insert into tags (user_id, name, color, is_default)
          values ($1, 'Presence', '#21A67A', true),
-                ($1, 'Smart working', '#3B82F6', false),
-                ($1, 'Not billable', '#8E8E93', false)`,
+                ($1, 'Smart working', '#3B82F6', true),
+                ($1, 'Not billable', '#8E8E93', true)`,
         [userId]
       );
 

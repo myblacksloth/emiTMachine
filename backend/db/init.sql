@@ -124,11 +124,11 @@ SELECT id, 'Presence', '#21A67A', true FROM users WHERE username = 'root'
 ON CONFLICT (user_id, name) DO NOTHING;
 
 INSERT INTO tags (user_id, name, color, is_default)
-SELECT id, 'Smart working', '#3B82F6', false FROM users WHERE username = 'root'
+SELECT id, 'Smart working', '#3B82F6', true FROM users WHERE username = 'root'
 ON CONFLICT (user_id, name) DO NOTHING;
 
 INSERT INTO tags (user_id, name, color, is_default)
-SELECT id, 'Not billable', '#8E8E93', false FROM users WHERE username = 'root'
+SELECT id, 'Not billable', '#8E8E93', true FROM users WHERE username = 'root'
 ON CONFLICT (user_id, name) DO NOTHING;
 
 CREATE TABLE default_tag_templates (
