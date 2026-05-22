@@ -1094,6 +1094,29 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", `${result.deletedCount} old administrative request${result.deletedCount === 1 ? "" : "s"} deleted.`);
   };
 
+  const importSelectedUserData = async (file: File | null) => {
+    if (!selectedUser || !file) return;
+    if (
+      !(await confirmCritical(
+        `Import this JSON backup into ${selectedUser.username}? Current sessions, tags, countdowns, overtime payments, and administrative requests for this user will be replaced.`
+      ))
+    ) {
+      return;
+    }
+    try {
+      const result = await api.importAdminUserData(selectedUser.id, file);
+      await loadUsers();
+      await loadSelectedUserData(selectedUser.id);
+      onToast(
+        "success",
+        `Imported ${result.imported.sessions} sessions, ${result.imported.events} events, and ${result.imported.administrativeRequests} administrative requests.`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to import user data.");
+      onToast("error", "User data import failed.");
+    }
+  };
+
   const copyUserId = async (user: AdminUser) => {
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -1235,6 +1258,24 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             ) : null}
             {selectedUser ? <p className="muted">Name: {selectedUser.displayName || selectedUser.username} · Email: {selectedUser.email || "not set"}</p> : null}
           </div>
+          {selectedUser ? (
+            <div className="selected-user-data-actions">
+              <a className="download-link" href={api.adminUserExportUrl(selectedUser.id)}>
+                <Download size={16} /> Export user data
+              </a>
+              <label className="download-link upload-link">
+                <UploadCloud size={16} /> Import user data
+                <input
+                  accept=".json,application/json"
+                  type="file"
+                  onChange={(event) => {
+                    void importSelectedUserData(event.target.files?.[0] ?? null);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          ) : null}
         </div>
         {summary ? (
           <section className="summary-grid compact" aria-label="Selected user summary">

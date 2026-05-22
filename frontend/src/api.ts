@@ -632,6 +632,17 @@ export const api = {
   adminUserSessions: (id: string) =>
     request<{ sessions: BackendSession[] }>(`/api/admin/users/${id}/sessions?limit=100`).then((payload) => payload.sessions.map(mapSession)),
   adminUserOvertime: (id: string) => request<OvertimeReport>(`/api/admin/users/${id}/overtime`),
+  adminUserExportUrl: (id: string) => `${apiBaseUrl}/api/admin/users/${id}/export`,
+  importAdminUserData: async (id: string, file: File) => {
+    const data = JSON.parse(await file.text()) as unknown;
+    return request<{ imported: { tags: number; sessions: number; events: number; countdowns: number; overtimePayments: number; administrativeRequests: number } }>(
+      `/api/admin/users/${id}/import`,
+      {
+        method: "POST",
+        body: JSON.stringify({ data })
+      }
+    );
+  },
   cleanupAdministrativeRequests: () =>
     request<{ cutoff: string; deletedCount: number }>("/api/admin/administrative-requests/cleanup", { method: "DELETE" }),
   adminDumpUrl: `${apiBaseUrl}/api/admin/dump`,

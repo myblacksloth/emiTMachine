@@ -641,6 +641,14 @@ input[type="datetime-local"] {
   opacity: 1;
 }
 
+.upload-link {
+  cursor: pointer;
+}
+
+.upload-link input[type="file"] {
+  display: none;
+}
+
 /* ── Summary metrics ────────────────────────────────────────── */
 .summary-grid {
   display: grid;
@@ -1829,6 +1837,13 @@ button svg,
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.selected-user-data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
 }
 
 .admin-user-list {

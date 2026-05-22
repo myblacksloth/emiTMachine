@@ -1,7 +1,7 @@
 import { Router, type Request } from "express";
 import { stringify } from "csv-stringify/sync";
 import { z } from "zod";
-import { pool } from "../db.js";
+import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getOvertimeReport } from "./overtime.js";
@@ -36,6 +36,25 @@ const registrationSchema = z.object({
   enabled: z.boolean()
 });
 
+const importRowsSchema = z.array(z.record(z.unknown())).default([]);
+
+const userDataPayloadSchema = z.object({
+  version: z.number().optional(),
+  user: z.record(z.unknown()).optional(),
+  tags: importRowsSchema,
+  time_sessions: importRowsSchema,
+  session_tags: importRowsSchema,
+  time_events: importRowsSchema,
+  countdowns: importRowsSchema,
+  overtime_payments: importRowsSchema,
+  administrative_requests: importRowsSchema
+});
+
+const userDataImportSchema = z.union([
+  z.object({ data: userDataPayloadSchema }),
+  userDataPayloadSchema
+]);
+
 async function assertCanManageResponsibleUser(req: Request, userId: string) {
   if (req.user?.role === "root") {
     return;
@@ -59,6 +78,49 @@ function requireRoot(req: Request) {
   if (!req.user || req.user.role !== "root") {
     throw new HttpError(403, "Root access required");
   }
+}
+
+async function assertCanExportImportUser(req: Request, userId: string) {
+  const result = await pool.query(
+    `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
+            overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
+            status, disabled_at, created_at, last_login_at
+     from users
+     where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')`,
+    [userId, req.user!.role]
+  );
+  if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be exported by this admin");
+  return result.rows[0];
+}
+
+function stringValue(row: Record<string, unknown>, key: string, fallback = "") {
+  const value = row[key];
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function nullableStringValue(row: Record<string, unknown>, key: string) {
+  const value = row[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function numberValue(row: Record<string, unknown>, key: string, fallback = 0) {
+  const value = row[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function booleanValue(row: Record<string, unknown>, key: string, fallback = false) {
+  const value = row[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function safeSource(row: Record<string, unknown>) {
+  const source = stringValue(row, "source", "admin_restore");
+  // Imported CSV rows may not carry the original csv_import metadata, so restore them as admin records.
+  return source === "csv_import" ? "admin_restore" : source;
+}
+
+function isDefaultTagName(name: string) {
+  return ["presence", "smart working", "not billable"].includes(name.trim().toLowerCase());
 }
 
 router.use(requireAuth);
@@ -453,6 +515,257 @@ router.delete("/administrative-requests/cleanup", async (req, res, next) => {
       deletedCount: payload.deleted_count
     });
     res.json({ cutoff: payload.cutoff, deletedCount: payload.deleted_count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/users/:id/export", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const user = await assertCanExportImportUser(req, userId);
+    const tables = {
+      tags: await pool.query("select * from tags where user_id = $1 order by created_at, name", [userId]),
+      time_sessions: await pool.query("select * from time_sessions where user_id = $1 order by started_at, created_at", [userId]),
+      session_tags: await pool.query(
+        `select st.*
+         from session_tags st
+         join time_sessions s on s.id = st.session_id
+         where s.user_id = $1
+         order by st.created_at`,
+        [userId]
+      ),
+      time_events: await pool.query("select * from time_events where user_id = $1 order by occurred_at, created_at", [userId]),
+      countdowns: await pool.query("select * from countdowns where user_id = $1 order by created_at", [userId]),
+      overtime_payments: await pool.query("select * from overtime_payments where user_id = $1 order by week_start", [userId]),
+      administrative_requests: await pool.query("select * from administrative_requests where user_id = $1 order by started_at, created_at", [userId])
+    };
+
+    res.header("Content-Type", "application/json");
+    res.header("Content-Disposition", `attachment; filename="emitmachine-user-${user.username}.json"`);
+    res.json({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      user,
+      tags: tables.tags.rows,
+      time_sessions: tables.time_sessions.rows,
+      session_tags: tables.session_tags.rows,
+      time_events: tables.time_events.rows,
+      countdowns: tables.countdowns.rows,
+      overtime_payments: tables.overtime_payments.rows,
+      administrative_requests: tables.administrative_requests.rows
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/users/:id/import", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    await assertCanExportImportUser(req, userId);
+    const parsed = userDataImportSchema.parse(req.body);
+    const data = "data" in parsed ? parsed.data : parsed;
+
+    const imported = await withTransaction(async (client) => {
+      await client.query("delete from administrative_requests where user_id = $1", [userId]);
+      await client.query("delete from overtime_payments where user_id = $1", [userId]);
+      await client.query("delete from countdowns where user_id = $1", [userId]);
+      await client.query("delete from time_sessions where user_id = $1", [userId]);
+      await client.query("delete from tags where user_id = $1 and is_default = false", [userId]);
+
+      const tagIdMap = new Map<string, string>();
+      for (const tag of data.tags) {
+        const originalId = stringValue(tag, "id");
+        const name = stringValue(tag, "name");
+        if (!name) continue;
+        const result = await client.query(
+          `insert into tags (user_id, name, color, is_default, is_archived, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, coalesce($6::timestamptz, now()), coalesce($7::timestamptz, now()))
+           on conflict (user_id, name) do update
+           set color = excluded.color,
+               is_default = excluded.is_default,
+               is_archived = excluded.is_archived,
+               updated_at = now()
+           returning id`,
+          [
+            userId,
+            name,
+            stringValue(tag, "color", "#8E8E93"),
+            isDefaultTagName(name) || booleanValue(tag, "is_default", false),
+            booleanValue(tag, "is_archived", false),
+            nullableStringValue(tag, "created_at"),
+            nullableStringValue(tag, "updated_at")
+          ]
+        );
+        if (originalId) tagIdMap.set(originalId, result.rows[0].id);
+      }
+
+      for (const session of data.time_sessions) {
+        const id = stringValue(session, "id");
+        if (!id || !stringValue(session, "started_at")) continue;
+        await client.query(
+          `insert into time_sessions (
+             id, user_id, started_at, ended_at, status, source, start_timezone, end_timezone,
+             note, no_count_minutes, anomaly_reason, created_at, updated_at
+           )
+           values (
+             $1, $2, $3::timestamptz, $4::timestamptz, $5, $6, $7, $8,
+             $9, $10, $11, coalesce($12::timestamptz, now()), coalesce($13::timestamptz, now())
+           )`,
+          [
+            id,
+            userId,
+            stringValue(session, "started_at"),
+            nullableStringValue(session, "ended_at"),
+            stringValue(session, "status", nullableStringValue(session, "ended_at") ? "closed" : "open"),
+            safeSource(session),
+            stringValue(session, "start_timezone", "UTC"),
+            nullableStringValue(session, "end_timezone"),
+            nullableStringValue(session, "note"),
+            numberValue(session, "no_count_minutes", 0),
+            nullableStringValue(session, "anomaly_reason"),
+            nullableStringValue(session, "created_at"),
+            nullableStringValue(session, "updated_at")
+          ]
+        );
+      }
+
+      for (const sessionTag of data.session_tags) {
+        const sessionId = stringValue(sessionTag, "session_id");
+        const importedTagId = tagIdMap.get(stringValue(sessionTag, "tag_id"));
+        if (!sessionId || !importedTagId) continue;
+        await client.query(
+          `insert into session_tags (session_id, tag_id, created_at)
+           values ($1, $2, coalesce($3::timestamptz, now()))
+           on conflict do nothing`,
+          [sessionId, importedTagId, nullableStringValue(sessionTag, "created_at")]
+        );
+      }
+
+      for (const event of data.time_events) {
+        const id = stringValue(event, "id");
+        const sessionId = stringValue(event, "session_id");
+        if (!id || !sessionId || !stringValue(event, "occurred_at")) continue;
+        await client.query(
+          `insert into time_events (
+             id, user_id, session_id, event_type, occurred_at, source, timezone,
+             client_submitted_at, note, change_reason, created_by_user_id, created_at
+           )
+           values (
+             $1, $2, $3, $4, $5::timestamptz, $6, $7,
+             coalesce($8::timestamptz, now()), $9, $10, $11, coalesce($12::timestamptz, now())
+           )`,
+          [
+            id,
+            userId,
+            sessionId,
+            stringValue(event, "event_type", "manual_adjustment"),
+            stringValue(event, "occurred_at"),
+            safeSource(event),
+            stringValue(event, "timezone", "UTC"),
+            nullableStringValue(event, "client_submitted_at"),
+            nullableStringValue(event, "note"),
+            nullableStringValue(event, "change_reason") ?? "Imported by admin",
+            userId,
+            nullableStringValue(event, "created_at")
+          ]
+        );
+      }
+
+      for (const countdown of data.countdowns) {
+        const id = stringValue(countdown, "id");
+        if (!id || !stringValue(countdown, "title") || !stringValue(countdown, "target_time")) continue;
+        await client.query(
+          `insert into countdowns (
+             id, user_id, session_id, title, target_time, target_timezone, target_at,
+             recurrence_rule, status, completed_at, created_at, updated_at
+           )
+           values (
+             $1, $2, $3, $4, $5::time, $6, $7::timestamptz,
+             $8, $9, $10::timestamptz, coalesce($11::timestamptz, now()), coalesce($12::timestamptz, now())
+           )`,
+          [
+            id,
+            userId,
+            nullableStringValue(countdown, "session_id"),
+            stringValue(countdown, "title"),
+            stringValue(countdown, "target_time"),
+            stringValue(countdown, "target_timezone", "UTC"),
+            nullableStringValue(countdown, "target_at"),
+            nullableStringValue(countdown, "recurrence_rule"),
+            stringValue(countdown, "status", "active"),
+            nullableStringValue(countdown, "completed_at"),
+            nullableStringValue(countdown, "created_at"),
+            nullableStringValue(countdown, "updated_at")
+          ]
+        );
+      }
+
+      for (const payment of data.overtime_payments) {
+        const id = stringValue(payment, "id");
+        if (!id || !stringValue(payment, "week_start")) continue;
+        await client.query(
+          `insert into overtime_payments (id, user_id, week_start, overtime_minutes, paid_at, paid_by_user_id, created_at)
+           values ($1, $2, $3::date, $4, coalesce($5::timestamptz, now()), $6, coalesce($7::timestamptz, now()))
+           on conflict (user_id, week_start) do update
+           set overtime_minutes = excluded.overtime_minutes,
+               paid_at = excluded.paid_at,
+               paid_by_user_id = excluded.paid_by_user_id`,
+          [
+            id,
+            userId,
+            stringValue(payment, "week_start"),
+            numberValue(payment, "overtime_minutes", 1),
+            nullableStringValue(payment, "paid_at"),
+            userId,
+            nullableStringValue(payment, "created_at")
+          ]
+        );
+      }
+
+      for (const request of data.administrative_requests) {
+        const id = stringValue(request, "id");
+        if (!id || !stringValue(request, "started_at") || !stringValue(request, "ended_at")) continue;
+        await client.query(
+          `insert into administrative_requests (
+             id, user_id, request_type, started_at, ended_at, status, note,
+             decided_by_user_id, decided_at, created_at, updated_at
+           )
+           values (
+             $1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7,
+             $8, $9::timestamptz, coalesce($10::timestamptz, now()), coalesce($11::timestamptz, now())
+           )`,
+          [
+            id,
+            userId,
+            stringValue(request, "request_type", "leave"),
+            stringValue(request, "started_at"),
+            stringValue(request, "ended_at"),
+            stringValue(request, "status", "pending"),
+            nullableStringValue(request, "note"),
+            stringValue(request, "status", "pending") === "pending" ? null : userId,
+            nullableStringValue(request, "decided_at"),
+            nullableStringValue(request, "created_at"),
+            nullableStringValue(request, "updated_at")
+          ]
+        );
+      }
+
+      return {
+        tags: data.tags.length,
+        sessions: data.time_sessions.length,
+        events: data.time_events.length,
+        countdowns: data.countdowns.length,
+        overtimePayments: data.overtime_payments.length,
+        administrativeRequests: data.administrative_requests.length
+      };
+    });
+
+    req.log?.info("user data imported by admin", { actorUserId: req.user!.id, userId, imported });
+    res.json({ imported });
   } catch (error) {
     next(error);
   }

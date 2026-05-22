@@ -82,6 +82,8 @@ POST   /api/admin/users/:id/reset-password
 DELETE /api/admin/users/:id
 GET    /api/admin/users/:id/summary
 GET    /api/admin/users/:id/sessions
+GET    /api/admin/users/:id/export
+POST   /api/admin/users/:id/import
 GET    /api/profile/managers
 GET    /api/administrative-requests
 POST   /api/administrative-requests
@@ -122,7 +124,7 @@ GET /api/admin/dump
 
 The JSON dump includes the current operational tables, including users, responsible assignments, administrative requests, tags, work sessions, session tags, time events, countdowns, overtime payments, recovery code metadata, and passkeys.
 
-Full restore is intentionally not implemented in the web UI yet. A safe restore flow should include:
+Full application restore is intentionally not implemented in the web UI yet. A safe restore flow should include:
 
 - upload validation;
 - preview of affected rows;
@@ -130,6 +132,19 @@ Full restore is intentionally not implemented in the web UI yet. A safe restore 
 - audit log entry;
 - active session revocation;
 - clear rollback instructions.
+
+Admins and root can export and reimport data for a single selected user from the Admin dashboard:
+
+```text
+GET  /api/admin/users/:id/export
+POST /api/admin/users/:id/import
+```
+
+Root can export/import any non-root account. Admins can export/import standard user accounts only.
+
+The per-user JSON export includes the selected user's operational data: tags, work sessions, session tags, time events, countdowns, overtime payment statuses, and administrative requests. It does not include passwords, passkeys, login sessions, recovery codes, or other credentials.
+
+The per-user import is a replacement restore. After explicit confirmation in the UI, the backend runs a transaction that removes the selected user's current operational data and imports the JSON data into that same user account. Imported records are reassigned to the selected user, so the import does not create or replace the user account itself.
 
 Until that is implemented, restore should be handled as a controlled PostgreSQL operation by an operator.
 
