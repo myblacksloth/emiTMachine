@@ -124,6 +124,14 @@ function activityEffectiveMinutes(activity: ActivitySession) {
   return Math.max(0, liveMinutes - activity.noCountMinutes);
 }
 
+function sameLocalMonth(first: Date, second: Date) {
+  return first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth();
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function weekRangeLabel(weekStart: string) {
   const start = dateFromDateOnly(weekStart);
   const end = new Date(start);
@@ -523,7 +531,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "requests" | "overtime" | "tags" | "tools" | "profile" | "admin">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "profile" | "admin">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -552,6 +560,9 @@ function Dashboard({
         </button>
         <button className={view === "activities" ? "active" : ""} onClick={() => setView("activities")} type="button">
           <CalendarClock size={16} /> Activities
+        </button>
+        <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">
+          <CalendarClock size={16} /> Calendar
         </button>
         <button className={view === "requests" ? "active" : ""} onClick={() => setView("requests")} type="button">
           <ShieldCheck size={16} /> Administrative Requests
@@ -610,6 +621,7 @@ function Dashboard({
       ) : null}
 
       {view === "activities" ? <ActivityPanel tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
+      {view === "calendar" ? <MonthlyCalendarPanel /> : null}
       {view === "requests" ? <AdministrativeRequestsPanel userRole={data.user.role} onToast={onToast} /> : null}
       {view === "overtime" ? <OvertimePanel onToast={onToast} /> : null}
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
@@ -670,6 +682,125 @@ function Chart({ title, buckets }: { title: string; buckets: ChartBucket[] }) {
         </div>
       )}
     </article>
+  );
+}
+
+function MonthlyCalendarPanel() {
+  const [activities, setActivities] = useState<ActivitySession[]>([]);
+  const [cursor, setCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const loadActivities = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      setActivities(await api.activities());
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load monthly calendar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadActivities();
+  }, []);
+
+  const monthDays = useMemo(() => {
+    const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const gridStart = startOfLocalWeek(firstOfMonth);
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = new Date(gridStart);
+      day.setDate(gridStart.getDate() + index);
+      return day;
+    });
+  }, [cursor]);
+
+  const activitiesByDay = useMemo(() => {
+    const grouped = new Map<string, ActivitySession[]>();
+    for (const activity of activities) {
+      const startedAt = new Date(activity.startedAt);
+      if (!sameLocalMonth(startedAt, cursor)) continue;
+      const key = localDateKey(startedAt);
+      grouped.set(key, [...(grouped.get(key) ?? []), activity]);
+    }
+    for (const [key, sessions] of grouped) {
+      grouped.set(key, [...sessions].sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime()));
+    }
+    return grouped;
+  }, [activities, cursor]);
+
+  const monthActivities = Array.from(activitiesByDay.values()).flat();
+  const monthTotalMinutes = monthActivities.reduce((total, activity) => total + activityEffectiveMinutes(activity), 0);
+  const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const todayKey = localDateKey(new Date());
+
+  const moveMonth = (offset: number) => {
+    setCursor((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  };
+
+  return (
+    <section className="panel calendar-panel">
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">Monthly report</p>
+          <h2>{monthLabel}</h2>
+        </div>
+        <div className="calendar-actions">
+          <button type="button" onClick={() => moveMonth(-1)}>Previous</button>
+          <button type="button" onClick={() => setCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Today</button>
+          <button type="button" onClick={() => moveMonth(1)}>Next</button>
+          <button type="button" onClick={loadActivities} disabled={loading}>
+            <RefreshCw size={16} /> Refresh
+          </button>
+        </div>
+      </div>
+      {message ? <p className="form-message error">{message}</p> : null}
+      {loading ? <div className="loading-line">Loading monthly calendar...</div> : null}
+      <section className="summary-grid compact calendar-summary" aria-label="Monthly summary">
+        <Metric label="Month total" value={minutesLabel(monthTotalMinutes)} icon={<TimerReset size={18} />} />
+        <Metric label="Activities" value={String(monthActivities.length)} icon={<CalendarClock size={18} />} />
+        <Metric label="Worked days" value={String(activitiesByDay.size)} icon={<Zap size={18} />} />
+        <Metric label="Month" value={monthKey(cursor)} icon={<BarChart3 size={18} />} />
+      </section>
+      <div className="calendar-weekdays" aria-hidden="true">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <span key={day}>{day}</span>)}
+      </div>
+      <div className="calendar-grid">
+        {monthDays.map((day) => {
+          const key = localDateKey(day);
+          const dayActivities = activitiesByDay.get(key) ?? [];
+          const inMonth = sameLocalMonth(day, cursor);
+          const dayTotal = dayActivities.reduce((total, activity) => total + activityEffectiveMinutes(activity), 0);
+          return (
+            <article className={`calendar-day ${inMonth ? "" : "outside"} ${key === todayKey ? "today" : ""}`} key={key}>
+              <div className="calendar-day-header">
+                <span>{day.getDate()}</span>
+                {dayTotal > 0 ? <strong>{minutesLabel(dayTotal)}</strong> : null}
+              </div>
+              <div className="calendar-activities">
+                {dayActivities.map((activity) => {
+                  const tag = activity.tags[0];
+                  return (
+                    <div className="calendar-activity" key={activity.id} style={{ borderColor: tag?.color ?? "#8E8E93", background: `${tag?.color ?? "#8E8E93"}22` }}>
+                      <span style={{ background: tag?.color ?? "#8E8E93" }} />
+                      <div>
+                        <strong>{new Date(activity.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</strong>
+                        <small>{tag?.name ?? "Activity"} · {activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</small>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
