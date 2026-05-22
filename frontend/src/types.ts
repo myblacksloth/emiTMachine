@@ -13,6 +13,7 @@ export type Tag = {
 
 export type ChartBucket = {
   label: string;
+  bucketStart: string;
   totalMinutes: number;
   segments: Array<{
     tagId: string;
@@ -24,6 +25,8 @@ export type ChartBucket = {
 
 export type DashboardSummary = {
   totalMinutes: number;
+  todayMinutes: number;
+  currentWeekMinutes: number;
   averageDailyMinutes: number;
   workedDays: number;
   presenceMinutes: number;

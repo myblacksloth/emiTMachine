@@ -46,6 +46,8 @@ const emptyDashboard: DashboardData = {
   charts: { daily: [], weekly: [], monthly: [] },
   summary: {
     totalMinutes: 0,
+    todayMinutes: 0,
+    currentWeekMinutes: 0,
     averageDailyMinutes: 0,
     workedDays: 0,
     presenceMinutes: 0,
@@ -95,6 +97,31 @@ function minutesLabel(minutes: number) {
 function dateFromDateOnly(value: string) {
   const [year, month, day] = value.slice(0, 10).split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfLocalWeek(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay() || 7;
+  start.setDate(start.getDate() - day + 1);
+  return start;
+}
+
+function weekStartKeyFromIso(value: string) {
+  return localDateKey(startOfLocalWeek(new Date(value)));
+}
+
+function activityEffectiveMinutes(activity: ActivitySession) {
+  if (activity.durationMinutes !== null) return activity.durationMinutes;
+  const liveMinutes = Math.max(0, Math.floor((Date.now() - new Date(activity.startedAt).getTime()) / 60000));
+  return Math.max(0, liveMinutes - activity.noCountMinutes);
 }
 
 function weekRangeLabel(weekStart: string) {
@@ -566,9 +593,9 @@ function Dashboard({
           </section>
 
           <section className="summary-grid" aria-label="Summary">
-            <Metric label="Total hours" value={minutesLabel(data.summary.totalMinutes)} icon={<TimerReset size={18} />} />
+            <Metric label="Today" value={minutesLabel(data.summary.todayMinutes)} icon={<TimerReset size={18} />} />
+            <Metric label="Current week" value={minutesLabel(data.summary.currentWeekMinutes)} icon={<CalendarClock size={18} />} />
             <Metric label="Daily average" value={minutesLabel(data.summary.averageDailyMinutes)} icon={<Sparkles size={18} />} />
-            <Metric label="Worked days" value={String(data.summary.workedDays)} icon={<Zap size={18} />} />
             <Metric label="Presence / smart" value={`${minutesLabel(data.summary.presenceMinutes)} / ${minutesLabel(data.summary.smartWorkingMinutes)}`} icon={<BarChart3 size={18} />} />
           </section>
 
@@ -1431,6 +1458,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedWeekStart, setSelectedWeekStart] = useState("");
 
   const loadActivities = async () => {
     setLoading(true);
@@ -1447,6 +1475,34 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   useEffect(() => {
     void loadActivities();
   }, []);
+
+  const weeklyGroups = useMemo(() => {
+    const groups = new Map<string, ActivitySession[]>();
+    for (const activity of activities) {
+      const weekStart = weekStartKeyFromIso(activity.startedAt);
+      groups.set(weekStart, [...(groups.get(weekStart) ?? []), activity]);
+    }
+    return Array.from(groups.entries())
+      .map(([weekStart, sessions]) => {
+        const sortedSessions = [...sessions].sort((first, second) => new Date(second.startedAt).getTime() - new Date(first.startedAt).getTime());
+        const totalMinutes = sortedSessions.reduce((total, session) => total + activityEffectiveMinutes(session), 0);
+        const daysWorked = new Set(sortedSessions.map((session) => localDateKey(new Date(session.startedAt)))).size;
+        const noCountMinutes = sortedSessions.reduce((total, session) => total + session.noCountMinutes, 0);
+        return { weekStart, sessions: sortedSessions, totalMinutes, daysWorked, noCountMinutes };
+      })
+      .sort((first, second) => dateFromDateOnly(second.weekStart).getTime() - dateFromDateOnly(first.weekStart).getTime());
+  }, [activities]);
+
+  const activeWeekStart = selectedWeekStart || weeklyGroups[0]?.weekStart || weekStartKeyFromIso(new Date().toISOString());
+  const activeWeek = weeklyGroups.find((group) => group.weekStart === activeWeekStart) ?? (
+    creating ? { weekStart: activeWeekStart, sessions: [], totalMinutes: 0, daysWorked: 0, noCountMinutes: 0 } : null
+  );
+
+  useEffect(() => {
+    if (weeklyGroups.length > 0 && !weeklyGroups.some((group) => group.weekStart === activeWeekStart)) {
+      setSelectedWeekStart(weeklyGroups[0].weekStart);
+    }
+  }, [weeklyGroups, activeWeekStart]);
 
   const startEdit = (activity: ActivitySession) => {
     setEditingId(activity.id);
@@ -1575,66 +1631,97 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       {message ? <p className="form-message error">{message}</p> : null}
       {loading ? <div className="loading-line">Loading activities...</div> : null}
       {activities.length === 0 && !loading ? <p className="empty-state">No activities recorded yet.</p> : null}
-      <div className="activity-list">
-        {creating && draft ? (
-          <ActivityEditor
-            draft={draft}
-            tags={tags}
-            onDraft={setDraft}
-            onCancel={() => {
-              setCreating(false);
-              setDraft(null);
-            }}
-            onSave={createActivity}
-            saveLabel="Create activity"
-          />
-        ) : null}
-        {activities.map((activity) => {
-          const activeDraft = editingId === activity.id ? draft : null;
-          return (
-            <article className="activity-card" key={activity.id}>
-              {activeDraft ? (
-                <ActivityEditor
-                  draft={activeDraft}
-                  tags={tags}
-                  onDraft={setDraft}
-                  onCancel={() => { setEditingId(null); setDraft(null); }}
-                  onSave={() => saveActivity(activity.id)}
-                  saveLabel="Save activity"
-                />
-              ) : (
-                <>
-                  <div className="activity-main">
-                    <div>
-                      <p className="eyebrow">{activity.endedAt ? "Closed session" : "Open session"}</p>
-                      <h3>{new Date(activity.startedAt).toLocaleString()} - {activity.endedAt ? new Date(activity.endedAt).toLocaleString() : "now"}</h3>
-                      <p className="muted">
-                        {activity.durationMinutes === null ? "Running" : minutesLabel(activity.durationMinutes)}
-                        {activity.noCountMinutes > 0 ? ` · No count ${minutesLabel(activity.noCountMinutes)}` : ""}
-                        {" · "}{activity.note || "No note"}
-                      </p>
-                    </div>
-                    <strong>{activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</strong>
-                  </div>
-                  <div className="activity-tags">
-                    {activity.tags.map((tag) => (
-                      <span key={tag.id}><i style={{ background: tag.color }} />{tag.name}</span>
-                    ))}
-                  </div>
-                  <div className="activity-actions">
-                    <button type="button" onClick={() => startEdit(activity)}>
-                      <Save size={16} /> Edit
-                    </button>
-                    <button className="danger-action" type="button" onClick={() => deleteActivity(activity)}>
-                      <Trash2 size={16} /> Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </article>
-          );
-        })}
-      </div>
+      {weeklyGroups.length > 0 ? (
+        <div className="week-tabs" role="tablist" aria-label="Activity weeks">
+          {weeklyGroups.map((group) => (
+            <button
+              className={group.weekStart === activeWeekStart ? "active" : ""}
+              key={group.weekStart}
+              onClick={() => setSelectedWeekStart(group.weekStart)}
+              role="tab"
+              type="button"
+            >
+              {weekRangeLabel(group.weekStart)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {activeWeek ? (
+        <section className="week-activity-section" aria-label={`Activities for ${weekRangeLabel(activeWeek.weekStart)}`}>
+          <div className="panel-title compact-title">
+            <div>
+              <p className="eyebrow">Week</p>
+              <h2>{weekRangeLabel(activeWeek.weekStart)}</h2>
+            </div>
+          </div>
+          <section className="summary-grid compact week-summary" aria-label="Week summary">
+            <Metric label="Week total" value={minutesLabel(activeWeek.totalMinutes)} icon={<TimerReset size={18} />} />
+            <Metric label="Sessions" value={String(activeWeek.sessions.length)} icon={<CalendarClock size={18} />} />
+            <Metric label="Worked days" value={String(activeWeek.daysWorked)} icon={<Zap size={18} />} />
+            <Metric label="No count" value={minutesLabel(activeWeek.noCountMinutes)} icon={<BarChart3 size={18} />} />
+          </section>
+          <div className="activity-list">
+            {creating && draft ? (
+              <ActivityEditor
+                draft={draft}
+                tags={tags}
+                onDraft={setDraft}
+                onCancel={() => {
+                  setCreating(false);
+                  setDraft(null);
+                }}
+                onSave={createActivity}
+                saveLabel="Create activity"
+              />
+            ) : null}
+            {activeWeek.sessions.map((activity) => {
+              const activeDraft = editingId === activity.id ? draft : null;
+              return (
+                <article className="activity-card" key={activity.id}>
+                  {activeDraft ? (
+                    <ActivityEditor
+                      draft={activeDraft}
+                      tags={tags}
+                      onDraft={setDraft}
+                      onCancel={() => { setEditingId(null); setDraft(null); }}
+                      onSave={() => saveActivity(activity.id)}
+                      saveLabel="Save activity"
+                    />
+                  ) : (
+                    <>
+                      <div className="activity-main">
+                        <div>
+                          <p className="eyebrow">{activity.endedAt ? "Closed session" : "Open session"}</p>
+                          <h3>{new Date(activity.startedAt).toLocaleString()} - {activity.endedAt ? new Date(activity.endedAt).toLocaleString() : "now"}</h3>
+                          <p className="muted">
+                            {activity.durationMinutes === null ? "Running" : minutesLabel(activity.durationMinutes)}
+                            {activity.noCountMinutes > 0 ? ` · No count ${minutesLabel(activity.noCountMinutes)}` : ""}
+                            {" · "}{activity.note || "No note"}
+                          </p>
+                        </div>
+                        <strong>{activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</strong>
+                      </div>
+                      <div className="activity-tags">
+                        {activity.tags.map((tag) => (
+                          <span key={tag.id}><i style={{ background: tag.color }} />{tag.name}</span>
+                        ))}
+                      </div>
+                      <div className="activity-actions">
+                        <button type="button" onClick={() => startEdit(activity)}>
+                          <Save size={16} /> Edit
+                        </button>
+                        <button className="danger-action" type="button" onClick={() => deleteActivity(activity)}>
+                          <Trash2 size={16} /> Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </section>
   );
 }

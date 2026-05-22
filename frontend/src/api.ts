@@ -17,6 +17,25 @@ class ApiError extends Error {
   }
 }
 
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfLocalWeek(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay() || 7;
+  start.setDate(start.getDate() - day + 1);
+  return start;
+}
+
+function weekStartKeyFromIso(value: string) {
+  return localDateKey(startOfLocalWeek(new Date(value)));
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.body instanceof FormData ? undefined : jsonHeaders);
   if (options.headers) {
@@ -211,6 +230,7 @@ function mapBuckets(buckets: BackendBucket[], type: BackendBucket["bucket_type"]
       const totalMinutes = secondsToMinutes(bucket.total_seconds);
       return {
         label: bucketLabel(bucket.bucket_start, type),
+        bucketStart: bucket.bucket_start,
         totalMinutes,
         segments: [{ tagId: "all", tagName: "All tags", color: "#27b3a8", minutes: totalMinutes }]
       };
@@ -458,6 +478,19 @@ async function fetchDashboard() {
   const smartWorking = reports.byTag.find((tag) => tag.name.toLowerCase() === "smart working");
   const totalMinutes = secondsToMinutes(reports.summary.total_seconds);
   const workedDays = Number(reports.summary.days_worked ?? 0);
+  const now = new Date();
+  const todayKey = localDateKey(now);
+  const currentWeekKey = weekStartKeyFromIso(now.toISOString());
+  const closedTodayMinutes = reports.buckets
+    .filter((bucket) => bucket.bucket_type === "day" && localDateKey(new Date(bucket.bucket_start)) === todayKey)
+    .reduce((total, bucket) => total + secondsToMinutes(bucket.total_seconds), 0);
+  const closedCurrentWeekMinutes = reports.buckets
+    .filter((bucket) => bucket.bucket_type === "week" && weekStartKeyFromIso(bucket.bucket_start) === currentWeekKey)
+    .reduce((total, bucket) => total + secondsToMinutes(bucket.total_seconds), 0);
+  const liveMinutes = status.activeSession ? Math.max(0, Math.floor((now.getTime() - new Date(status.activeSession.started_at).getTime()) / 60000)) : 0;
+  const liveStartedAt = status.activeSession ? new Date(status.activeSession.started_at) : null;
+  const liveTodayMinutes = liveStartedAt && localDateKey(liveStartedAt) === todayKey ? liveMinutes : 0;
+  const liveCurrentWeekMinutes = liveStartedAt && weekStartKeyFromIso(status.activeSession!.started_at) === currentWeekKey ? liveMinutes : 0;
 
   return {
     user: {
@@ -488,6 +521,8 @@ async function fetchDashboard() {
     },
     summary: {
       totalMinutes,
+      todayMinutes: closedTodayMinutes + liveTodayMinutes,
+      currentWeekMinutes: closedCurrentWeekMinutes + liveCurrentWeekMinutes,
       averageDailyMinutes: workedDays > 0 ? Math.round(totalMinutes / workedDays) : 0,
       workedDays,
       presenceMinutes: presence ? secondsToMinutes(presence.total_seconds) : 0,
@@ -529,7 +564,7 @@ export const api = {
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
   dashboard: fetchDashboard,
   activities: () =>
-    request<{ sessions: BackendSession[] }>("/api/reports/sessions?limit=100")
+    request<{ sessions: BackendSession[] }>("/api/reports/sessions?limit=200")
       .then((payload) => payload.sessions.map(mapSession)),
   createActivity: (input: {
     startedAt: string;
