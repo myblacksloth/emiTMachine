@@ -59,8 +59,24 @@ async function assertCanManageResponsibleUser(req: Request, userId: string) {
   if (req.user?.role === "root") {
     return;
   }
+  /*
+   * Admin assignment management follows the same hierarchy used for request review.
+   * A non-root admin may change responsible links only for users already inside their
+   * direct or indirect responsibility subtree.
+   */
   const result = await pool.query(
-    "select 1 from user_managers where user_id = $1 and manager_user_id = $2",
+    `with recursive managed_tree as (
+       select um.user_id
+       from user_managers um
+       where um.manager_user_id = $2
+
+       union
+
+       select um.user_id
+       from user_managers um
+       join managed_tree mt on mt.user_id = um.manager_user_id
+     )
+     select 1 from managed_tree where user_id = $1`,
     [userId, req.user!.id]
   );
   if (!result.rows[0]) {
@@ -259,15 +275,31 @@ router.patch("/users/:id/overtime-permission", async (req, res, next) => {
 router.get("/manager-assignments", async (req, res, next) => {
   try {
     requireAdmin(req);
+    /*
+     * Root needs the whole graph. Admins receive all links that are relevant to their
+     * subtree, including links below descendant admins, so multi-level hierarchies are visible.
+     */
     const result = await pool.query(
       req.user!.role === "root"
         ? `select user_id, manager_user_id, assigned_by_user_id, created_at
            from user_managers
            order by created_at desc`
-        : `select user_id, manager_user_id, assigned_by_user_id, created_at
-           from user_managers
-           where user_id in (select user_id from user_managers where manager_user_id = $1)
-              or manager_user_id = $1
+        : `with recursive managed_tree as (
+             select um.user_id
+             from user_managers um
+             where um.manager_user_id = $1
+
+             union
+
+             select um.user_id
+             from user_managers um
+             join managed_tree mt on mt.user_id = um.manager_user_id
+           )
+           select um.user_id, um.manager_user_id, um.assigned_by_user_id, um.created_at
+           from user_managers um
+           where um.manager_user_id = $1
+              or um.manager_user_id in (select user_id from managed_tree)
+              or um.user_id in (select user_id from managed_tree)
            order by created_at desc`,
       req.user!.role === "root" ? [] : [req.user!.id]
     );
@@ -286,6 +318,28 @@ router.post("/users/:managerId/managed-users", async (req, res, next) => {
       throw new HttpError(400, "A user cannot be responsible for themselves");
     }
     await assertCanManageResponsibleUser(req, input.userId);
+
+    /*
+     * Prevent responsibility cycles such as admin1 -> admin2 -> admin1.
+     * The recursive tree starts from the target user; if the intended manager already
+     * appears below that target, adding this edge would make approvals ambiguous forever.
+     */
+    const cycleResult = await pool.query(
+      `with recursive target_tree as (
+         select um.user_id
+         from user_managers um
+         where um.manager_user_id = $1
+
+         union
+
+         select um.user_id
+         from user_managers um
+         join target_tree tt on tt.user_id = um.manager_user_id
+       )
+       select 1 from target_tree where user_id = $2`,
+      [input.userId, managerId]
+    );
+    if (cycleResult.rows[0]) throw new HttpError(400, "This assignment would create a responsibility cycle");
 
     const managerResult = await pool.query(
       `select id from users

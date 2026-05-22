@@ -27,9 +27,38 @@ function requireReviewer(req: Request) {
 
 async function assertCanReviewRequest(req: Request, requestUserId: string) {
   if (req.user?.role === "root") return;
-  const result = await pool.query("select 1 from user_managers where user_id = $1 and manager_user_id = $2", [requestUserId, req.user!.id]);
+  /*
+   * Review permissions are hierarchical:
+   * - an admin can review every direct or indirect descendant in user_managers;
+   * - a top-level admin, meaning an admin with no assigned responsible, can review their own requests;
+   * - an admin assigned to another admin cannot review their own requests, because their responsible admin must do it.
+   */
+  const result = await pool.query(
+    `with recursive managed_tree as (
+       select um.user_id
+       from user_managers um
+       where um.manager_user_id = $1
+
+       union
+
+       select um.user_id
+       from user_managers um
+       join managed_tree mt on mt.user_id = um.manager_user_id
+     ),
+     top_level_self as (
+       select u.id
+       from users u
+       where u.id = $1
+         and u.role = 'admin'
+         and not exists (select 1 from user_managers own_managers where own_managers.user_id = u.id)
+     )
+     select 1
+     where exists (select 1 from managed_tree where user_id = $2)
+        or exists (select 1 from top_level_self where id = $2)`,
+    [req.user!.id, requestUserId]
+  );
   if (!result.rows[0]) {
-    throw new HttpError(403, "You can review only requests from users assigned to you");
+    throw new HttpError(403, "You can review only requests from your hierarchy");
   }
 }
 
@@ -108,16 +137,43 @@ router.post("/", async (req, res, next) => {
 router.get("/review", async (req, res, next) => {
   try {
     requireReviewer(req);
+    /*
+     * Root sees every request. Admins see requests from their whole responsibility subtree.
+     * If an admin has no responsible admin above them, their own requests are included as top-level self-review.
+     */
     const result = await pool.query(
       req.user!.role === "root"
         ? `select ar.*, u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
            from administrative_requests ar
            join users u on u.id = ar.user_id
            order by ar.created_at desc`
-        : `select ar.*, u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
+        : `with recursive reviewable_users as (
+             select um.user_id
+             from user_managers um
+             where um.manager_user_id = $1
+
+             union
+
+             select um.user_id
+             from user_managers um
+             join reviewable_users ru on ru.user_id = um.manager_user_id
+           ),
+           top_level_self as (
+             select u.id as user_id
+             from users u
+             where u.id = $1
+               and u.role = 'admin'
+               and not exists (select 1 from user_managers own_managers where own_managers.user_id = u.id)
+           ),
+           visible_users as (
+             select user_id from reviewable_users
+             union
+             select user_id from top_level_self
+           )
+           select ar.*, u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
            from administrative_requests ar
            join users u on u.id = ar.user_id
-           join user_managers um on um.user_id = ar.user_id and um.manager_user_id = $1
+           join visible_users vu on vu.user_id = ar.user_id
            order by ar.created_at desc`,
       req.user!.role === "root" ? [] : [req.user!.id]
     );

@@ -62,9 +62,63 @@ Root can additionally:
 
 Users can have one or more responsible admins. A responsible can only be an approved `admin` user, not a standard user or root.
 
-Root can assign or remove any user/responsible association. Admins can assign or remove responsible associations only for users they already manage.
+Responsible assignments form a hierarchy. The hierarchy can include admins under other admins, for example:
+
+```text
+root
+├─ admin1
+│  ├─ user1
+│  ├─ user2
+│  └─ user3
+├─ admin2
+│  └─ admin3
+│     ├─ user4
+│     └─ user5
+└─ admin4
+```
+
+The `root` user is not stored in `user_managers`; root is implicitly above every user and can always manage every administrative request.
+
+Top-level admins are approved admin users with no assigned responsible admin above them. Top-level admins can review their own administrative requests because root has delegated them as first-level administrators. In the example above, `admin1`, `admin2`, and `admin4` can self-review their own administrative requests.
+
+Nested admins are admin users assigned to another admin. Nested admins cannot review their own administrative requests. Their own requests must be reviewed by one of their responsible admins above them in the hierarchy. In the example above, `admin3` cannot approve or revoke `admin3` requests; `admin2` or root must review them.
+
+Review permission is recursive. An admin can review administrative requests for every direct and indirect descendant in their responsibility subtree:
+
+- `admin1` can review `user1`, `user2`, and `user3`;
+- `admin2` can review `admin3`, `user4`, and `user5`;
+- `admin3` can review `user4` and `user5`;
+- root can review everyone.
+
+Deeper hierarchies follow the same rule:
+
+```text
+root
+└─ admin1
+   └─ admin2
+      └─ admin3
+         ├─ user1
+         ├─ user2
+         └─ user3
+```
+
+In that hierarchy, `admin1` can review `admin2`, `admin3`, `user1`, `user2`, and `user3`; `admin2` can review `admin3`, `user1`, `user2`, and `user3`; `admin3` can review `user1`, `user2`, and `user3`.
+
+Root can assign or remove any user/responsible association. Admins can assign or remove responsible associations only for users already inside their direct or indirect managed subtree. The backend rejects cycles, so an assignment cannot make an admin responsible for one of their own ancestors.
 
 Users see their assigned responsibles from their profile area when at least one responsible is configured.
+
+## Administrative Request Review Hierarchy
+
+Administrative request review uses the responsible hierarchy described above.
+
+The `/api/administrative-requests/review` endpoint returns:
+
+- every request for root;
+- every direct and indirect descendant request for admins;
+- the admin's own requests only when that admin has no assigned responsible admin.
+
+The `PATCH /api/administrative-requests/:id/status` endpoint applies the same permission check before approving or revoking a request. Deleted requests cannot be reviewed again.
 
 ## API
 
