@@ -664,6 +664,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const [endedAt, setEndedAt] = useState(defaultEndDateTimeValue());
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
   const canReview = userRole === "admin" || userRole === "root";
 
   const loadRequests = async () => {
@@ -684,6 +685,15 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
     void loadRequests();
   }, []);
 
+  const openCreateRequest = () => {
+    setRequestType("vacation");
+    setStartedAt(defaultStartDateTimeValue());
+    setEndedAt(defaultEndDateTimeValue());
+    setNote("");
+    setMessage("");
+    setCreateOpen(true);
+  };
+
   const createRequest = async (event: FormEvent) => {
     event.preventDefault();
     if (!isLocalDateTimeValue(startedAt) || !isLocalDateTimeValue(endedAt)) {
@@ -703,6 +713,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
         note
       });
       setNote("");
+      setCreateOpen(false);
       await loadRequests();
       onToast("success", "Administrative request created.");
     } catch (error) {
@@ -726,32 +737,52 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
 
   return (
     <section className="request-grid">
-      <form className="panel stack" onSubmit={createRequest}>
+      <section className="panel stack">
         <div className="panel-title">
           <div>
             <p className="eyebrow">Administrative Requests</p>
-            <h2>New request</h2>
+            <h2>Requests</h2>
           </div>
+          <button className="primary-action" type="button" onClick={openCreateRequest}>
+            <Plus size={18} /> New request
+          </button>
         </div>
         {message ? <p className="form-message error">{message}</p> : null}
-        <label className="field">
-          <span>Type</span>
-          <select value={requestType} onChange={(event) => setRequestType(event.target.value as AdministrativeRequestType)}>
-            <option value="vacation">Vacation</option>
-            <option value="leave">Leave</option>
-            <option value="smart_working">Smart working</option>
-          </select>
-        </label>
-        <DateTimeField label="Start" value={startedAt} onChange={setStartedAt} />
-        <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
-        <label className="field">
-          <span>Note</span>
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} />
-        </label>
-        <button className="primary-action" type="submit">
-          <Save size={18} /> Submit request
-        </button>
-      </form>
+      </section>
+
+      {createOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <form className="modal request-modal" role="dialog" aria-modal="true" aria-labelledby="request-modal-title" onSubmit={createRequest}>
+            <div className="panel-title compact-title">
+              <div>
+                <p className="eyebrow">Administrative Requests</p>
+                <h2 id="request-modal-title">New request</h2>
+              </div>
+            </div>
+            {message ? <p className="form-message error">{message}</p> : null}
+            <label className="field">
+              <span>Type</span>
+              <select value={requestType} onChange={(event) => setRequestType(event.target.value as AdministrativeRequestType)}>
+                <option value="vacation">Vacation</option>
+                <option value="leave">Leave</option>
+                <option value="smart_working">Smart working</option>
+              </select>
+            </label>
+            <DateTimeField label="Start" value={startedAt} onChange={setStartedAt} />
+            <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
+            <label className="field">
+              <span>Note</span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+            </label>
+            <div className="modal-actions">
+              <button type="button" onClick={() => setCreateOpen(false)}>Cancel</button>
+              <button className="primary-action" type="submit">
+                <Save size={18} /> Submit request
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       <section className="panel stack">
         <div className="panel-title">
