@@ -724,6 +724,14 @@ export const api = {
   myManagers: () =>
     request<{ managers: BackendManagerSummary[] }>("/api/profile/managers").then((payload) => payload.managers.map(mapManagerSummary)),
   administrativeRequests: () => request<{ requests: AdministrativeRequest[] }>("/api/administrative-requests").then((payload) => payload.requests),
+  administrativeRequestHistory: (filters: { year?: string; month?: string; userId?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.year) params.set("year", filters.year);
+    if (filters.month) params.set("month", filters.month);
+    if (filters.userId) params.set("userId", filters.userId);
+    const query = params.toString();
+    return request<{ requests: AdministrativeRequest[] }>(`/api/administrative-requests/history${query ? `?${query}` : ""}`).then((payload) => payload.requests);
+  },
   createAdministrativeRequest: (input: { requestType: AdministrativeRequestType; startedAt: string; endedAt: string; note: string }) =>
     request<{ request: AdministrativeRequest }>("/api/administrative-requests", {
       method: "POST",
@@ -736,6 +744,13 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ status })
     }).then((payload) => payload.request),
+  archiveAdministrativeRequests: (requestIds: string[]) =>
+    request<{ archived: number }>("/api/administrative-requests/archive", {
+      method: "POST",
+      body: JSON.stringify({ requestIds })
+    }),
+  clearAdministrativeRequestHistory: () =>
+    request<{ deletedCount: number }>("/api/administrative-requests/history", { method: "DELETE" }),
   deleteAdministrativeRequest: (id: string) =>
     request<{ mode: "deleted" | "marked_deleted"; request: AdministrativeRequest | null }>(`/api/administrative-requests/${id}`, { method: "DELETE" }),
   setupTotp: async () => {

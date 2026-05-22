@@ -132,6 +132,8 @@ export type AdministrativeRequest = {
   decidedAt: string | null;
   deletedByUserId: string | null;
   deletedAt: string | null;
+  archivedAt?: string | null;
+  historyRemovedAt?: string | null;
   activityChangeAction?: "create" | "update" | "delete" | null;
   activityChangePayload?: unknown;
   createdAt: string;

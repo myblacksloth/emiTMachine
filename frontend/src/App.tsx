@@ -961,9 +961,45 @@ function requestStatusLabel(status: AdministrativeRequest["status"]) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function csvCell(value: unknown) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadAdministrativeRequestsCsv(requests: AdministrativeRequest[]) {
+  const header = ["id", "type", "status", "requester", "public_id", "start", "end", "archived_at", "note"];
+  const rows = requests.map((request) => [
+    request.id,
+    administrativeRequestLabels[request.requestType],
+    requestStatusLabel(request.status),
+    request.requester?.username ?? "",
+    request.requester?.publicId ?? "",
+    request.startedAt,
+    request.endedAt,
+    request.archivedAt ?? "",
+    request.note ?? ""
+  ]);
+  const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `administrative-request-history-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" | "admin" | "root"; onToast: (tone: Toast["tone"], message: string) => void }) {
   const [requests, setRequests] = useState<AdministrativeRequest[]>([]);
   const [reviewRequests, setReviewRequests] = useState<AdministrativeRequest[]>([]);
+  const [selectedOwnRequestIds, setSelectedOwnRequestIds] = useState<Set<string>>(() => new Set());
+  const [selectedReviewRequestIds, setSelectedReviewRequestIds] = useState<Set<string>>(() => new Set());
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRequests, setHistoryRequests] = useState<AdministrativeRequest[]>([]);
+  const [historyUserOptions, setHistoryUserOptions] = useState<Array<{ userId: string; label: string; publicId: string }>>([]);
+  const [historyYear, setHistoryYear] = useState("");
+  const [historyMonth, setHistoryMonth] = useState("");
+  const [historyUserId, setHistoryUserId] = useState("");
   const [requestType, setRequestType] = useState<AdministrativeRequestType>("vacation");
   const [startedAt, setStartedAt] = useState(defaultStartDateTimeValue());
   const [endedAt, setEndedAt] = useState(defaultEndDateTimeValue());
@@ -981,6 +1017,8 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
       ]);
       setRequests(own);
       setReviewRequests(review);
+      setSelectedOwnRequestIds(new Set());
+      setSelectedReviewRequestIds(new Set());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load administrative requests.");
     }
@@ -1055,8 +1093,73 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
     }
   };
 
+  const loadHistory = async (filters = { year: historyYear, month: historyMonth, userId: historyUserId }, refreshUserOptions = false) => {
+    try {
+      const nextHistory = await api.administrativeRequestHistory(filters);
+      setHistoryRequests(nextHistory);
+      if (refreshUserOptions) {
+        const options = new Map<string, { userId: string; label: string; publicId: string }>();
+        for (const request of nextHistory) {
+          if (request.requester) {
+            options.set(request.userId, {
+              userId: request.userId,
+              label: request.requester.displayName || request.requester.username,
+              publicId: request.requester.publicId
+            });
+          }
+        }
+        setHistoryUserOptions(Array.from(options.values()));
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load historical administrative requests.");
+    }
+  };
+
+  const openHistory = async () => {
+    setHistoryYear("");
+    setHistoryMonth("");
+    setHistoryUserId("");
+    setHistoryOpen(true);
+    await loadHistory({ year: "", month: "", userId: "" }, true);
+  };
+
+  const archiveRequests = async (requestIds: string[], clearSelection: () => void) => {
+    if (requestIds.length === 0) return;
+    if (!(await confirmCritical(`Move ${requestIds.length} already reviewed administrative request(s) to history?`))) return;
+    try {
+      const result = await api.archiveAdministrativeRequests(requestIds);
+      clearSelection();
+      await loadRequests();
+      onToast("success", `${result.archived} request(s) moved to history.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to move requests to history.");
+    }
+  };
+
+  const exportHistory = async () => {
+    try {
+      downloadAdministrativeRequestsCsv(await api.administrativeRequestHistory());
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to export administrative request history.");
+    }
+  };
+
+  const clearHistory = async () => {
+    if (!(await confirmCritical("Delete all administrative requests from your history view? This does not delete the canonical requests."))) return;
+    try {
+      const result = await api.clearAdministrativeRequestHistory();
+      setHistoryRequests([]);
+      await loadRequests();
+      onToast("success", `${result.deletedCount} historical request(s) removed.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to clear administrative request history.");
+    }
+  };
+
   const pending = reviewRequests.filter((request) => request.status === "pending");
   const decided = reviewRequests.filter((request) => request.status !== "pending");
+  const selectedOwnRequestIdsArray = Array.from(selectedOwnRequestIds);
+  const selectedReviewRequestIdsArray = Array.from(selectedReviewRequestIds);
 
   return (
     <section className="request-grid">
@@ -1110,9 +1213,23 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
       <section className="panel stack">
         <div className="panel-title">
           <h2>My requests</h2>
-          <button type="button" onClick={loadRequests}><RefreshCw size={16} /> Refresh</button>
+          <div className="request-toolbar">
+            <button type="button" onClick={loadRequests}><RefreshCw size={16} /> Refresh</button>
+            <button
+              type="button"
+              onClick={() => archiveRequests(selectedOwnRequestIdsArray, () => setSelectedOwnRequestIds(new Set()))}
+              disabled={selectedOwnRequestIds.size === 0}
+            >
+              Move to history
+            </button>
+          </div>
         </div>
-        <RequestList requests={requests} onDelete={deleteRequest} />
+        <RequestList
+          requests={requests}
+          onDelete={deleteRequest}
+          selectedIds={selectedOwnRequestIds}
+          onSelectionChange={setSelectedOwnRequestIds}
+        />
       </section>
 
       {canReview ? (
@@ -1126,10 +1243,84 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
           <section className="panel stack">
             <div className="panel-title">
               <h2>Reviewed requests</h2>
+              <button
+                type="button"
+                onClick={() => archiveRequests(selectedReviewRequestIdsArray, () => setSelectedReviewRequestIds(new Set()))}
+                disabled={selectedReviewRequestIds.size === 0}
+              >
+                Move to history
+              </button>
             </div>
-            <RequestList requests={decided} onStatus={setStatus} />
+            <RequestList
+              requests={decided}
+              onStatus={setStatus}
+              selectedIds={selectedReviewRequestIds}
+              onSelectionChange={setSelectedReviewRequestIds}
+            />
           </section>
         </>
+      ) : null}
+
+      <section className="panel stack">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Administrative Requests</p>
+            <h2>History</h2>
+          </div>
+          <button type="button" onClick={openHistory}>Open history</button>
+        </div>
+      </section>
+
+      {historyOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+            <div className="panel-title compact-title">
+              <div>
+                <p className="eyebrow">Administrative Requests</p>
+                <h2 id="history-modal-title">Historical requests</h2>
+              </div>
+            </div>
+            <div className="history-filters">
+              <label className="field">
+                <span>Year</span>
+                <input value={historyYear} onChange={(event) => setHistoryYear(event.target.value)} placeholder="2026" inputMode="numeric" />
+              </label>
+              <label className="field">
+                <span>Month</span>
+                <select value={historyMonth} onChange={(event) => setHistoryMonth(event.target.value)}>
+                  <option value="">All</option>
+                  {Array.from({ length: 12 }, (_, index) => (
+                    <option value={String(index + 1)} key={index + 1}>
+                      {new Date(2026, index, 1).toLocaleDateString(undefined, { month: "long" })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>User</span>
+                <select value={historyUserId} onChange={(event) => setHistoryUserId(event.target.value)}>
+                  <option value="">All</option>
+                  {historyUserOptions.map((requester) => (
+                    <option value={requester.userId} key={requester.publicId}>
+                      {requester.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={() => loadHistory()}>Apply filters</button>
+            </div>
+            <RequestList requests={historyRequests} />
+            <div className="modal-actions">
+              <button type="button" onClick={exportHistory}>
+                <Download size={16} /> Export CSV
+              </button>
+              <button className="danger-action" type="button" onClick={clearHistory}>
+                <Trash2 size={16} /> Clear history
+              </button>
+              <button type="button" onClick={() => setHistoryOpen(false)}>Close</button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </section>
   );
@@ -1138,25 +1329,57 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
 function RequestList({
   requests,
   onStatus,
-  onDelete
+  onDelete,
+  selectedIds,
+  onSelectionChange
 }: {
   requests: AdministrativeRequest[];
   onStatus?: (request: AdministrativeRequest, status: "approved" | "revoked") => void;
   onDelete?: (request: AdministrativeRequest) => void;
+  selectedIds?: Set<string>;
+  onSelectionChange?: (ids: Set<string>) => void;
 }) {
   if (requests.length === 0) {
     return <p className="empty-state">No administrative requests.</p>;
   }
+  const selectableRequests = requests.filter((request) => request.status !== "pending");
+  const allSelected = selectableRequests.length > 0 && selectableRequests.every((request) => selectedIds?.has(request.id));
+  const toggleAll = () => {
+    if (!onSelectionChange) return;
+    onSelectionChange(allSelected ? new Set() : new Set(selectableRequests.map((request) => request.id)));
+  };
+  const toggleOne = (requestId: string) => {
+    if (!onSelectionChange || !selectedIds) return;
+    const next = new Set(selectedIds);
+    if (next.has(requestId)) {
+      next.delete(requestId);
+    } else {
+      next.add(requestId);
+    }
+    onSelectionChange(next);
+  };
   return (
     <div className="request-list">
+      {onSelectionChange && selectableRequests.length > 0 ? (
+        <label className="request-select-all">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+          <span>Select all reviewed requests</span>
+        </label>
+      ) : null}
       {requests.map((request) => (
         <article className={`request-card ${request.status} ${request.deletedAt ? "deleted" : ""}`} key={request.id}>
+          {onSelectionChange && request.status !== "pending" ? (
+            <label className="request-select">
+              <input type="checkbox" checked={selectedIds?.has(request.id) ?? false} onChange={() => toggleOne(request.id)} />
+            </label>
+          ) : null}
           <div>
             <p className="eyebrow">{request.requester ? `${request.requester.displayName} (${request.requester.username})` : requestStatusLabel(request.status)}</p>
             <h3>{administrativeRequestLabels[request.requestType]}</h3>
             <p className="muted">{new Date(request.startedAt).toLocaleString()} - {new Date(request.endedAt).toLocaleString()}</p>
             {request.note ? <p className="muted">{request.note}</p> : null}
             {request.deletedAt ? <p className="deleted-request-note">Deleted · original status: {requestStatusLabel(request.status)}</p> : null}
+            {request.archivedAt ? <p className="deleted-request-note">Archived · {new Date(request.archivedAt).toLocaleString()}</p> : null}
           </div>
           <div className="request-actions">
             <strong>{requestStatusLabel(request.status)}</strong>

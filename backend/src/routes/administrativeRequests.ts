@@ -20,6 +20,16 @@ const requestStatusSchema = z.object({
   status: z.enum(["approved", "revoked"])
 });
 
+const archiveSchema = z.object({
+  requestIds: z.array(uuidSchema).min(1).max(200)
+});
+
+const historyQuerySchema = z.object({
+  year: z.coerce.number().int().min(1970).max(9999).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  userId: uuidSchema.optional()
+});
+
 const activitySessionPayloadSchema = z.object({
   startedAt: isoDateTimeSchema,
   endedAt: isoDateTimeSchema.nullable().optional(),
@@ -93,6 +103,8 @@ function mapRequest(row: Record<string, unknown>) {
     decidedAt: row.decided_at,
     deletedByUserId: row.deleted_by_user_id,
     deletedAt: row.deleted_at,
+    archivedAt: row.archived_at,
+    historyRemovedAt: row.history_removed_at,
     activityChangeAction: row.activity_change_action,
     activityChangePayload: row.activity_change_payload,
     createdAt: row.created_at,
@@ -184,14 +196,36 @@ async function applyActivityChangeRequest(client: DbClient, request: Record<stri
   }
 }
 
+function historyDateFilters(input: z.infer<typeof historyQuerySchema>) {
+  const filters: string[] = [];
+  const values: unknown[] = [];
+  if (input.year) {
+    values.push(input.year);
+    filters.push(`extract(year from ar.started_at) = $${values.length}`);
+  }
+  if (input.month) {
+    values.push(input.month);
+    filters.push(`extract(month from ar.started_at) = $${values.length}`);
+  }
+  if (input.userId) {
+    values.push(input.userId);
+    filters.push(`ar.user_id = $${values.length}`);
+  }
+  return { filters, values };
+}
+
 router.use(requireAuth);
 
 router.get("/", async (req, res, next) => {
   try {
     const result = await pool.query(
-      `select *
-       from administrative_requests
-       where user_id = $1
+      `select ar.*, arh.archived_at, arh.removed_at as history_removed_at
+       from administrative_requests ar
+       left join administrative_request_history arh
+         on arh.request_id = ar.id
+        and arh.viewer_user_id = $1
+       where ar.user_id = $1
+         and arh.request_id is null
        order by started_at desc`,
       [req.user!.id]
     );
@@ -241,9 +275,14 @@ router.get("/review", async (req, res, next) => {
      */
     const result = await pool.query(
       req.user!.role === "root"
-        ? `select ar.*, u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
+        ? `select ar.*, arh.archived_at, arh.removed_at as history_removed_at,
+                  u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
            from administrative_requests ar
            join users u on u.id = ar.user_id
+           left join administrative_request_history arh
+             on arh.request_id = ar.id
+            and arh.viewer_user_id = $1
+           where arh.request_id is null
            order by ar.created_at desc`
         : `with recursive reviewable_users as (
              select um.user_id
@@ -268,14 +307,117 @@ router.get("/review", async (req, res, next) => {
              union
              select user_id from top_level_self
            )
-           select ar.*, u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
+           select ar.*, arh.archived_at, arh.removed_at as history_removed_at,
+                  u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
            from administrative_requests ar
            join users u on u.id = ar.user_id
            join visible_users vu on vu.user_id = ar.user_id
+           left join administrative_request_history arh
+             on arh.request_id = ar.id
+            and arh.viewer_user_id = $1
+           where arh.request_id is null
            order by ar.created_at desc`,
-      req.user!.role === "root" ? [] : [req.user!.id]
+      [req.user!.id]
     );
     res.json({ requests: result.rows.map(mapRequest) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/archive", async (req, res, next) => {
+  try {
+    const input = archiveSchema.parse(req.body);
+    const archived = await withTransaction(async (client) => {
+      let count = 0;
+      for (const requestId of input.requestIds) {
+        const currentResult = await client.query("select * from administrative_requests where id = $1 for update", [requestId]);
+        const current = currentResult.rows[0];
+        if (!current) throw new HttpError(404, "Administrative request not found");
+        if (current.status === "pending") throw new HttpError(400, "Only already reviewed requests can be moved to history");
+        if (current.user_id !== req.user!.id) {
+          requireReviewer(req);
+          await assertCanReviewRequest(req, current.user_id);
+        }
+        /*
+         * History is per viewer. The request remains untouched and keeps its
+         * original approval/revocation state, but this viewer no longer sees it
+         * in the primary request lists.
+         */
+        await client.query(
+          `insert into administrative_request_history (request_id, viewer_user_id, archived_at, removed_at)
+           values ($1, $2, now(), null)
+           on conflict (request_id, viewer_user_id)
+           do update set archived_at = now(), removed_at = null`,
+          [requestId, req.user!.id]
+        );
+        count += 1;
+      }
+      return count;
+    });
+    res.json({ archived });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/history", async (req, res, next) => {
+  try {
+    const input = historyQuerySchema.parse(req.query);
+    if (input.userId && req.user!.role === "user" && input.userId !== req.user!.id) {
+      throw new HttpError(403, "You can filter only your own historical requests");
+    }
+
+    const { filters, values } = historyDateFilters(input);
+    values.unshift(req.user!.id);
+    const where = [`arh.viewer_user_id = $1`, `arh.removed_at is null`, ...filters.map((filter) => filter.replace(/\$(\d+)/g, (_, number) => `$${Number(number) + 1}`))];
+    const result = await pool.query(
+      `select ar.*, arh.archived_at, arh.removed_at as history_removed_at,
+              u.username as requester_username, u.display_name as requester_display_name, u.public_id as requester_public_id
+       from administrative_request_history arh
+       join administrative_requests ar on ar.id = arh.request_id
+       join users u on u.id = ar.user_id
+       where ${where.join(" and ")}
+       order by arh.archived_at desc, ar.started_at desc`,
+      values
+    );
+    res.json({ requests: result.rows.map(mapRequest) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/history", async (req, res, next) => {
+  try {
+    const result = await withTransaction(async (client) => {
+      const cleared = await client.query(
+        `update administrative_request_history
+         set removed_at = now()
+         where viewer_user_id = $1 and removed_at is null
+         returning request_id`,
+        [req.user!.id]
+      );
+
+      if ((req.user!.role === "admin" || req.user!.role === "root") && cleared.rows.length > 0) {
+        /*
+         * Admin cleanup also hides the same historical entries from the involved
+         * requester, while preserving the canonical administrative request row.
+         */
+        await client.query(
+          `insert into administrative_request_history (request_id, viewer_user_id, archived_at, removed_at)
+           select ar.id, ar.user_id, now(), now()
+           from administrative_requests ar
+           join unnest($1::uuid[]) as cleared_ids(request_id) on cleared_ids.request_id = ar.id
+           where ar.user_id <> $2
+           on conflict (request_id, viewer_user_id)
+           do update set removed_at = now()`,
+          [cleared.rows.map((row) => row.request_id), req.user!.id]
+        );
+      }
+
+      return cleared.rowCount;
+    });
+    res.json({ deletedCount: result });
   } catch (error) {
     next(error);
   }

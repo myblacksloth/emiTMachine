@@ -171,6 +171,9 @@ POST   /api/administrative-requests
 DELETE /api/administrative-requests/:id
 GET    /api/administrative-requests/review
 PATCH  /api/administrative-requests/:id/status
+POST   /api/administrative-requests/archive
+GET    /api/administrative-requests/history
+DELETE /api/administrative-requests/history
 ```
 
 Root-only endpoints:
@@ -204,7 +207,7 @@ Root can download an application-level JSON dump from:
 GET /api/admin/dump
 ```
 
-The JSON dump includes the current operational tables, including users, responsible assignments, administrative requests, tags, work sessions, session tags, time events, countdowns, overtime payments, recovery code metadata, and passkeys.
+The JSON dump includes the current operational tables, including users, responsible assignments, administrative requests, administrative request history visibility, tags, work sessions, session tags, time events, countdowns, overtime payments, recovery code metadata, and passkeys.
 
 Full application restore is intentionally not implemented in the web UI yet. A safe restore flow should include:
 
@@ -241,3 +244,21 @@ DELETE /api/admin/administrative-requests/cleanup
 ```
 
 Requests that overlap or belong to the current month are kept.
+
+## Administrative Request History
+
+Already reviewed administrative requests can be moved to a per-viewer history from the Administrative Requests tab.
+
+- Users can archive their own approved or revoked requests.
+- Admins and root can archive approved or revoked requests visible in their review queue.
+- Pending requests cannot be archived because they still require action.
+- Archived requests no longer appear in the primary request lists for the viewer that archived them.
+- The canonical `administrative_requests` row is not deleted or modified by archiving, so audit state and approval/revocation remain intact.
+
+The history popup can be filtered by year, month, and requester. The CSV export downloads all historical requests currently visible to the viewer, independently from the active filters in the popup.
+
+Clearing history is also per viewer:
+
+- a standard user clearing history removes those entries only from that user's historical view;
+- an admin/root clearing history removes those entries from the admin/root historical view and also hides the corresponding historical entries for the involved requester;
+- clearing history does not delete the canonical administrative request row.

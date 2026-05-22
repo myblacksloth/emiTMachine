@@ -112,6 +112,19 @@ ALTER TABLE administrative_requests
 CREATE INDEX administrative_requests_user_status_idx ON administrative_requests (user_id, status, started_at DESC);
 CREATE INDEX administrative_requests_status_idx ON administrative_requests (status, started_at DESC);
 
+CREATE TABLE administrative_request_history (
+  request_id uuid NOT NULL REFERENCES administrative_requests(id) ON DELETE CASCADE,
+  viewer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  archived_at timestamptz NOT NULL DEFAULT now(),
+  removed_at timestamptz,
+  PRIMARY KEY (request_id, viewer_user_id),
+  CONSTRAINT administrative_request_history_removed_after_archive CHECK (removed_at IS NULL OR removed_at >= archived_at)
+);
+
+CREATE INDEX administrative_request_history_viewer_idx ON administrative_request_history (viewer_user_id, archived_at DESC)
+WHERE removed_at IS NULL;
+CREATE INDEX administrative_request_history_request_idx ON administrative_request_history (request_id);
+
 CREATE TABLE tags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
