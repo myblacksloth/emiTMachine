@@ -687,6 +687,7 @@ function Chart({ title, buckets }: { title: string; buckets: ChartBucket[] }) {
 
 function MonthlyCalendarPanel() {
   const [activities, setActivities] = useState<ActivitySession[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<ActivitySession | null>(null);
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -786,13 +787,19 @@ function MonthlyCalendarPanel() {
                 {dayActivities.map((activity) => {
                   const tag = activity.tags[0];
                   return (
-                    <div className="calendar-activity" key={activity.id} style={{ borderColor: tag?.color ?? "#8E8E93", background: `${tag?.color ?? "#8E8E93"}22` }}>
+                    <button
+                      className="calendar-activity"
+                      key={activity.id}
+                      onClick={() => setSelectedActivity(activity)}
+                      style={{ borderColor: tag?.color ?? "#8E8E93", background: `${tag?.color ?? "#8E8E93"}22` }}
+                      type="button"
+                    >
                       <span style={{ background: tag?.color ?? "#8E8E93" }} />
                       <div>
                         <strong>{new Date(activity.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</strong>
                         <small>{tag?.name ?? "Activity"} · {activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</small>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -800,6 +807,45 @@ function MonthlyCalendarPanel() {
           );
         })}
       </div>
+      {selectedActivity ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
+            <div className="panel-title compact-title">
+              <div>
+                <p className="eyebrow">{selectedActivity.endedAt ? "Closed activity" : "Open activity"}</p>
+                <h2 id="activity-detail-title">Activity details</h2>
+              </div>
+            </div>
+            <div className="activity-detail-grid">
+              <div>
+                <span>Start</span>
+                <strong>{new Date(selectedActivity.startedAt).toLocaleString()}</strong>
+              </div>
+              <div>
+                <span>End</span>
+                <strong>{selectedActivity.endedAt ? new Date(selectedActivity.endedAt).toLocaleString() : "Running"}</strong>
+              </div>
+              <div>
+                <span>Duration</span>
+                <strong>{selectedActivity.durationMinutes === null ? "Live" : minutesLabel(selectedActivity.durationMinutes)}</strong>
+              </div>
+              <div>
+                <span>No count</span>
+                <strong>{minutesLabel(selectedActivity.noCountMinutes)}</strong>
+              </div>
+            </div>
+            <div className="activity-tags detail-tags">
+              {selectedActivity.tags.map((tag) => (
+                <span key={tag.id}><i style={{ background: tag.color }} />{tag.name}</span>
+              ))}
+            </div>
+            <p className="muted">{selectedActivity.note || "No note"}</p>
+            <div className="modal-actions">
+              <button type="button" onClick={() => setSelectedActivity(null)}>Close</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
