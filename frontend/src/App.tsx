@@ -117,6 +117,11 @@ function isoFromLocalValue(value: string) {
   return new Date(value).toISOString();
 }
 
+function isLocalDateTimeValue(value: string) {
+  const date = new Date(value);
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value) && !Number.isNaN(date.getTime());
+}
+
 function defaultEndDateTimeValue() {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -681,6 +686,14 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
 
   const createRequest = async (event: FormEvent) => {
     event.preventDefault();
+    if (!isLocalDateTimeValue(startedAt) || !isLocalDateTimeValue(endedAt)) {
+      setMessage("Use date and time in YYYY-MM-DD and HH:MM format.");
+      return;
+    }
+    if (new Date(endedAt) <= new Date(startedAt)) {
+      setMessage("Request end time must be after start time.");
+      return;
+    }
     if (!(await confirmCritical("Submit this administrative request?"))) return;
     try {
       await api.createAdministrativeRequest({
@@ -2487,7 +2500,6 @@ function DateTimeField({ label, value, onChange }: { label: string; value: strin
           onChange={(event) => update(event.target.value, time)}
           inputMode="numeric"
           placeholder="YYYY-MM-DD"
-          pattern="\\d{4}-\\d{2}-\\d{2}"
         />
         <input
           aria-label={`${label} time`}
@@ -2495,7 +2507,6 @@ function DateTimeField({ label, value, onChange }: { label: string; value: strin
           onChange={(event) => update(date, event.target.value)}
           inputMode="numeric"
           placeholder="HH:MM"
-          pattern="\\d{2}:\\d{2}"
         />
       </div>
     </label>
