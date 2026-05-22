@@ -132,8 +132,17 @@ function sameLocalMonth(first: Date, second: Date) {
   return first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth();
 }
 
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function dayRange(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1);
+  return { start, end };
+}
+
+function requestOverlapsDay(request: AdministrativeRequest, day: Date) {
+  const { start, end } = dayRange(day);
+  return new Date(request.startedAt) < end && new Date(request.endedAt) > start;
 }
 
 function weekRangeLabel(weekStart: string) {
@@ -692,6 +701,8 @@ function Chart({ title, buckets }: { title: string; buckets: ChartBucket[] }) {
 function MonthlyCalendarPanel() {
   const [activities, setActivities] = useState<ActivitySession[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivitySession | null>(null);
+  const [administrativeRequests, setAdministrativeRequests] = useState<AdministrativeRequest[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<AdministrativeRequest | null>(null);
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -703,7 +714,14 @@ function MonthlyCalendarPanel() {
     setLoading(true);
     setMessage("");
     try {
-      setActivities(await api.activities());
+      const [nextActivities, nextRequests] = await Promise.all([
+        api.activities(),
+        api.administrativeRequests()
+      ]);
+      setActivities(nextActivities);
+      setAdministrativeRequests(
+        nextRequests.filter((request) => request.status === "approved" && !request.deletedAt && request.requestType !== "activity_change")
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load monthly calendar.");
     } finally {
@@ -739,7 +757,22 @@ function MonthlyCalendarPanel() {
     return grouped;
   }, [activities, cursor]);
 
+  const approvedRequestsByDay = useMemo(() => {
+    const grouped = new Map<string, AdministrativeRequest[]>();
+    for (const day of monthDays) {
+      if (!sameLocalMonth(day, cursor)) continue;
+      const dayRequests = administrativeRequests
+        .filter((request) => requestOverlapsDay(request, day))
+        .sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime());
+      if (dayRequests.length > 0) grouped.set(localDateKey(day), dayRequests);
+    }
+    return grouped;
+  }, [administrativeRequests, cursor, monthDays]);
+
   const monthActivities = Array.from(activitiesByDay.values()).flat();
+  const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  const monthRequests = administrativeRequests.filter((request) => new Date(request.startedAt) < monthEnd && new Date(request.endedAt) > monthStart);
   const monthTotalMinutes = monthActivities.reduce((total, activity) => total + activityEffectiveMinutes(activity), 0);
   const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const todayKey = localDateKey(new Date());
@@ -769,8 +802,8 @@ function MonthlyCalendarPanel() {
       <section className="summary-grid compact calendar-summary" aria-label="Monthly summary">
         <Metric label="Month total" value={minutesLabel(monthTotalMinutes)} icon={<TimerReset size={18} />} />
         <Metric label="Activities" value={String(monthActivities.length)} icon={<CalendarClock size={18} />} />
+        <Metric label="Approved requests" value={String(monthRequests.length)} icon={<ShieldCheck size={18} />} />
         <Metric label="Worked days" value={String(activitiesByDay.size)} icon={<Zap size={18} />} />
-        <Metric label="Month" value={monthKey(cursor)} icon={<BarChart3 size={18} />} />
       </section>
       <div className="calendar-weekdays" aria-hidden="true">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <span key={day}>{day}</span>)}
@@ -779,6 +812,7 @@ function MonthlyCalendarPanel() {
         {monthDays.map((day) => {
           const key = localDateKey(day);
           const dayActivities = activitiesByDay.get(key) ?? [];
+          const dayRequests = approvedRequestsByDay.get(key) ?? [];
           const inMonth = sameLocalMonth(day, cursor);
           const dayTotal = dayActivities.reduce((total, activity) => total + activityEffectiveMinutes(activity), 0);
           return (
@@ -802,6 +836,28 @@ function MonthlyCalendarPanel() {
                       <div>
                         <strong>{new Date(activity.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</strong>
                         <small>{tag?.name ?? "Activity"} · {activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</small>
+                      </div>
+                    </button>
+                  );
+                })}
+                {dayRequests.map((request) => {
+                  const color = administrativeRequestCalendarColors[request.requestType as Exclude<AdministrativeRequestType, "activity_change">] ?? "#8E8E93";
+                  return (
+                    <button
+                      className="calendar-activity calendar-request"
+                      key={request.id}
+                      onClick={() => setSelectedRequest(request)}
+                      style={{ borderColor: color, background: `${color}22` }}
+                      type="button"
+                    >
+                      <span style={{ background: color }} />
+                      <div>
+                        <strong>{administrativeRequestLabels[request.requestType]}</strong>
+                        <small>
+                          {new Date(request.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                          {" - "}
+                          {new Date(request.endedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        </small>
                       </div>
                     </button>
                   );
@@ -850,6 +906,40 @@ function MonthlyCalendarPanel() {
           </section>
         </div>
       ) : null}
+      {selectedRequest ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
+            <div className="panel-title compact-title">
+              <div>
+                <p className="eyebrow">Approved administrative request</p>
+                <h2 id="request-detail-title">{administrativeRequestLabels[selectedRequest.requestType]}</h2>
+              </div>
+            </div>
+            <div className="activity-detail-grid">
+              <div>
+                <span>Start</span>
+                <strong>{new Date(selectedRequest.startedAt).toLocaleString()}</strong>
+              </div>
+              <div>
+                <span>End</span>
+                <strong>{new Date(selectedRequest.endedAt).toLocaleString()}</strong>
+              </div>
+              <div>
+                <span>Status</span>
+                <strong>{requestStatusLabel(selectedRequest.status)}</strong>
+              </div>
+              <div>
+                <span>Decided at</span>
+                <strong>{selectedRequest.decidedAt ? new Date(selectedRequest.decidedAt).toLocaleString() : "Approved"}</strong>
+              </div>
+            </div>
+            <p className="muted">{selectedRequest.note || "No note"}</p>
+            <div className="modal-actions">
+              <button type="button" onClick={() => setSelectedRequest(null)}>Close</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -859,6 +949,12 @@ const administrativeRequestLabels: Record<AdministrativeRequestType, string> = {
   leave: "Leave",
   smart_working: "Smart working",
   activity_change: "Activity change"
+};
+
+const administrativeRequestCalendarColors: Record<Exclude<AdministrativeRequestType, "activity_change">, string> = {
+  vacation: "#34C759",
+  leave: "#FF9F0A",
+  smart_working: "#0A84FF"
 };
 
 function requestStatusLabel(status: AdministrativeRequest["status"]) {
