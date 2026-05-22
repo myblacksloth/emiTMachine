@@ -127,6 +127,8 @@ export type AdministrativeRequest = {
   note: string | null;
   decidedByUserId: string | null;
   decidedAt: string | null;
+  deletedByUserId: string | null;
+  deletedAt: string | null;
   createdAt: string;
   requester?: {
     username: string;

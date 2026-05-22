@@ -693,6 +693,8 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ status })
     }).then((payload) => payload.request),
+  deleteAdministrativeRequest: (id: string) =>
+    request<{ mode: "deleted" | "marked_deleted"; request: AdministrativeRequest | null }>(`/api/administrative-requests/${id}`, { method: "DELETE" }),
   setupTotp: async () => {
     const result = await request<{ qrCodeDataUrl: string; secret: string }>("/api/auth/totp/setup", { method: "POST" });
     return { qrCodeUrl: result.qrCodeDataUrl, secretLabel: result.secret };

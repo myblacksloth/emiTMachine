@@ -87,6 +87,7 @@ POST   /api/admin/users/:id/import
 GET    /api/profile/managers
 GET    /api/administrative-requests
 POST   /api/administrative-requests
+DELETE /api/administrative-requests/:id
 GET    /api/administrative-requests/review
 PATCH  /api/administrative-requests/:id/status
 ```

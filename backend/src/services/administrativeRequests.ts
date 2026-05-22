@@ -12,6 +12,7 @@ export async function assertNoApprovedAdministrativeRequestOverlap(
      from administrative_requests
      where user_id = $1
        and status = 'approved'
+       and deleted_at is null
        and tstzrange(started_at, ended_at, '[)') && tstzrange($2::timestamptz, $3::timestamptz, '[)')
      limit 1`,
     [userId, startedAt, endedAt]

@@ -20,24 +20,36 @@ CREATE TABLE IF NOT EXISTS administrative_requests (
   note text,
   decided_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   decided_at timestamptz,
+  deleted_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  deleted_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT administrative_requests_end_after_start CHECK (ended_at > started_at),
   CONSTRAINT administrative_requests_decision_state CHECK ((status = 'pending') = (decided_at IS NULL))
 );
 
+ALTER TABLE administrative_requests
+  ADD COLUMN IF NOT EXISTS deleted_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'administrative_requests_no_overlap'
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'administrative_requests_no_overlap'
+      AND conrelid = 'administrative_requests'::regclass
   ) THEN
-    ALTER TABLE administrative_requests
-      ADD CONSTRAINT administrative_requests_no_overlap
-      EXCLUDE USING gist (
-        user_id WITH =,
-        (tstzrange(started_at, ended_at, '[)')) WITH &&
-      );
+    ALTER TABLE administrative_requests DROP CONSTRAINT administrative_requests_no_overlap;
   END IF;
+
+  ALTER TABLE administrative_requests
+    ADD CONSTRAINT administrative_requests_no_overlap
+    EXCLUDE USING gist (
+      user_id WITH =,
+      (tstzrange(started_at, ended_at, '[)')) WITH &&
+    )
+    WHERE (deleted_at IS NULL);
 END;
 $$;
 

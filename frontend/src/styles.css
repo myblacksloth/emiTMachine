@@ -2041,6 +2041,23 @@ button svg,
   border-color: rgba(255, 59, 48, 0.22);
 }
 
+.request-card.deleted {
+  border-style: dashed;
+  opacity: 0.76;
+  background: rgba(120, 120, 128, 0.08);
+}
+
+.deleted-request-note {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: var(--r-pill);
+  padding: 0.2rem 0.55rem;
+  background: rgba(120, 120, 128, 0.16);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .request-actions {
   display: grid;
   gap: 0.45rem;

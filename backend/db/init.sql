@@ -86,6 +86,8 @@ CREATE TABLE administrative_requests (
   note text,
   decided_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   decided_at timestamptz,
+  deleted_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  deleted_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT administrative_requests_end_after_start CHECK (ended_at > started_at),
@@ -97,7 +99,8 @@ ALTER TABLE administrative_requests
   EXCLUDE USING gist (
     user_id WITH =,
     (tstzrange(started_at, ended_at, '[)')) WITH &&
-  );
+  )
+  WHERE (deleted_at IS NULL);
 
 CREATE INDEX administrative_requests_user_status_idx ON administrative_requests (user_id, status, started_at DESC);
 CREATE INDEX administrative_requests_status_idx ON administrative_requests (status, started_at DESC);

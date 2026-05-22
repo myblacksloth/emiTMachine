@@ -44,6 +44,8 @@ function mapRequest(row: Record<string, unknown>) {
     note: row.note,
     decidedByUserId: row.decided_by_user_id,
     decidedAt: row.decided_at,
+    deletedByUserId: row.deleted_by_user_id,
+    deletedAt: row.deleted_at,
     createdAt: row.created_at,
     requester: row.requester_username
       ? {
@@ -135,6 +137,7 @@ router.patch("/:id/status", async (req, res, next) => {
       const currentResult = await client.query("select * from administrative_requests where id = $1 for update", [requestId]);
       const current = currentResult.rows[0];
       if (!current) throw new HttpError(404, "Administrative request not found");
+      if (current.deleted_at) throw new HttpError(400, "Deleted administrative requests cannot be reviewed");
       await assertCanReviewRequest(req, current.user_id);
       if (input.status === "approved") {
         await assertNoWorkSessionOverlap(client, current.user_id, new Date(current.started_at), new Date(current.ended_at));
@@ -154,6 +157,38 @@ router.patch("/:id/status", async (req, res, next) => {
 
     req.log?.info("administrative request reviewed", { actorUserId: req.user!.id, requestId, status: input.status });
     res.json({ request: mapRequest(request) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const requestId = uuidSchema.parse(req.params.id);
+    const result = await withTransaction(async (client) => {
+      const currentResult = await client.query("select * from administrative_requests where id = $1 and user_id = $2 for update", [requestId, req.user!.id]);
+      const current = currentResult.rows[0];
+      if (!current) throw new HttpError(404, "Administrative request not found");
+
+      if (current.status === "pending") {
+        await client.query("delete from administrative_requests where id = $1", [requestId]);
+        return { mode: "deleted", request: null };
+      }
+
+      const updateResult = await client.query(
+        `update administrative_requests
+         set deleted_by_user_id = $2,
+             deleted_at = coalesce(deleted_at, now()),
+             updated_at = now()
+         where id = $1
+         returning *`,
+        [requestId, req.user!.id]
+      );
+      return { mode: "marked_deleted", request: mapRequest(updateResult.rows[0]) };
+    });
+
+    req.log?.info("administrative request deleted by owner", { userId: req.user!.id, requestId, mode: result.mode });
+    res.json(result);
   } catch (error) {
     next(error);
   }

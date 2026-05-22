@@ -736,6 +736,20 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
     }
   };
 
+  const deleteRequest = async (request: AdministrativeRequest) => {
+    const message = request.status === "pending"
+      ? "Delete this pending administrative request? This cannot be undone."
+      : "Delete this already reviewed request? It will remain visible as deleted while keeping its approval status.";
+    if (!(await confirmCritical(message))) return;
+    try {
+      const result = await api.deleteAdministrativeRequest(request.id);
+      await loadRequests();
+      onToast("success", result.mode === "deleted" ? "Administrative request deleted." : "Administrative request marked as deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete administrative request.");
+    }
+  };
+
   const pending = reviewRequests.filter((request) => request.status === "pending");
   const decided = reviewRequests.filter((request) => request.status !== "pending");
 
@@ -793,7 +807,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
           <h2>My requests</h2>
           <button type="button" onClick={loadRequests}><RefreshCw size={16} /> Refresh</button>
         </div>
-        <RequestList requests={requests} />
+        <RequestList requests={requests} onDelete={deleteRequest} />
       </section>
 
       {canReview ? (
@@ -816,27 +830,41 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   );
 }
 
-function RequestList({ requests, onStatus }: { requests: AdministrativeRequest[]; onStatus?: (request: AdministrativeRequest, status: "approved" | "revoked") => void }) {
+function RequestList({
+  requests,
+  onStatus,
+  onDelete
+}: {
+  requests: AdministrativeRequest[];
+  onStatus?: (request: AdministrativeRequest, status: "approved" | "revoked") => void;
+  onDelete?: (request: AdministrativeRequest) => void;
+}) {
   if (requests.length === 0) {
     return <p className="empty-state">No administrative requests.</p>;
   }
   return (
     <div className="request-list">
       {requests.map((request) => (
-        <article className={`request-card ${request.status}`} key={request.id}>
+        <article className={`request-card ${request.status} ${request.deletedAt ? "deleted" : ""}`} key={request.id}>
           <div>
             <p className="eyebrow">{request.requester ? `${request.requester.displayName} (${request.requester.username})` : requestStatusLabel(request.status)}</p>
             <h3>{administrativeRequestLabels[request.requestType]}</h3>
             <p className="muted">{new Date(request.startedAt).toLocaleString()} - {new Date(request.endedAt).toLocaleString()}</p>
             {request.note ? <p className="muted">{request.note}</p> : null}
+            {request.deletedAt ? <p className="deleted-request-note">Deleted · original status: {requestStatusLabel(request.status)}</p> : null}
           </div>
           <div className="request-actions">
             <strong>{requestStatusLabel(request.status)}</strong>
-            {onStatus ? (
+            {onStatus && !request.deletedAt ? (
               <>
                 <button type="button" onClick={() => onStatus(request, "approved")}>Approve</button>
                 <button className="danger-action" type="button" onClick={() => onStatus(request, "revoked")}>Revoke</button>
               </>
+            ) : null}
+            {onDelete && !request.deletedAt ? (
+              <button className="danger-action" type="button" onClick={() => onDelete(request)}>
+                <Trash2 size={16} /> Delete
+              </button>
             ) : null}
           </div>
         </article>
