@@ -557,7 +557,7 @@ function Dashboard({
           <ShieldCheck size={16} /> Administrative Requests
         </button>
         <button className={view === "overtime" ? "active" : ""} onClick={() => setView("overtime")} type="button">
-          <Hourglass size={16} /> Banca ore
+          <Hourglass size={16} /> Overtime
         </button>
         <button className={view === "tags" ? "active" : ""} onClick={() => setView("tags")} type="button">
           <Tags size={16} /> Tags
@@ -1535,6 +1535,11 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
     });
   };
 
+  const cancelCreate = () => {
+    setCreating(false);
+    setDraft(null);
+  };
+
   const saveActivity = async (activityId: string) => {
     if (!draft) return;
     if (draft.tagIds.length === 0) {
@@ -1661,19 +1666,6 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
             <Metric label="No count" value={minutesLabel(activeWeek.noCountMinutes)} icon={<BarChart3 size={18} />} />
           </section>
           <div className="activity-list">
-            {creating && draft ? (
-              <ActivityEditor
-                draft={draft}
-                tags={tags}
-                onDraft={setDraft}
-                onCancel={() => {
-                  setCreating(false);
-                  setDraft(null);
-                }}
-                onSave={createActivity}
-                saveLabel="Create activity"
-              />
-            ) : null}
             {activeWeek.sessions.map((activity) => {
               const activeDraft = editingId === activity.id ? draft : null;
               return (
@@ -1721,6 +1713,26 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
             })}
           </div>
         </section>
+      ) : null}
+      {creating && draft ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal activity-modal" role="dialog" aria-modal="true" aria-labelledby="activity-modal-title">
+            <div className="panel-title compact-title">
+              <div>
+                <p className="eyebrow">Manual activity</p>
+                <h2 id="activity-modal-title">Add activity</h2>
+              </div>
+            </div>
+            <ActivityEditor
+              draft={draft}
+              tags={tags}
+              onDraft={setDraft}
+              onCancel={cancelCreate}
+              onSave={createActivity}
+              saveLabel="Create activity"
+            />
+          </section>
+        </div>
       ) : null}
     </section>
   );
