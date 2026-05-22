@@ -1850,16 +1850,48 @@ button svg,
   background: rgba(0, 122, 255, 0.08);
 }
 
-.admin-user > button {
+.admin-user-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-user-select {
   justify-content: space-between;
   width: 100%;
   min-height: 42px;
 }
 
-.admin-user > button span {
+.admin-user-select span {
   color: var(--text-tertiary);
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.copy-id-button,
+.inline-copy-id {
+  max-width: 240px;
+  min-height: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-color: rgba(0, 122, 255, 0.22);
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--text-link);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.inline-copy-id {
+  display: inline-flex;
+  width: auto;
+  max-width: min(420px, 100%);
+  min-height: 28px;
+  margin-left: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  vertical-align: middle;
 }
 
 .admin-user-actions {

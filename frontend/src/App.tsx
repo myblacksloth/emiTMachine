@@ -1094,6 +1094,27 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", `${result.deletedCount} old administrative request${result.deletedCount === 1 ? "" : "s"} deleted.`);
   };
 
+  const copyUserId = async (user: AdminUser) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(user.publicId);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = user.publicId;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      onToast("success", "User ID copied to clipboard.");
+    } catch {
+      onToast("error", "Unable to copy user ID.");
+    }
+  };
+
   return (
     <section className="admin-grid">
       <section className="panel stack">
@@ -1121,10 +1142,15 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
         <div className="admin-user-list">
           {users.map((user) => (
             <article className={`admin-user ${selectedUserId === user.id ? "active" : ""}`} key={user.id}>
-              <button type="button" onClick={() => setSelectedUserId(user.id)}>
-                <strong>{user.username}</strong>
-                <span>{user.publicId} · {user.role}{user.role === "admin" && !user.adminApproved ? " · pending" : ""}</span>
-              </button>
+              <div className="admin-user-header">
+                <button className="admin-user-select" type="button" onClick={() => setSelectedUserId(user.id)}>
+                  <strong>{user.username}</strong>
+                  <span>{user.role}{user.role === "admin" && !user.adminApproved ? " · pending" : ""}</span>
+                </button>
+                <button className="copy-id-button" type="button" onClick={() => copyUserId(user)} title="Copy user ID">
+                  {user.publicId}
+                </button>
+              </div>
               <div className="admin-user-actions">
                 {currentRole === "root" && user.role === "admin" && !user.adminApproved ? (
                   <button type="button" onClick={() => approveAdmin(user)}>Approve</button>
@@ -1199,7 +1225,14 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           <div>
             <p className="eyebrow">Selected user</p>
             <h2>{selectedUser?.username ?? "No user selected"}</h2>
-            {selectedUser ? <p className="muted">User ID: {selectedUser.publicId}</p> : null}
+            {selectedUser ? (
+              <p className="muted">
+                User ID:{" "}
+                <button className="inline-copy-id" type="button" onClick={() => copyUserId(selectedUser)} title="Copy user ID">
+                  {selectedUser.publicId}
+                </button>
+              </p>
+            ) : null}
             {selectedUser ? <p className="muted">Name: {selectedUser.displayName || selectedUser.username} · Email: {selectedUser.email || "not set"}</p> : null}
           </div>
         </div>
