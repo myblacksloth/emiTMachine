@@ -120,6 +120,33 @@ The `/api/administrative-requests/review` endpoint returns:
 
 The `PATCH /api/administrative-requests/:id/status` endpoint applies the same permission check before approving or revoking a request. Deleted requests cannot be reviewed again.
 
+## Historical Activity Audit Workflow
+
+Manual activity changes are immediate only for activities in the current week. The current week is the Monday-to-Sunday week containing the current day.
+
+When a user creates, modifies, or deletes an activity outside the current week, the backend does not write the change directly to `time_sessions`. Instead it creates a pending administrative request with:
+
+- `request_type = activity_change`;
+- `activity_change_action = create`, `update`, or `delete`;
+- `activity_change_payload` containing the exact session change requested;
+- `note` containing the user's reason.
+
+This makes historical corrections part of the same review workflow as Vacation, Leave, and Smart working requests. The requested change affects reports, overtime, calendar views, and totals only after an authorized reviewer approves it.
+
+Approval behavior:
+
+- approving an `activity_change` request applies the queued payload to `time_sessions`, `session_tags`, and `time_events`;
+- revoking an `activity_change` request leaves the original history untouched;
+- deleted `activity_change` requests cannot be reviewed again;
+- the same recursive hierarchy rules decide who can approve the request.
+
+Frontend behavior:
+
+- current-week activity changes still behave like direct edits;
+- historical creates and updates use the Reason field in the activity form;
+- historical deletes ask for a reason before submitting the pending request;
+- successful historical submissions show as pending approval and do not appear in hour calculations until approved.
+
 ## API
 
 Admin/root endpoints:

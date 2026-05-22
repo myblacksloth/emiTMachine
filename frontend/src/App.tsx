@@ -118,6 +118,10 @@ function weekStartKeyFromIso(value: string) {
   return localDateKey(startOfLocalWeek(new Date(value)));
 }
 
+function isCurrentLocalWeek(value: string) {
+  return weekStartKeyFromIso(value) === weekStartKeyFromIso(new Date().toISOString());
+}
+
 function activityEffectiveMinutes(activity: ActivitySession) {
   if (activity.durationMinutes !== null) return activity.durationMinutes;
   const liveMinutes = Math.max(0, Math.floor((Date.now() - new Date(activity.startedAt).getTime()) / 60000));
@@ -853,7 +857,8 @@ function MonthlyCalendarPanel() {
 const administrativeRequestLabels: Record<AdministrativeRequestType, string> = {
   vacation: "Vacation",
   leave: "Leave",
-  smart_working: "Smart working"
+  smart_working: "Smart working",
+  activity_change: "Activity change"
 };
 
 function requestStatusLabel(status: AdministrativeRequest["status"]) {
@@ -1728,22 +1733,29 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       return;
     }
     if (!(await confirmCritical("Save changes to this activity?"))) return;
+    let reason = draft.reason;
+    const originalActivity = activities.find((activity) => activity.id === activityId);
+    if (!isCurrentLocalWeek(draft.startedAt) || (originalActivity && !isCurrentLocalWeek(originalActivity.startedAt))) {
+      const value = await promptCritical("Reason for changing this historical activity", draft.reason, "Audit reason");
+      if (value === null) return;
+      reason = value;
+    }
     try {
-      await api.updateActivity(activityId, {
+      const result = await api.updateActivity(activityId, {
         startedAt: isoFromLocalValue(draft.startedAt),
         endedAt: draft.endedAt ? isoFromLocalValue(draft.endedAt) : null,
         startTimezone: draft.startTimezone,
         endTimezone: draft.endedAt ? draft.endTimezone : null,
         note: draft.note,
         tagIds: draft.tagIds,
-        reason: draft.reason,
+        reason,
         noCountMinutes: draft.noCountMinutes
       });
       setEditingId(null);
       setDraft(null);
       await loadActivities();
       await onRefresh();
-      onToast("success", "Activity updated.");
+      onToast("success", result.pendingApproval ? "Historical activity update submitted for approval." : "Activity updated.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to update activity.");
     }
@@ -1760,22 +1772,28 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       return;
     }
     if (!(await confirmCritical("Create this manual activity?"))) return;
+    let reason = draft.reason;
+    if (!isCurrentLocalWeek(draft.startedAt)) {
+      const value = await promptCritical("Reason for creating this historical activity", draft.reason, "Audit reason");
+      if (value === null) return;
+      reason = value;
+    }
     try {
-      await api.createActivity({
+      const result = await api.createActivity({
         startedAt: isoFromLocalValue(draft.startedAt),
         endedAt: draft.endedAt ? isoFromLocalValue(draft.endedAt) : null,
         startTimezone: draft.startTimezone,
         endTimezone: draft.endedAt ? draft.endTimezone : null,
         note: draft.note,
         tagIds: draft.tagIds,
-        reason: draft.reason,
+        reason,
         noCountMinutes: draft.noCountMinutes
       });
       setCreating(false);
       setDraft(null);
       await loadActivities();
       await onRefresh();
-      onToast("success", "Activity created.");
+      onToast("success", result.pendingApproval ? "Historical activity creation submitted for approval." : "Activity created.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to create activity.");
     }
@@ -1783,11 +1801,22 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
 
   const deleteActivity = async (activity: ActivitySession) => {
     if (!(await confirmCritical("Delete this activity permanently? This cannot be undone."))) return;
+    let reason: string | undefined;
+    if (!isCurrentLocalWeek(activity.startedAt)) {
+      const value = await promptCritical("Reason for deleting this historical activity", "Historical activity deletion", "Audit reason");
+      if (value === null) return;
+      reason = value;
+    }
     try {
-      await api.deleteActivity(activity.id);
+      const result = await api.deleteActivity(activity.id, reason);
       await loadActivities();
       await onRefresh();
-      onToast("success", "Activity deleted.");
+      onToast(
+        "success",
+        result && typeof result === "object" && "pendingApproval" in result && result.pendingApproval
+          ? "Historical activity deletion submitted for approval."
+          : "Activity deleted."
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to delete activity.");
     }

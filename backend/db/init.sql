@@ -11,7 +11,7 @@ CREATE TYPE csv_import_status AS ENUM ('uploaded', 'validated', 'imported', 'fai
 CREATE TYPE auth_challenge_type AS ENUM ('registration', 'login', 'authentication', 'totp_setup', 'totp_login', 'password_recovery');
 CREATE TYPE countdown_status AS ENUM ('active', 'completed', 'cancelled');
 CREATE TYPE overtime_mode AS ENUM ('overtime', 'time_bank');
-CREATE TYPE administrative_request_type AS ENUM ('vacation', 'leave', 'smart_working');
+CREATE TYPE administrative_request_type AS ENUM ('vacation', 'leave', 'smart_working', 'activity_change');
 CREATE TYPE administrative_request_status AS ENUM ('pending', 'approved', 'revoked');
 
 CREATE TABLE users (
@@ -88,10 +88,17 @@ CREATE TABLE administrative_requests (
   decided_at timestamptz,
   deleted_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   deleted_at timestamptz,
+  activity_change_action text,
+  activity_change_payload jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT administrative_requests_end_after_start CHECK (ended_at > started_at),
-  CONSTRAINT administrative_requests_decision_state CHECK ((status = 'pending') = (decided_at IS NULL))
+  CONSTRAINT administrative_requests_decision_state CHECK ((status = 'pending') = (decided_at IS NULL)),
+  CONSTRAINT administrative_requests_activity_change_payload CHECK (
+    (request_type <> 'activity_change' and activity_change_action is null and activity_change_payload is null)
+    or
+    (request_type = 'activity_change' and activity_change_action in ('create', 'update', 'delete') and activity_change_payload is not null)
+  )
 );
 
 ALTER TABLE administrative_requests

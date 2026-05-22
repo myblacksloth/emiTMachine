@@ -1,7 +1,7 @@
 export type AuthMode = "login" | "register" | "passkey" | "recovery" | "totp";
 export type UserRole = "user" | "admin" | "root";
 export type OvertimeMode = "overtime" | "time_bank";
-export type AdministrativeRequestType = "vacation" | "leave" | "smart_working";
+export type AdministrativeRequestType = "vacation" | "leave" | "smart_working" | "activity_change";
 export type AdministrativeRequestStatus = "pending" | "approved" | "revoked";
 
 export type Tag = {
@@ -132,6 +132,8 @@ export type AdministrativeRequest = {
   decidedAt: string | null;
   deletedByUserId: string | null;
   deletedAt: string | null;
+  activityChangeAction?: "create" | "update" | "delete" | null;
+  activityChangePayload?: unknown;
   createdAt: string;
   requester?: {
     username: string;

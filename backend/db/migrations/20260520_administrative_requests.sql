@@ -1,7 +1,7 @@
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'administrative_request_type') THEN
-    CREATE TYPE administrative_request_type AS ENUM ('vacation', 'leave', 'smart_working');
+    CREATE TYPE administrative_request_type AS ENUM ('vacation', 'leave', 'smart_working', 'activity_change');
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'administrative_request_status') THEN
@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS administrative_requests (
   decided_at timestamptz,
   deleted_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   deleted_at timestamptz,
+  activity_change_action text,
+  activity_change_payload jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT administrative_requests_end_after_start CHECK (ended_at > started_at),
@@ -30,7 +32,11 @@ CREATE TABLE IF NOT EXISTS administrative_requests (
 
 ALTER TABLE administrative_requests
   ADD COLUMN IF NOT EXISTS deleted_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS activity_change_action text,
+  ADD COLUMN IF NOT EXISTS activity_change_payload jsonb;
+
+ALTER TYPE administrative_request_type ADD VALUE IF NOT EXISTS 'activity_change';
 
 DO $$
 BEGIN
@@ -55,6 +61,24 @@ $$;
 
 CREATE INDEX IF NOT EXISTS administrative_requests_user_status_idx ON administrative_requests (user_id, status, started_at DESC);
 CREATE INDEX IF NOT EXISTS administrative_requests_status_idx ON administrative_requests (status, started_at DESC);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'administrative_requests_activity_change_payload'
+      AND conrelid = 'administrative_requests'::regclass
+  ) THEN
+    ALTER TABLE administrative_requests
+      ADD CONSTRAINT administrative_requests_activity_change_payload CHECK (
+        (request_type <> 'activity_change' and activity_change_action is null and activity_change_payload is null)
+        or
+        (request_type = 'activity_change' and activity_change_action in ('create', 'update', 'delete') and activity_change_payload is not null)
+      );
+  END IF;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS administrative_requests_set_updated_at ON administrative_requests;
 CREATE TRIGGER administrative_requests_set_updated_at BEFORE UPDATE ON administrative_requests

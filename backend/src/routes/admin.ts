@@ -786,11 +786,13 @@ router.post("/users/:id/import", async (req, res, next) => {
         await client.query(
           `insert into administrative_requests (
              id, user_id, request_type, started_at, ended_at, status, note,
-             decided_by_user_id, decided_at, deleted_by_user_id, deleted_at, created_at, updated_at
+             decided_by_user_id, decided_at, deleted_by_user_id, deleted_at,
+             activity_change_action, activity_change_payload, created_at, updated_at
            )
            values (
              $1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7,
-             $8, $9::timestamptz, $10, $11::timestamptz, coalesce($12::timestamptz, now()), coalesce($13::timestamptz, now())
+             $8, $9::timestamptz, $10, $11::timestamptz,
+             $12, $13::jsonb, coalesce($14::timestamptz, now()), coalesce($15::timestamptz, now())
            )`,
           [
             id,
@@ -804,6 +806,8 @@ router.post("/users/:id/import", async (req, res, next) => {
             nullableStringValue(request, "decided_at"),
             nullableStringValue(request, "deleted_at") ? userId : null,
             nullableStringValue(request, "deleted_at"),
+            nullableStringValue(request, "activity_change_action"),
+            request.activity_change_payload ? JSON.stringify(request.activity_change_payload) : null,
             nullableStringValue(request, "created_at"),
             nullableStringValue(request, "updated_at")
           ]

@@ -155,6 +155,10 @@ type BackendSession = {
   tags: BackendTag[];
 };
 
+type ActivityMutationResult =
+  | { session: ActivitySession; pendingApproval?: false }
+  | { session: null; pendingApproval: true; request: AdministrativeRequest };
+
 type BackendCountdown = {
   id: string;
   title: string;
@@ -576,10 +580,10 @@ export const api = {
     reason: string;
     noCountMinutes: number;
   }) =>
-    request<{ session: BackendSession }>("/api/reports/sessions", {
+    request<{ session?: BackendSession; pendingApproval?: boolean; request?: AdministrativeRequest }>("/api/reports/sessions", {
       method: "POST",
       body: JSON.stringify(input)
-    }).then((payload) => mapSession(payload.session)),
+    }).then((payload): ActivityMutationResult => payload.pendingApproval ? { session: null, pendingApproval: true, request: payload.request! } : { session: mapSession(payload.session!), pendingApproval: false }),
   updateActivity: (id: string, input: {
     startedAt: string;
     endedAt: string | null;
@@ -590,11 +594,15 @@ export const api = {
     reason: string;
     noCountMinutes: number;
   }) =>
-    request<{ session: BackendSession }>(`/api/reports/sessions/${id}`, {
+    request<{ session?: BackendSession; pendingApproval?: boolean; request?: AdministrativeRequest }>(`/api/reports/sessions/${id}`, {
       method: "PATCH",
       body: JSON.stringify(input)
-    }).then((payload) => mapSession(payload.session)),
-  deleteActivity: (id: string) => request<void>(`/api/reports/sessions/${id}`, { method: "DELETE" }),
+    }).then((payload): ActivityMutationResult => payload.pendingApproval ? { session: null, pendingApproval: true, request: payload.request! } : { session: mapSession(payload.session!), pendingApproval: false }),
+  deleteActivity: (id: string, reason?: string) =>
+    request<void | { pendingApproval?: boolean; request?: AdministrativeRequest }>(`/api/reports/sessions/${id}`, {
+      method: "DELETE",
+      body: reason ? JSON.stringify({ reason }) : undefined
+    }),
   createCountdown: (title: string, targetAt: string, linkToCurrentSession: boolean) =>
     request<{ countdown: BackendCountdown }>("/api/countdowns", {
       method: "POST",

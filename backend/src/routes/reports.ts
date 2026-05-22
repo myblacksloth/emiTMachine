@@ -23,6 +23,9 @@ const sessionUpdateSchema = z.object({
 });
 
 const sessionCreateSchema = sessionUpdateSchema;
+const sessionDeleteSchema = z.object({
+  reason: z.string().trim().min(3).max(500).optional()
+});
 
 function assertActivityEditEnabled(canEditSessions: boolean) {
   // Root/admin users always keep session correction access. Standard users
@@ -30,6 +33,52 @@ function assertActivityEditEnabled(canEditSessions: boolean) {
   if (!canEditSessions) {
     throw new HttpError(403, "Activity editing is not enabled for this user");
   }
+}
+
+function startOfCurrentWeek() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay() || 7;
+  start.setDate(start.getDate() - day + 1);
+  return start;
+}
+
+function endOfCurrentWeek() {
+  const end = startOfCurrentWeek();
+  end.setDate(end.getDate() + 7);
+  return end;
+}
+
+function isInCurrentWeek(date: Date) {
+  return date >= startOfCurrentWeek() && date < endOfCurrentWeek();
+}
+
+function requestRangeEnd(startedAt: Date, endedAt: Date | null) {
+  return endedAt ?? new Date(startedAt.getTime() + 60_000);
+}
+
+async function createPendingActivityChangeRequest(
+  userId: string,
+  action: "create" | "update" | "delete",
+  startedAt: Date,
+  endedAt: Date | null,
+  reason: string,
+  payload: Record<string, unknown>
+) {
+  /*
+   * Historical changes are not written directly to time_sessions. They are stored
+   * as pending administrative requests and become effective only after approval.
+   */
+  const result = await pool.query(
+    `insert into administrative_requests (
+       user_id, request_type, started_at, ended_at, note,
+       activity_change_action, activity_change_payload
+     )
+     values ($1, 'activity_change', $2, $3, $4, $5, $6::jsonb)
+     returning *`,
+    [userId, startedAt, requestRangeEnd(startedAt, endedAt), reason, action, JSON.stringify(payload)]
+  );
+  return result.rows[0];
 }
 
 router.get("/summary", async (req, res, next) => {
@@ -151,6 +200,20 @@ router.post("/sessions", async (req, res, next) => {
       throw new HttpError(400, "No count time cannot exceed session duration");
     }
 
+    if (!isInCurrentWeek(startedAt)) {
+      await withTransaction(async (client) => {
+        await assertUserTags(client, req.user!.id, input.tagIds);
+        await assertTagsAreCompatible(client, req.user!.id, input.tagIds);
+      });
+      const request = await createPendingActivityChangeRequest(req.user!.id, "create", startedAt, endedAt, input.reason, {
+        action: "create",
+        session: input
+      });
+      req.log?.info("historical activity create queued for approval", { userId: req.user!.id, requestId: request.id });
+      res.status(202).json({ pendingApproval: true, request });
+      return;
+    }
+
     const session = await withTransaction(async (client) => {
       await assertUserTags(client, req.user!.id, input.tagIds);
       await assertTagsAreCompatible(client, req.user!.id, input.tagIds);
@@ -216,6 +279,31 @@ router.patch("/sessions/:id", async (req, res, next) => {
     }
     if (endedAt && input.noCountMinutes > Math.floor((endedAt.getTime() - startedAt.getTime()) / 60000)) {
       throw new HttpError(400, "No count time cannot exceed session duration");
+    }
+
+    const currentForAudit = await pool.query(
+      `select id, started_at, ended_at
+       from time_sessions
+       where id = $1 and user_id = $2`,
+      [sessionId, req.user!.id]
+    );
+    if (!currentForAudit.rows[0]) {
+      throw new HttpError(404, "Activity not found");
+    }
+    const currentStartedAt = new Date(currentForAudit.rows[0].started_at);
+    if (!isInCurrentWeek(currentStartedAt) || !isInCurrentWeek(startedAt)) {
+      await withTransaction(async (client) => {
+        await assertUserTags(client, req.user!.id, input.tagIds);
+        await assertTagsAreCompatible(client, req.user!.id, input.tagIds);
+      });
+      const request = await createPendingActivityChangeRequest(req.user!.id, "update", startedAt, endedAt, input.reason, {
+        action: "update",
+        sessionId,
+        session: input
+      });
+      req.log?.info("historical activity update queued for approval", { userId: req.user!.id, sessionId, requestId: request.id });
+      res.status(202).json({ pendingApproval: true, request });
+      return;
     }
 
     const session = await withTransaction(async (client) => {
@@ -345,6 +433,28 @@ router.delete("/sessions/:id", async (req, res, next) => {
   try {
     assertActivityEditEnabled(req.user!.canEditSessions || req.user!.role === "admin" || req.user!.role === "root");
     const sessionId = uuidSchema.parse(req.params.id);
+    const input = sessionDeleteSchema.parse(req.body ?? {});
+
+    const currentResult = await pool.query(
+      `select id, started_at, ended_at
+       from time_sessions
+       where id = $1 and user_id = $2`,
+      [sessionId, req.user!.id]
+    );
+    if (!currentResult.rows[0]) {
+      throw new HttpError(404, "Activity not found");
+    }
+    const startedAt = new Date(currentResult.rows[0].started_at);
+    const endedAt = currentResult.rows[0].ended_at ? new Date(currentResult.rows[0].ended_at) : null;
+    if (!isInCurrentWeek(startedAt)) {
+      const request = await createPendingActivityChangeRequest(req.user!.id, "delete", startedAt, endedAt, input.reason ?? "Historical activity deletion", {
+        action: "delete",
+        sessionId
+      });
+      req.log?.info("historical activity delete queued for approval", { userId: req.user!.id, sessionId, requestId: request.id });
+      res.status(202).json({ pendingApproval: true, request });
+      return;
+    }
 
     const result = await pool.query("delete from time_sessions where id = $1 and user_id = $2 returning id", [sessionId, req.user!.id]);
     if (!result.rows[0]) {
