@@ -1163,56 +1163,64 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           <p className="form-message">Temporary password: <strong>{temporaryPassword}</strong></p>
         ) : null}
         <div className="admin-user-list">
-          {users.map((user) => (
-            <article className={`admin-user ${selectedUserId === user.id ? "active" : ""}`} key={user.id}>
-              <div className="admin-user-header">
-                <button className="admin-user-select" type="button" onClick={() => setSelectedUserId(user.id)}>
-                  <strong>{user.username}</strong>
-                  <span>{user.role}{user.role === "admin" && !user.adminApproved ? " · pending" : ""}</span>
-                </button>
-                <button className="copy-id-button" type="button" onClick={() => copyUserId(user)} title="Copy user ID">
-                  {user.publicId}
-                </button>
-              </div>
-              <div className="admin-user-actions">
-                {currentRole === "root" && user.role === "admin" && !user.adminApproved ? (
-                  <button type="button" onClick={() => approveAdmin(user)}>Approve</button>
-                ) : null}
-                {user.role === "admin" && user.adminApproved ? (
-                  <button type="button" onClick={() => addManagedUser(user)}>Add managed user</button>
-                ) : null}
-                {currentRole === "root" || user.role === "user" ? (
-                  <button type="button" onClick={() => updatePublicId(user)}>Edit user ID</button>
-                ) : null}
-                {currentRole === "root" || user.role === "user" ? (
-                  <button type="button" onClick={() => updateUserProfile(user)}>Edit name/email</button>
-                ) : null}
-                {user.role !== "root" ? (
-                  <button type="button" onClick={() => toggleEditPermission(user)}>
-                    {user.canEditSessions ? "Disable edits" : "Enable edits"}
+          {users.map((user) => {
+            const isPendingAdmin = user.role === "admin" && !user.adminApproved;
+            return (
+              <article className={`admin-user ${selectedUserId === user.id ? "active" : ""} ${isPendingAdmin ? "pending-admin" : ""}`} key={user.id}>
+                <div className="admin-user-header">
+                  <button className="admin-user-select" type="button" onClick={() => setSelectedUserId(user.id)}>
+                    <strong>{user.username}</strong>
+                    <span>{user.role}{isPendingAdmin ? " · pending" : ""}</span>
                   </button>
+                  <button className="copy-id-button" type="button" onClick={() => copyUserId(user)} title="Copy user ID">
+                    {user.publicId}
+                  </button>
+                </div>
+                {isPendingAdmin ? (
+                  <div className="pending-admin-banner">
+                    <strong>Approval pending</strong>
+                    <span>This admin account cannot sign in until root approves it.</span>
+                  </div>
                 ) : null}
-                {user.role !== "root" ? (
-                  <>
-                    <button type="button" onClick={() => toggleOvertimePermission(user)}>
-                      {user.overtimeEnabled ? "Disable overtime" : "Enable overtime"}
+                <div className="admin-user-actions">
+                  {currentRole === "root" && isPendingAdmin ? (
+                    <button className="approve-admin-action" type="button" onClick={() => approveAdmin(user)}>Approve admin</button>
+                  ) : null}
+                  {user.role === "admin" && user.adminApproved ? (
+                    <button type="button" onClick={() => addManagedUser(user)}>Add managed user</button>
+                  ) : null}
+                  {currentRole === "root" || user.role === "user" ? (
+                    <button type="button" onClick={() => updatePublicId(user)}>Edit user ID</button>
+                  ) : null}
+                  {currentRole === "root" || user.role === "user" ? (
+                    <button type="button" onClick={() => updateUserProfile(user)}>Edit name/email</button>
+                  ) : null}
+                  {user.role !== "root" ? (
+                    <button type="button" onClick={() => toggleEditPermission(user)}>
+                      {user.canEditSessions ? "Disable edits" : "Enable edits"}
                     </button>
-                    {user.overtimeEnabled ? (
-                      <select value={user.overtimeMode} onChange={(event) => changeOvertimeMode(user, event.target.value as "overtime" | "time_bank")}>
-                        <option value="overtime">Straordinari</option>
-                        <option value="time_bank">Banca ore</option>
-                      </select>
-                    ) : null}
-                  </>
-                ) : null}
-                {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
-                  <>
-                    <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
-                    <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
-                  </>
-                ) : null}
-              </div>
-              {user.role === "admin" && user.adminApproved ? (
+                  ) : null}
+                  {user.role !== "root" ? (
+                    <>
+                      <button type="button" onClick={() => toggleOvertimePermission(user)}>
+                        {user.overtimeEnabled ? "Disable overtime" : "Enable overtime"}
+                      </button>
+                      {user.overtimeEnabled ? (
+                        <select value={user.overtimeMode} onChange={(event) => changeOvertimeMode(user, event.target.value as "overtime" | "time_bank")}>
+                          <option value="overtime">Straordinari</option>
+                          <option value="time_bank">Banca ore</option>
+                        </select>
+                      ) : null}
+                    </>
+                  ) : null}
+                  {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
+                    <>
+                      <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
+                      <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
+                    </>
+                  ) : null}
+                </div>
+                {user.role === "admin" && user.adminApproved ? (
                 <div className="manager-chip-list">
                   {managerAssignments.filter((assignment) => assignment.managerUserId === user.id).map((assignment) => {
                     const target = users.find((candidate) => candidate.id === assignment.userId);
@@ -1228,8 +1236,9 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                   })}
                 </div>
               ) : null}
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
         {currentRole === "root" ? (
           <div className="admin-maintenance-actions">
