@@ -704,7 +704,11 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
       setMessage("Request end time must be after start time.");
       return;
     }
-    if (!(await confirmCritical("Submit this administrative request?"))) return;
+    setCreateOpen(false);
+    if (!(await confirmCritical("Submit this administrative request?"))) {
+      setCreateOpen(true);
+      return;
+    }
     try {
       await api.createAdministrativeRequest({
         requestType,
@@ -713,10 +717,10 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
         note
       });
       setNote("");
-      setCreateOpen(false);
       await loadRequests();
       onToast("success", "Administrative request created.");
     } catch (error) {
+      setCreateOpen(true);
       setMessage(error instanceof Error ? error.message : "Unable to create administrative request.");
     }
   };
