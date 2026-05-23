@@ -53,3 +53,38 @@ Do **not** open public issues for security vulnerabilities. Send a private repor
 ## Questions
 
 Open a [Discussion](../../discussions) rather than an issue for general questions or ideas.
+
+---
+
+## Keeping your fork up to date
+
+Before starting new work or pulling a PR, make sure your local fork is synced with the original repository (`upstream`).
+
+```bash
+# 1. Add the original repository as a remote named 'upstream' (only needed once)
+git remote add upstream [https://github.com/myblacksloth/emiTMachine](https://github.com/myblacksloth/emiTMachine)
+
+# 2. Fetch the latest changes from upstream
+git fetch upstream
+
+# 3. Switch to your local main branch
+git checkout main
+
+# 4. Merge upstream/main into your local main branch
+git merge upstream/main
+
+# 5. Push the updated main branch to your GitHub fork (origin)
+git push origin main
+
+
+# ------------------------------------------
+
+# if working with feature branch
+
+git checkout your-feature-branch
+git rebase main
+```
+
+<!-- 
+`rebase` è generalmente preferibile in questi flussi di lavoro perché mantiene la cronologia dei commit lineare, il che si allinea perfettamente con la regola interna dei *"focused, atomic commits"*
+-->

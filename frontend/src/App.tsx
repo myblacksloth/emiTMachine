@@ -4,14 +4,17 @@ import {
   BarChart3,
   CalendarClock,
   ChevronDown,
+  ChevronRight,
   Clock,
   Download,
   FileText,
   Hourglass,
   KeyRound,
   LayoutDashboard,
+  Loader2,
   LogOut,
   MoreHorizontal,
+  Play,
   Plus,
   RefreshCw,
   Save,
@@ -2868,6 +2871,7 @@ function PunchDialog({
         <SlideToConfirm
           label={busy ? "Saving..." : `Slide to ${mode === "in" ? "clock in" : "clock out"}`}
           disabled={busy}
+          variant={mode}
           onConfirm={submit}
         />
         <div className="modal-actions">
@@ -2880,7 +2884,17 @@ function PunchDialog({
   );
 }
 
-function SlideToConfirm({ label, disabled, onConfirm }: { label: string; disabled?: boolean; onConfirm: () => Promise<void> | void }) {
+function SlideToConfirm({
+  label,
+  disabled,
+  onConfirm,
+  variant
+}: {
+  label: string;
+  disabled?: boolean;
+  onConfirm: () => Promise<void> | void;
+  variant?: "in" | "out";
+}) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const valueRef = useRef(0);
   const draggingRef = useRef(false);
@@ -2937,13 +2951,29 @@ function SlideToConfirm({ label, disabled, onConfirm }: { label: string; disable
     }
     setReturning(true);
     window.requestAnimationFrame(() => setSlideValue(0));
-    window.setTimeout(() => setReturning(false), 260);
+    window.setTimeout(() => setReturning(false), 300);
   };
+
+  const cls = [
+    "slide-confirm",
+    variant === "out" ? "variant-out" : "",
+    unlocked ? "unlocked" : "",
+    dragging ? "dragging" : "",
+    returning ? "returning" : "",
+    submitting ? "submitting" : "",
+    isDisabled ? "disabled" : ""
+  ].filter(Boolean).join(" ");
+
+  const ThumbIcon = submitting
+    ? <Loader2 size={22} className="slide-thumb-spin" />
+    : variant === "out"
+    ? <Square size={20} fill="currentColor" />
+    : <Play size={20} fill="currentColor" style={{ marginLeft: "2px" }} />;
 
   return (
     <div
       ref={trackRef}
-      className={`slide-confirm ${unlocked ? "unlocked" : ""} ${dragging ? "dragging" : ""} ${returning ? "returning" : ""} ${isDisabled ? "disabled" : ""}`}
+      className={cls}
       role="slider"
       aria-label={label}
       aria-valuemin={0}
@@ -2962,9 +2992,14 @@ function SlideToConfirm({ label, disabled, onConfirm }: { label: string; disable
         }
       }}
     >
-      <span>{label}</span>
+      <div className="slide-confirm-label">
+        <ChevronRight size={15} className="slide-label-chevron" />
+        <span>{label}</span>
+      </div>
       <i className="slide-confirm-fill" style={{ width: `${value}%` }} />
-      <b className="slide-confirm-thumb" style={{ left: `${value}%` }} />
+      <div className="slide-confirm-thumb" style={{ left: `${value}%` }}>
+        {ThumbIcon}
+      </div>
     </div>
   );
 }

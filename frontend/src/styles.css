@@ -1299,89 +1299,224 @@ input[type="datetime-local"] {
   padding-top: 0.25rem;
 }
 
+/* ── Slide-to-confirm — premium control ─────────────────────── */
 .slide-confirm {
   position: relative;
-  display: grid;
+  display: flex;
   align-items: center;
-  min-height: 68px;
-  border: 0;
+  justify-content: center;
+  min-height: 84px;
   border-radius: var(--r-pill);
   overflow: visible;
-  background: transparent;
   touch-action: none;
   cursor: grab;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Track pill (inset so thumb can overflow the edges gracefully) */
 .slide-confirm::before {
   content: "";
   position: absolute;
-  inset: 13px 0;
-  border: 1px solid var(--border);
+  inset: 10px 0;
   border-radius: var(--r-pill);
-  background: linear-gradient(90deg, rgba(52, 199, 89, 0.16), rgba(0, 122, 255, 0.14));
-  box-shadow: inset 0 1px 2px rgba(31, 35, 45, 0.08);
+  background: rgba(52, 199, 89, 0.1);
+  border: 1.5px solid rgba(52, 199, 89, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 2px 6px rgba(0, 0, 0, 0.07);
+  transition:
+    background 0.3s var(--ease),
+    border-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
 }
 
-.slide-confirm span {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--text-primary);
-  font-weight: 800;
-  pointer-events: none;
-  z-index: 2;
+/* Clock-out variant: red/orange palette */
+.slide-confirm.variant-out::before {
+  background: rgba(255, 59, 48, 0.08);
+  border-color: rgba(255, 59, 48, 0.28);
 }
 
+/* Progress fill */
 .slide-confirm-fill {
   position: absolute;
-  inset: 13px auto 13px 0;
+  inset: 10px auto 10px 0;
   border-radius: var(--r-pill);
-  background: rgba(52, 199, 89, 0.22);
+  background: linear-gradient(
+    90deg,
+    rgba(52, 199, 89, 0.45) 0%,
+    rgba(52, 199, 89, 0.18) 100%
+  );
   pointer-events: none;
-  transition: width 0.22s var(--ease);
+  transition: width 0.18s var(--ease);
 }
 
+.slide-confirm.variant-out .slide-confirm-fill {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 59, 48, 0.42) 0%,
+    rgba(255, 59, 48, 0.16) 100%
+  );
+}
+
+/* Label — centered over the track */
+.slide-confirm-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  pointer-events: none;
+  z-index: 2;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.015em;
+  transition: opacity 0.2s var(--ease);
+}
+
+/* Animated chevron hint — pulses to show slide direction */
+.slide-label-chevron {
+  color: var(--green);
+  animation: slide-hint 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.slide-confirm.variant-out .slide-label-chevron {
+  color: var(--red);
+}
+
+@keyframes slide-hint {
+  0%, 100% { transform: translateX(0);    opacity: 0.6; }
+  50%       { transform: translateX(5px);  opacity: 1;   }
+}
+
+/* Fade label while dragging; hide when unlocked */
+.slide-confirm.dragging  .slide-confirm-label { opacity: 0.35; }
+.slide-confirm.unlocked  .slide-confirm-label { opacity: 0;    }
+.slide-confirm.submitting .slide-confirm-label { opacity: 0.4; }
+
+/* Chevron stops pulsing while dragging */
+.slide-confirm.dragging .slide-label-chevron,
+.slide-confirm.unlocked .slide-label-chevron {
+  animation: none;
+}
+
+/* Thumb — big tactile circle */
 .slide-confirm-thumb {
   position: absolute;
   top: 50%;
-  width: 66px;
-  height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(242, 242, 247, 0.92));
-  box-shadow: 0 8px 22px rgba(31, 35, 45, 0.22);
+  background: linear-gradient(145deg, #ffffff 0%, #f0f0f5 100%);
+  color: var(--green);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    0 6px 18px rgba(0, 0, 0, 0.14),
+    0 0 0 0px rgba(52, 199, 89, 0);
   pointer-events: none;
   transform: translate(-50%, -50%);
-  transition: left 0.22s var(--ease);
+  transition:
+    left 0.18s var(--ease),
+    box-shadow 0.25s var(--ease),
+    background 0.25s var(--ease),
+    color 0.2s var(--ease);
   z-index: 3;
 }
 
+.slide-confirm.variant-out .slide-confirm-thumb {
+  color: var(--red);
+}
+
+/* Glow ring while dragging */
+.slide-confirm.dragging .slide-confirm-thumb {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.16),
+    0 8px 28px rgba(0, 0, 0, 0.16),
+    0 0 0 10px rgba(52, 199, 89, 0.14),
+    0 0 0 20px rgba(52, 199, 89, 0.05);
+  transition: box-shadow 0.15s var(--ease);
+}
+
+.slide-confirm.variant-out.dragging .slide-confirm-thumb {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.16),
+    0 8px 28px rgba(0, 0, 0, 0.16),
+    0 0 0 10px rgba(255, 59, 48, 0.14),
+    0 0 0 20px rgba(255, 59, 48, 0.05);
+}
+
+/* No position transitions during free drag */
+.slide-confirm.dragging .slide-confirm-fill,
+.slide-confirm.dragging .slide-confirm-thumb {
+  transition: box-shadow 0.15s var(--ease);
+}
+
+/* Spring-back with slight overshoot */
+.slide-confirm.returning .slide-confirm-fill {
+  transition: width 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.slide-confirm.returning .slide-confirm-thumb {
+  transition: left 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.25s var(--ease);
+}
+
+/* Thumb turns solid on unlock — success burst */
+.slide-confirm.unlocked .slide-confirm-thumb {
+  background: var(--green);
+  color: #fff;
+  box-shadow:
+    0 6px 24px rgba(52, 199, 89, 0.5),
+    0 0 0 8px rgba(52, 199, 89, 0.18);
+}
+.slide-confirm.variant-out.unlocked .slide-confirm-thumb {
+  background: var(--red);
+  color: #fff;
+  box-shadow:
+    0 6px 24px rgba(255, 59, 48, 0.5),
+    0 0 0 8px rgba(255, 59, 48, 0.18);
+}
+
+/* Track also brightens when unlocked */
+.slide-confirm.unlocked::before {
+  background: rgba(52, 199, 89, 0.22);
+  border-color: rgba(52, 199, 89, 0.5);
+}
+.slide-confirm.variant-out.unlocked::before {
+  background: rgba(255, 59, 48, 0.18);
+  border-color: rgba(255, 59, 48, 0.5);
+}
+
+/* Outer ring pulses outward while submitting */
+.slide-confirm.submitting::before {
+  animation: slide-submitting-ring 1s ease-in-out infinite;
+}
+@keyframes slide-submitting-ring {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 2px 6px rgba(0,0,0,0.07), 0 0 0 0px rgba(52, 199, 89, 0.0); }
+  50%       { box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 2px 6px rgba(0,0,0,0.07), 0 0 0 5px rgba(52, 199, 89, 0.15); }
+}
+
+/* Grabbing cursor while dragging */
 .slide-confirm.dragging {
   cursor: grabbing;
 }
 
-.slide-confirm.dragging .slide-confirm-fill,
-.slide-confirm.dragging .slide-confirm-thumb {
-  transition: none;
-}
-
-.slide-confirm.returning .slide-confirm-fill,
-.slide-confirm.returning .slide-confirm-thumb {
-  transition: width 0.24s var(--ease), left 0.24s var(--ease);
-}
-
-.slide-confirm.unlocked {
-  background: transparent;
-}
-
-.slide-confirm.unlocked::before {
-  background: rgba(52, 199, 89, 0.24);
-}
-
+/* Disabled */
 .slide-confirm.disabled {
-  opacity: 0.65;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Thumb icon spin for loading state */
+.slide-thumb-spin {
+  animation: slide-spin 0.9s linear infinite;
+}
+@keyframes slide-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Toast notifications ────────────────────────────────────── */
