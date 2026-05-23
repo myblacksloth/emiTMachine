@@ -23,6 +23,7 @@ docker-compose-reverse.*.env
 
 
 todo.txt
+todo.*.txt
 done.txt
 .env
 node_modules/
