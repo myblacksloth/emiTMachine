@@ -566,7 +566,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "profile" | "admin">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -610,6 +610,9 @@ function Dashboard({
         </button>
         <button className={view === "tools" ? "active" : ""} onClick={() => setView("tools")} type="button">
           <Clock size={16} /> <span>Tools</span>
+        </button>
+        <button className={view === "countdowns" ? "active" : ""} onClick={() => setView("countdowns")} type="button">
+          <AlarmClock size={16} /> <span>Countdowns</span>
         </button>
         <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")} type="button">
           <UserRound size={16} /> <span>Profile</span>
@@ -666,7 +669,6 @@ function Dashboard({
             <Chart title="Monthly hours" buckets={data.charts.monthly} />
           </section>
 
-          <Countdowns countdowns={data.countdowns} activeSessionId={data.activeSession?.id ?? null} onRefresh={onRefresh} onToast={onToast} />
         </>
       ) : null}
 
@@ -676,6 +678,7 @@ function Dashboard({
       {view === "overtime" ? <OvertimePanel onToast={onToast} /> : null}
       {view === "tags" ? <TagManager tags={data.tags} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "tools" ? <TimeTools /> : null}
+      {view === "countdowns" ? <Countdowns countdowns={data.countdowns} activeSessionId={data.activeSession?.id ?? null} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "profile" ? <ProfileSettings data={data} onToast={onToast} onRefresh={onRefresh} /> : null}
       {view === "admin" && data.user.role !== "user" ? <AdminPanel currentRole={data.user.role} onToast={onToast} /> : null}
 
