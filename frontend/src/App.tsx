@@ -1007,7 +1007,7 @@ function MonthlyCalendarPanel() {
           <button type="button" onClick={() => moveMonth(1)} aria-label="Next month">
             <ChevronRight size={16} /><span className="cal-btn-label">Next</span>
           </button>
-          <button type="button" onClick={loadActivities} disabled={loading}>
+          <button type="button" onClick={loadActivities} disabled={loading} aria-label="Refresh calendar">
             <RefreshCw size={16} /><span className="cal-btn-label">Refresh</span>
           </button>
         </div>
@@ -1751,6 +1751,7 @@ function RequestList({
                   }
                 }}
                 title="Copy request ID"
+                aria-label={`Copy request ID ${request.id}`}
               >
                 {request.id}
               </button>
@@ -2489,7 +2490,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                     <strong>{user.username}</strong>
                     <span>{user.role}{isPendingAdmin ? " · pending" : ""}</span>
                   </button>
-                  <button className="copy-id-button" type="button" onClick={() => copyUserId(user)} title="Copy user ID">
+                  <button className="copy-id-button" type="button" onClick={() => copyUserId(user)} title="Copy user ID" aria-label={`Copy user ID ${user.publicId}`}>
                     {user.publicId}
                   </button>
                 </div>
@@ -2581,7 +2582,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             {selectedUser ? (
               <p className="muted">
                 User ID:{" "}
-                <button className="inline-copy-id" type="button" onClick={() => copyUserId(selectedUser)} title="Copy user ID">
+                <button className="inline-copy-id" type="button" onClick={() => copyUserId(selectedUser)} title="Copy user ID" aria-label={`Copy user ID ${selectedUser.publicId}`}>
                   {selectedUser.publicId}
                 </button>
               </p>
