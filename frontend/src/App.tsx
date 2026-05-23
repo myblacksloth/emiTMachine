@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarClock,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Download,
@@ -928,6 +929,11 @@ function MonthlyCalendarPanel() {
     return grouped;
   }, [administrativeRequests, cursor, monthDays]);
 
+  const agendaDays = useMemo<string[]>(() => {
+    const keys = new Set([...activitiesByDay.keys(), ...approvedRequestsByDay.keys()]);
+    return [...keys].sort();
+  }, [activitiesByDay, approvedRequestsByDay]);
+
   const monthActivities = Array.from(activitiesByDay.values()).flat();
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
@@ -948,11 +954,15 @@ function MonthlyCalendarPanel() {
           <h2>{monthLabel}</h2>
         </div>
         <div className="calendar-actions">
-          <button type="button" onClick={() => moveMonth(-1)}>Previous</button>
+          <button type="button" onClick={() => moveMonth(-1)} aria-label="Previous month">
+            <ChevronLeft size={16} /><span className="cal-btn-label">Previous</span>
+          </button>
           <button type="button" onClick={() => setCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Today</button>
-          <button type="button" onClick={() => moveMonth(1)}>Next</button>
+          <button type="button" onClick={() => moveMonth(1)} aria-label="Next month">
+            <ChevronRight size={16} /><span className="cal-btn-label">Next</span>
+          </button>
           <button type="button" onClick={loadActivities} disabled={loading}>
-            <RefreshCw size={16} /> Refresh
+            <RefreshCw size={16} /><span className="cal-btn-label">Refresh</span>
           </button>
         </div>
       </div>
@@ -1026,6 +1036,70 @@ function MonthlyCalendarPanel() {
           );
         })}
       </div>
+
+      {/* Agenda view — rendered in DOM always, shown only on mobile via CSS */}
+      <div className="calendar-agenda" aria-label={`Agenda — ${monthLabel}`}>
+        {agendaDays.length === 0 && !loading ? (
+          <p className="empty-state">No activities or requests this month.</p>
+        ) : null}
+        {agendaDays.map((key) => {
+          const dayActivities = activitiesByDay.get(key) ?? [];
+          const dayRequests = approvedRequestsByDay.get(key) ?? [];
+          const dayDate = new Date(`${key}T12:00:00`);
+          const dayTotal = dayActivities.reduce((total, activity) => total + activityEffectiveMinutes(activity), 0);
+          return (
+            <article key={key} className={`agenda-day ${key === todayKey ? "today" : ""}`}>
+              <div className="agenda-day-header">
+                <span>{dayDate.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+                {dayTotal > 0 ? <strong>{minutesLabel(dayTotal)}</strong> : null}
+              </div>
+              <div className="calendar-activities">
+                {dayActivities.map((activity) => {
+                  const tag = activity.tags[0];
+                  return (
+                    <button
+                      className="calendar-activity"
+                      key={activity.id}
+                      onClick={() => setSelectedActivity(activity)}
+                      style={{ borderColor: tag?.color ?? "#8E8E93", background: `${tag?.color ?? "#8E8E93"}22` }}
+                      type="button"
+                    >
+                      <span style={{ background: tag?.color ?? "#8E8E93" }} />
+                      <div>
+                        <strong>{new Date(activity.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</strong>
+                        <small>{tag?.name ?? "Activity"} · {activity.durationMinutes === null ? "Live" : minutesLabel(activity.durationMinutes)}</small>
+                      </div>
+                    </button>
+                  );
+                })}
+                {dayRequests.map((request) => {
+                  const color = administrativeRequestCalendarColors[request.requestType as Exclude<AdministrativeRequestType, "activity_change">] ?? "#8E8E93";
+                  return (
+                    <button
+                      className="calendar-activity calendar-request"
+                      key={request.id}
+                      onClick={() => setSelectedRequest(request)}
+                      style={{ borderColor: color, background: `${color}22` }}
+                      type="button"
+                    >
+                      <span style={{ background: color }} />
+                      <div>
+                        <strong>{administrativeRequestLabels[request.requestType]}</strong>
+                        <small>
+                          {new Date(request.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                          {" - "}
+                          {new Date(request.endedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        </small>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
       {selectedActivity ? (
         <div className="modal-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
