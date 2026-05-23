@@ -3760,6 +3760,9 @@ function ProfileSettings({
 
       <section className="panel stack wide">
         <h2>CSV export and restore</h2>
+        <p className="form-message destructive-warning">
+          CSV restore can create new records. Review the file carefully before uploading it.
+        </p>
         <div className="csv-actions">
           <a className="download-link" href={api.exportCsvUrl}>
             <Download size={16} /> Download CSV export
