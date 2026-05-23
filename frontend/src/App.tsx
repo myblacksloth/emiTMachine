@@ -3596,167 +3596,178 @@ function ProfileSettings({
 
   return (
     <section className="settings-grid">
-      <section className="panel stack">
-        <h2>Account</h2>
-        <p className="muted">User ID: <strong>{data.user.publicId || "Not assigned"}</strong></p>
-        <p className="muted">This identifier is generated automatically and can be changed by an admin.</p>
-        {managers.length > 0 ? (
-          <div className="manager-list">
-            <h3>Responsabili</h3>
-            {managers.map((manager) => (
-              <p className="muted" key={manager.id}>
-                <strong>{manager.displayName}</strong> ({manager.username}){manager.email ? ` · ${manager.email}` : ""}
-              </p>
-            ))}
-          </div>
-        ) : null}
-      </section>
+      <details className="panel stack profile-section" open>
+        <summary>Account</summary>
+        <div className="profile-section-body">
+          <p className="muted profile-long-text">User ID: <strong>{data.user.publicId || "Not assigned"}</strong></p>
+          <p className="muted">This identifier is generated automatically and can be changed by an admin.</p>
+          {managers.length > 0 ? (
+            <div className="manager-list">
+              <h3>Responsabili</h3>
+              {managers.map((manager) => (
+                <p className="muted profile-long-text" key={manager.id}>
+                  <strong>{manager.displayName}</strong> ({manager.username}){manager.email ? ` · ${manager.email}` : ""}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </details>
 
-      <form
-        className="panel stack"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (!(await confirmCritical("Save these profile changes?"))) return;
-          await api.updateProfile(profileName, profileEmail);
-          await onRefresh();
-          onToast("success", "Profile updated.");
-        }}
-      >
-        <h2>Name and email</h2>
-        <TextField label="Name" value={profileName} onChange={setProfileName} autoComplete="name" />
-        <TextField label="Email" value={profileEmail} onChange={setProfileEmail} type="email" autoComplete="email" />
-        <button className="primary-action" type="submit">
-          <Save size={18} /> Save profile
-        </button>
-      </form>
-
-      <form
-        className="panel stack"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (!(await confirmCritical("Change your password?"))) return;
-          await api.changePassword(currentPassword, newPassword);
-          setCurrentPassword("");
-          setNewPassword("");
-          onToast("success", "Password changed.");
-        }}
-      >
-        <h2>Password</h2>
-        <TextField label="Current password" value={currentPassword} onChange={setCurrentPassword} type="password" autoComplete="current-password" />
-        <TextField label="New password" value={newPassword} onChange={setNewPassword} type="password" autoComplete="new-password" minLength={8} />
-        <PasswordHints password={newPassword} />
-        <button className="primary-action" type="submit">
-          <ShieldCheck size={18} /> Change password
-        </button>
-      </form>
-
-      <section className="panel stack">
-        <h2>TOTP</h2>
-        <p className="muted">{data.user.totpEnabled ? "TOTP is enabled for this account." : "Set up an authenticator app with a QR code."}</p>
-        <button
-          type="button"
-          onClick={async () => {
-            if (!(await confirmCritical("Start TOTP setup for this account?"))) return;
-            setTotp(await api.setupTotp());
+      <details className="panel stack profile-section" open>
+        <summary>Name and email</summary>
+        <form
+          className="profile-section-body stack"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!(await confirmCritical("Save these profile changes?"))) return;
+            await api.updateProfile(profileName, profileEmail);
+            await onRefresh();
+            onToast("success", "Profile updated.");
           }}
         >
-          <KeyRound size={16} /> Show QR setup
-        </button>
-        {totp ? (
-          <>
-            <img className="qr" src={totp.qrCodeUrl} alt="TOTP setup QR code" />
-            <p className="muted">{totp.secretLabel}</p>
-            <TextField label="Verification code" value={totpCode} onChange={setTotpCode} inputMode="numeric" />
-            <button
-              className="primary-action"
-              type="button"
-              onClick={async () => {
-                if (!(await confirmCritical("Enable TOTP for this account?"))) return;
-                await api.confirmTotp(totpCode);
-                onToast("success", "TOTP enabled.");
-              }}
-            >
-              <ShieldCheck size={18} /> Enable TOTP
-            </button>
-          </>
-        ) : null}
-      </section>
+          <TextField label="Name" value={profileName} onChange={setProfileName} autoComplete="name" />
+          <TextField label="Email" value={profileEmail} onChange={setProfileEmail} type="email" autoComplete="email" />
+          <button className="primary-action" type="submit">
+            <Save size={18} /> Save profile
+          </button>
+        </form>
+      </details>
 
-      <form
-        className="panel stack"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (passkeyBusy) return;
-          if (!(await confirmCritical("Register this passkey for your account?"))) return;
-          setPasskeyBusy(true);
-          try {
-            await api.registerPasskey(passkeyLabel);
-            setPasskeyLabel("");
-            await onRefresh();
-            onToast("success", "Passkey registered.");
-          } catch (err) {
-            onToast("error", err instanceof Error ? err.message : "Passkey registration failed.");
-          } finally {
-            setPasskeyBusy(false);
-          }
-        }}
-      >
-        <h2>Passkeys</h2>
-        <p className="muted">{data.user.passkeyCount} passkey records are linked to this account.</p>
-        {passkeyWarning ? <p className="form-message error">{passkeyWarning}</p> : null}
-        <TextField label="Passkey label" value={passkeyLabel} onChange={setPasskeyLabel} placeholder="Work laptop" />
-        <button className="primary-action" type="submit" disabled={passkeyBusy || Boolean(passkeyWarning)}>
-          <KeyRound size={18} />
-          {passkeyBusy ? "Waiting for authenticator..." : "Register passkey"}
-        </button>
-      </form>
+      <details className="panel stack profile-section" open>
+        <summary>Password</summary>
+        <form
+          className="profile-section-body stack"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!(await confirmCritical("Change your password?"))) return;
+            await api.changePassword(currentPassword, newPassword);
+            setCurrentPassword("");
+            setNewPassword("");
+            onToast("success", "Password changed.");
+          }}
+        >
+          <TextField label="Current password" value={currentPassword} onChange={setCurrentPassword} type="password" autoComplete="current-password" />
+          <TextField label="New password" value={newPassword} onChange={setNewPassword} type="password" autoComplete="new-password" minLength={8} />
+          <PasswordHints password={newPassword} />
+          <button className="primary-action" type="submit">
+            <ShieldCheck size={18} /> Change password
+          </button>
+        </form>
+      </details>
 
-      <section className="panel stack">
-        <h2>Recovery codes</h2>
+      <details className="panel stack profile-section" open>
+        <summary>TOTP</summary>
+        <div className="profile-section-body stack">
+          <p className="muted">{data.user.totpEnabled ? "TOTP is enabled for this account." : "Set up an authenticator app with a QR code."}</p>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!(await confirmCritical("Start TOTP setup for this account?"))) return;
+              setTotp(await api.setupTotp());
+            }}
+          >
+            <KeyRound size={16} /> Show QR setup
+          </button>
+          {totp ? (
+            <>
+              <img className="qr" src={totp.qrCodeUrl} alt="TOTP setup QR code" />
+              <p className="muted profile-long-text">{totp.secretLabel}</p>
+              <TextField label="Verification code" value={totpCode} onChange={setTotpCode} inputMode="numeric" />
+              <button
+                className="primary-action"
+                type="button"
+                onClick={async () => {
+                  if (!(await confirmCritical("Enable TOTP for this account?"))) return;
+                  await api.confirmTotp(totpCode);
+                  onToast("success", "TOTP enabled.");
+                }}
+              >
+                <ShieldCheck size={18} /> Enable TOTP
+              </button>
+            </>
+          ) : null}
+        </div>
+      </details>
 
-        {recoveryCodes.length === 0 ? (
-          <>
-            {remainingCount === 0 ? (
+      <details className="panel stack profile-section" open>
+        <summary>Passkeys</summary>
+        <form
+          className="profile-section-body stack"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (passkeyBusy) return;
+            if (!(await confirmCritical("Register this passkey for your account?"))) return;
+            setPasskeyBusy(true);
+            try {
+              await api.registerPasskey(passkeyLabel);
+              setPasskeyLabel("");
+              await onRefresh();
+              onToast("success", "Passkey registered.");
+            } catch (err) {
+              onToast("error", err instanceof Error ? err.message : "Passkey registration failed.");
+            } finally {
+              setPasskeyBusy(false);
+            }
+          }}
+        >
+          <p className="muted">{data.user.passkeyCount} passkey records are linked to this account.</p>
+          {passkeyWarning ? <p className="form-message error">{passkeyWarning}</p> : null}
+          <TextField label="Passkey label" value={passkeyLabel} onChange={setPasskeyLabel} placeholder="Work laptop" />
+          <button className="primary-action" type="submit" disabled={passkeyBusy || Boolean(passkeyWarning)}>
+            <KeyRound size={18} />
+            {passkeyBusy ? "Waiting for authenticator..." : "Register passkey"}
+          </button>
+        </form>
+      </details>
+
+      <details className="panel stack profile-section" open>
+        <summary>Recovery codes</summary>
+        <div className="profile-section-body stack">
+          {recoveryCodes.length === 0 ? (
+            <>
+              {remainingCount === 0 ? (
+                <p className="recovery-status warn">
+                  No recovery codes — you won't be able to recover your account if you lose access.
+                </p>
+              ) : (
+                <p className="recovery-status ok">
+                  {remainingCount} unused {remainingCount === 1 ? "code" : "codes"} stored for this account.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!(await confirmCritical(
+                    remainingCount > 0
+                      ? "This will permanently invalidate all existing recovery codes. Continue?"
+                      : "Generate recovery codes for this account?"
+                  ))) return;
+                  const result = await api.generateRecoveryCodes();
+                  setRecoveryCodes(result.codes);
+                  setRemainingCount(result.codes.length);
+                  await onRefresh();
+                }}
+              >
+                {remainingCount === 0 ? "Generate recovery codes" : "Regenerate codes"}
+              </button>
+            </>
+          ) : (
+            <>
               <p className="recovery-status warn">
-                No recovery codes — you won't be able to recover your account if you lose access.
+                Save these codes now — they will not be shown again.
               </p>
-            ) : (
-              <p className="recovery-status ok">
-                {remainingCount} unused {remainingCount === 1 ? "code" : "codes"} stored for this account.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={async () => {
-                if (!(await confirmCritical(
-                  remainingCount > 0
-                    ? "This will permanently invalidate all existing recovery codes. Continue?"
-                    : "Generate recovery codes for this account?"
-                ))) return;
-                const result = await api.generateRecoveryCodes();
-                setRecoveryCodes(result.codes);
-                setRemainingCount(result.codes.length);
-                await onRefresh();
-              }}
-            >
-              {remainingCount === 0 ? "Generate recovery codes" : "Regenerate codes"}
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="recovery-status warn">
-              Save these codes now — they will not be shown again.
-            </p>
-            <pre className="codes">{recoveryCodes.join("\n")}</pre>
-            <a className="download-link" href={recoveryUrl} download="emitmachine-recovery-codes.txt">
-              <Download size={16} /> Download recovery codes
-            </a>
-            <button type="button" onClick={() => setRecoveryCodes([])}>
-              Done — I have saved my codes
-            </button>
-          </>
-        )}
-      </section>
+              <pre className="codes">{recoveryCodes.join("\n")}</pre>
+              <a className="download-link" href={recoveryUrl} download="emitmachine-recovery-codes.txt">
+                <Download size={16} /> Download recovery codes
+              </a>
+              <button type="button" onClick={() => setRecoveryCodes([])}>
+                Done — I have saved my codes
+              </button>
+            </>
+          )}
+        </div>
+      </details>
 
       <section className="panel stack wide">
         <h2>CSV export and restore</h2>

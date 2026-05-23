@@ -1184,6 +1184,61 @@ input[type="datetime-local"] {
   grid-column: 1 / -1;
 }
 
+.profile-section {
+  align-content: start;
+}
+
+.profile-section summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 44px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.profile-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.profile-section summary::after {
+  content: "⌄";
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform var(--duration) var(--ease);
+}
+
+.profile-section[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.profile-section-body {
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.profile-long-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.settings-grid button,
+.settings-grid .download-link {
+  min-height: 48px;
+}
+
 /* ── Tag editor ─────────────────────────────────────────────── */
 .tag-manager-grid {
   display: grid;
@@ -1796,6 +1851,9 @@ input[type="datetime-local"] {
   font-size: 0.875rem;
   line-height: 1.7;
   overflow-x: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── CSV actions ────────────────────────────────────────────── */
@@ -1999,6 +2057,35 @@ input[type="datetime-local"] {
   .time-result {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .profile-section {
+    padding: 0.875rem;
+  }
+
+  .profile-section summary {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .profile-section-body {
+    padding-top: 0.35rem;
+  }
+
+  .settings-grid .field,
+  .settings-grid button,
+  .settings-grid .download-link {
+    width: 100%;
+  }
+
+  .settings-grid .qr {
+    justify-self: center;
+  }
+
+  .settings-grid .codes {
+    max-width: 100%;
+    padding: 0.875rem;
+    font-size: 0.82rem;
   }
 
   .topbar-actions {
