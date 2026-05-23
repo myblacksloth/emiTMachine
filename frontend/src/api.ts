@@ -11,10 +11,23 @@ class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly requestId: string | null
+    readonly requestId: string | null,
+    readonly details?: unknown
   ) {
     super(requestId ? `${message} (request id: ${requestId})` : message);
   }
+}
+
+function formatErrorMessage(message: string, details: unknown) {
+  if (!details || typeof details !== "object") return message;
+  const payload = details as {
+    type?: string;
+    session?: { id?: string; startedAt?: string; endedAt?: string | null };
+  };
+  if (payload.type !== "work_session_overlap" || !payload.session?.startedAt) return message;
+  const startedAt = new Date(payload.session.startedAt).toLocaleString();
+  const endedAt = payload.session.endedAt ? new Date(payload.session.endedAt).toLocaleString() : "open session";
+  return `${message}. Conflicting session: ${startedAt} - ${endedAt}${payload.session.id ? ` (${payload.session.id})` : ""}.`;
 }
 
 function localDateKey(date: Date) {
@@ -51,13 +64,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     let message = "The request could not be completed.";
     const requestId = response.headers.get("x-request-id");
+    let details: unknown;
     try {
-      const payload = (await response.json()) as { message?: string; error?: string };
-      message = payload.message ?? payload.error ?? message;
+      const payload = (await response.json()) as { message?: string; error?: string; details?: unknown };
+      details = payload.details;
+      message = formatErrorMessage(payload.message ?? payload.error ?? message, details);
     } catch {
       message = response.statusText || message;
     }
-    throw new ApiError(message, response.status, requestId);
+    throw new ApiError(message, response.status, requestId, details);
   }
 
   if (response.status === 204) {

@@ -155,6 +155,20 @@ function requestOverlapsDay(request: AdministrativeRequest, day: Date) {
   return new Date(request.startedAt) < end && new Date(request.endedAt) > start;
 }
 
+function requestTimeLabelForDay(request: AdministrativeRequest, day: Date) {
+  const startedAt = new Date(request.startedAt);
+  const endedAt = new Date(request.endedAt);
+  const dayKey = localDateKey(day);
+  const startKey = localDateKey(startedAt);
+  const endKey = localDateKey(endedAt);
+  const startTime = startedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const endTime = endedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  if (startKey === endKey) return `${startTime} - ${endTime}`;
+  if (dayKey === startKey) return `${startTime} - end of day`;
+  if (dayKey === endKey) return `start of day - ${endTime}`;
+  return "All day";
+}
+
 function localDayRange(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const start = dateFromDateOnly(value);
@@ -1054,11 +1068,7 @@ function MonthlyCalendarPanel() {
                       <span style={{ background: color }} />
                       <div>
                         <strong>{administrativeRequestLabels[request.requestType]}</strong>
-                        <small>
-                          {new Date(request.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                          {" - "}
-                          {new Date(request.endedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                        </small>
+                        <small>{requestTimeLabelForDay(request, day)}</small>
                       </div>
                     </button>
                   );
@@ -1117,11 +1127,7 @@ function MonthlyCalendarPanel() {
                       <span style={{ background: color }} />
                       <div>
                         <strong>{administrativeRequestLabels[request.requestType]}</strong>
-                        <small>
-                          {new Date(request.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                          {" - "}
-                          {new Date(request.endedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                        </small>
+                        <small>{requestTimeLabelForDay(request, dayDate)}</small>
                       </div>
                     </button>
                   );
@@ -1437,6 +1443,9 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const requestDurationMinutes = isLocalDateTimeValue(startedAt) && isLocalDateTimeValue(endedAt)
     ? Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000))
     : null;
+  const requestIsMultiDay = isLocalDateTimeValue(startedAt) && isLocalDateTimeValue(endedAt)
+    ? localDateKey(new Date(startedAt)) !== localDateKey(new Date(endedAt))
+    : false;
   const requestUserOptions = useMemo(() => {
     const options = new Map<string, string>();
     for (const request of reviewRequests) {
@@ -1537,7 +1546,10 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
               <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
               {requestDurationMinutes !== null && requestDurationMinutes > 0 ? (
                 <div className="request-duration" aria-live="polite">
-                  <span>Estimated duration</span>
+                  <div>
+                    <span>Estimated duration</span>
+                    {requestIsMultiDay ? <small>Multi-day request: calendar days between start and end are covered.</small> : null}
+                  </div>
                   <strong>{minutesLabel(requestDurationMinutes)}</strong>
                 </div>
               ) : null}
