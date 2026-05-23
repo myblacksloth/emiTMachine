@@ -69,16 +69,27 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* Prevent the root element from ever producing horizontal scroll */
+  overflow-x: hidden;
 }
 
 body {
   min-height: 100vh;
+  min-height: 100dvh; /* dvh adjusts for mobile browser chrome (URL bar) */
   min-width: 320px;
   font-family: var(--font);
   font-size: 1rem;
   line-height: 1.5;
   color: var(--text-primary);
   background-color: var(--bg-page);
+  /* Belt-and-suspenders: block horizontal overflow at the body level too */
+  overflow-x: hidden;
+}
+
+/* #root must not be wider than the viewport */
+#root {
+  isolation: isolate;
+  overflow-x: hidden;
 }
 
 /* ── Base elements ──────────────────────────────────────────── */
@@ -88,6 +99,20 @@ textarea,
 select {
   font: inherit;
   color: inherit;
+  /* Prevent form elements from overflowing their container on narrow screens */
+  max-width: 100%;
+}
+
+/* Replaced content and media must never overflow the viewport */
+img,
+picture,
+video,
+canvas,
+embed,
+object {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 button {
@@ -164,13 +189,21 @@ legend {
 .app-shell {
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 1rem;
+  /* Safe-area insets for iPhone notch / home-indicator bar.
+     Requires <meta name="viewport" content="viewport-fit=cover"> to activate.
+     Falls back to 1rem on browsers that don't support env(). */
+  padding-left:   max(1rem, calc(env(safe-area-inset-left,   0px) + 0.5rem));
+  padding-right:  max(1rem, calc(env(safe-area-inset-right,  0px) + 0.5rem));
+  padding-bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
 }
 
 /* ── Auth layout ────────────────────────────────────────────── */
 .auth-layout {
   width: min(1080px, 100%);
   min-height: calc(100vh - 2rem);
+  min-height: calc(100dvh - 2rem);
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 420px;
@@ -1220,6 +1253,7 @@ input[type="datetime-local"] {
 .modal {
   width: min(520px, 100%);
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1617,7 +1651,12 @@ input[type="datetime-local"] {
 
 /* ── Responsive: mobile ─────────────────────────────────────── */
 @media (max-width: 560px) {
-  .app-shell { padding: 0.5rem; }
+  .app-shell {
+    padding: 0.5rem;
+    padding-left:   max(0.5rem, env(safe-area-inset-left,   0px));
+    padding-right:  max(0.5rem, env(safe-area-inset-right,  0px));
+    padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) + 0.25rem));
+  }
 
   body {
     font-size: 0.96rem;
@@ -1663,6 +1702,8 @@ input[type="datetime-local"] {
   .section-nav {
     position: sticky;
     top: 0.35rem;
+    /* In viewport-fit=cover mode, push below the notch */
+    top: max(0.35rem, calc(env(safe-area-inset-top, 0px) + 0.35rem));
     z-index: 20;
     flex-wrap: nowrap;
     justify-content: flex-start;
