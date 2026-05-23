@@ -164,6 +164,17 @@ a:hover {
   opacity: 0.8;
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+.modal:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.42);
+  outline-offset: 3px;
+}
+
 h1, h2, h3, h4 {
   font-weight: 700;
   line-height: 1.15;
@@ -1403,6 +1414,11 @@ input[type="datetime-local"] {
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.95) translateY(8px); }
   to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+
+@keyframes sheet-up {
+  from { opacity: 0.72; transform: translateY(100%); }
+  to   { opacity: 1;    transform: translateY(0);    }
 }
 
 .modal-actions {
@@ -3468,27 +3484,70 @@ button svg,
   }
 
   .modal-backdrop {
-    padding: 1rem 1.5rem;
+    place-items: end center;
+    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 0 0;
   }
 
   .modal {
-    padding: 1.5rem;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px));
+    border-radius: 24px 24px 0 0;
+    padding: 1rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overflow-x: hidden;
+    animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal::before {
+    content: "";
+    display: block;
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(60, 60, 67, 0.22);
+    justify-self: center;
+    margin-bottom: 0.2rem;
+  }
+
+  .critical-backdrop {
+    place-items: center;
+    padding: 1rem;
+  }
+
+  .critical-modal {
+    width: min(100%, 420px);
+    max-height: calc(100dvh - 2rem);
+    border-radius: 24px;
+    padding: 1.25rem;
+    padding-bottom: 1.25rem;
+    animation: modalIn 0.25s var(--ease);
+  }
+
+  .critical-modal::before {
+    content: none;
   }
 
   .activity-editor,
   .request-modal,
   .activity-modal,
-  .history-modal {
-    width: min(100%, calc(100vw - 3rem));
-    max-height: calc(100dvh - 2rem);
+  .history-modal,
+  .activity-detail-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px));
+    overflow-y: auto;
     overflow-x: hidden;
   }
 
-  .request-modal {
+  .request-modal,
+  .activity-modal,
+  .history-modal {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 0.85rem;
-    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
     overflow: hidden;
   }
 
@@ -3496,16 +3555,21 @@ button svg,
     margin-bottom: 0;
   }
 
+  .request-form-body,
+  .activity-modal .activity-editor,
+  .history-modal .request-list {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .request-form-body {
     align-content: start;
     grid-template-columns: 1fr;
     gap: 1rem;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
     padding-right: 0.1rem;
-    padding-bottom: 9rem;
-    -webkit-overflow-scrolling: touch;
+    padding-bottom: 1rem;
   }
 
   .request-duration {
@@ -3517,16 +3581,24 @@ button svg,
     font-size: 1.28rem;
   }
 
+  .modal-actions,
   .request-modal .modal-actions {
+    position: sticky;
+    bottom: calc(-1rem + env(safe-area-inset-bottom, 0px));
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.75rem;
-    padding-top: 0.8rem;
+    margin: 0 -1rem calc(-1 * max(1rem, env(safe-area-inset-bottom, 0px)));
+    padding: 0.8rem 1rem max(1rem, env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--separator);
     background: var(--bg-card);
+    box-shadow: 0 -16px 24px rgba(255, 255, 255, 0.86);
+    z-index: 1;
   }
 
+  .modal-actions button,
   .request-modal .modal-actions button {
+    width: 100%;
     min-height: 54px;
     border-radius: 16px;
     font-weight: 850;
@@ -4477,9 +4549,9 @@ p.small {
     width: 100%;
   }
 
-  /* 7. Activity modal: full-screen on very small phones, scrollable */
+  /* 7. Activity modal keeps the shared bottom-sheet sizing. */
   .activity-modal {
-    max-height: calc(100dvh - max(env(safe-area-inset-top, 0px), 0.5rem) - max(env(safe-area-inset-bottom, 0px), 0.5rem) - 2rem);
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px));
     overflow-y: auto;
   }
 }
@@ -4593,58 +4665,22 @@ p.small {
 }
 
 /* ── Bottom-sheet detail modal (calendar, mobile) ────────────── */
-
-/* Slide-up keyframe — only fires when the @media fires */
-@keyframes sheet-up {
-  from { transform: translateY(100%); opacity: 0.7; }
-  to   { transform: translateY(0);    opacity: 1;   }
-}
-
 @media (max-width: 560px) {
-  /* Backdrop: anchor children to the bottom edge */
   .bottom-sheet-backdrop {
-    align-items: end;
-    padding: 0;
+    place-items: end center;
   }
 
-  /* Sheet itself */
   .bottom-sheet-backdrop .activity-detail-modal {
     width: 100%;
     max-width: 100%;
-    /* rounded top corners only */
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px));
     border-radius: 24px 24px 0 0;
-    /* cap height and make content scrollable */
-    max-height: 85dvh;
     overflow-y: auto;
-    /* safe-area bottom padding for iPhone home indicator */
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
-    /* slide up from bottom */
-    animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
-  /* Drag-handle visual hint at top of sheet */
-  .bottom-sheet-backdrop .activity-detail-modal::before {
-    content: "";
-    display: block;
-    width: 40px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(60, 60, 67, 0.2);
-    margin: 0 auto 0.75rem;
-  }
-
-  /* Close button always visible — sticks to bottom of scroll container */
   .bottom-sheet-backdrop .modal-actions {
     position: sticky;
-    bottom: 0;
-    /* fade the scrolling content into the button area */
-    box-shadow: 0 -16px 20px var(--bg-card);
-    background: var(--bg-card);
-    padding-top: 0.75rem;
-    padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
-    margin-top: 0.5rem;
-    /* full-width button on mobile */
-    flex-direction: column;
+    bottom: calc(-1rem + env(safe-area-inset-bottom, 0px));
   }
 
   .bottom-sheet-backdrop .modal-actions button {
