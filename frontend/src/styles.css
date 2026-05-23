@@ -2853,6 +2853,36 @@ button svg,
   color: #c8261a;
 }
 
+.request-id-row {
+  display: grid;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.request-id-row > span {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.request-id-copy {
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  overflow: hidden;
+  border-color: rgba(0, 122, 255, 0.18);
+  background: rgba(0, 122, 255, 0.07);
+  color: var(--text-link);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .request-dates {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

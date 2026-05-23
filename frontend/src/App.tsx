@@ -1265,6 +1265,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const [historyYear, setHistoryYear] = useState("");
   const [historyMonth, setHistoryMonth] = useState("");
   const [historyUserId, setHistoryUserId] = useState("");
+  const [requestFilterId, setRequestFilterId] = useState("");
   const [requestFilterUserId, setRequestFilterUserId] = useState("");
   const [requestFilterFrom, setRequestFilterFrom] = useState("");
   const [requestFilterTo, setRequestFilterTo] = useState("");
@@ -1444,6 +1445,8 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
     return Array.from(options.entries()).sort((first, second) => first[1].localeCompare(second[1]));
   }, [reviewRequests]);
   const matchesRequestFilters = (request: AdministrativeRequest) => {
+    const normalizedRequestId = requestFilterId.trim().toLowerCase();
+    if (normalizedRequestId && !request.id.toLowerCase().includes(normalizedRequestId)) return false;
     if (canReview && requestFilterUserId && request.userId !== requestFilterUserId) return false;
     return intervalOverlapsDateFilters(request.startedAt, request.endedAt, requestFilterFrom, requestFilterTo);
   };
@@ -1451,6 +1454,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const filteredPending = pending.filter(matchesRequestFilters);
   const filteredDecided = decided.filter(matchesRequestFilters);
   const resetRequestFilters = () => {
+    setRequestFilterId("");
     setRequestFilterUserId("");
     setRequestFilterFrom("");
     setRequestFilterTo("");
@@ -1470,6 +1474,15 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
         </div>
         {message ? <p className="form-message error">{message}</p> : null}
         <div className="request-filter-bar">
+          <label className="field">
+            <span>Request ID</span>
+            <input
+              value={requestFilterId}
+              onChange={(event) => setRequestFilterId(event.target.value)}
+              placeholder="Search request ID"
+              spellCheck={false}
+            />
+          </label>
           {canReview ? (
             <label className="field">
               <span>User</span>
@@ -1714,6 +1727,21 @@ function RequestList({
                 <h3>{administrativeRequestLabels[request.requestType]}</h3>
               </div>
               <strong className={`request-status ${request.status}`}>{requestStatusLabel(request.status)}</strong>
+            </div>
+            <div className="request-id-row">
+              <span>Request ID</span>
+              <button
+                className="request-id-copy"
+                type="button"
+                onClick={() => {
+                  if (navigator.clipboard && window.isSecureContext) {
+                    void navigator.clipboard.writeText(request.id);
+                  }
+                }}
+                title="Copy request ID"
+              >
+                {request.id}
+              </button>
             </div>
             <div className="request-dates">
               <div>
