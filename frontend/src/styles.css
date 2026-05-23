@@ -1923,6 +1923,10 @@ button svg,
   gap: 1.15rem;
 }
 
+.mobile-signout {
+  display: none;
+}
+
 .topbar {
   padding: 1.2rem 0 0.65rem;
 }
@@ -2819,10 +2823,6 @@ button svg,
     transform: none;
     box-shadow: none;
   }
-}
-
-.mobile-signout {
-  display: none;
 }
 
 /* ── Time Tools ─────────────────────────────────────────────── */
