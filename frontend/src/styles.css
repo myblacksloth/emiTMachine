@@ -2729,12 +2729,20 @@ button svg,
     grid-template-columns: 1fr;
   }
 
+  .modal-backdrop {
+    padding: 1rem 1.5rem;
+  }
+
+  .modal {
+    padding: 1.5rem;
+  }
+
   .activity-editor,
   .request-modal,
   .activity-modal,
   .history-modal {
-    width: min(100%, calc(100vw - 1rem));
-    max-height: calc(100dvh - 1rem);
+    width: min(100%, calc(100vw - 3rem));
+    max-height: calc(100dvh - 2rem);
   }
 
   .activity-card,
