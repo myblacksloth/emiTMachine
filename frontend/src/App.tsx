@@ -641,21 +641,6 @@ function Dashboard({
             </button>
           </section>
 
-          <section className="quick-actions" aria-label="Quick actions">
-            <button type="button" onClick={() => setView("activities")}>
-              <Plus size={16} /> Add activity
-            </button>
-            <button type="button" onClick={() => setView("calendar")}>
-              <CalendarClock size={16} /> Month
-            </button>
-            <button type="button" onClick={() => setView("requests")}>
-              <ShieldCheck size={16} /> Request
-            </button>
-            <button type="button" onClick={() => setView("tools")}>
-              <Clock size={16} /> Tools
-            </button>
-          </section>
-
           <section className="summary-grid" aria-label="Summary">
             <Metric label="Today" value={minutesLabel(data.summary.todayMinutes)} icon={<TimerReset size={18} />} />
             <Metric label="Current week" value={minutesLabel(data.summary.currentWeekMinutes)} icon={<CalendarClock size={18} />} />
