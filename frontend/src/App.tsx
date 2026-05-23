@@ -2030,6 +2030,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   const startCreate = () => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const defaultTag = presenceTag(tags);
+    setMessage("");
     setCreating(true);
     setEditingId(null);
     setDraft({
@@ -2047,6 +2048,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
   const cancelCreate = () => {
     setCreating(false);
     setDraft(null);
+    setMessage("");
   };
 
   const saveActivity = async (activityId: string) => {
@@ -2166,7 +2168,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
           <Plus size={16} /> Add activity
         </button>
       </div>
-      {message ? <p className="form-message error">{message}</p> : null}
+      {message && !creating ? <p className="form-message error">{message}</p> : null}
       {loading ? <div className="loading-line">Loading activities...</div> : null}
       {activities.length === 0 && !loading ? <p className="empty-state">No activities recorded yet.</p> : null}
       {weeklyGroups.length > 0 ? (
@@ -2263,6 +2265,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
                 <h2 id="activity-modal-title">Add activity</h2>
               </div>
             </div>
+            {message ? <p className="form-message error">{message}</p> : null}
             <ActivityEditor
               draft={draft}
               tags={tags}
