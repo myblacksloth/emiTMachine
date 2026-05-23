@@ -811,6 +811,18 @@ export const api = {
     const qs = query.toString();
     return `${apiBaseUrl}/api/audit/export${qs ? `?${qs}` : ""}`;
   },
+  workReportPdfUrl: (params: {
+    userId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): string => {
+    const query = new URLSearchParams();
+    if (params.userId) query.set("userId", params.userId);
+    if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+    if (params.dateTo) query.set("dateTo", params.dateTo);
+    const qs = query.toString();
+    return `${apiBaseUrl}/api/audit/work-report.pdf${qs ? `?${qs}` : ""}`;
+  },
   exportCsvUrl: `${apiBaseUrl}/api/csv/export`,
   importCsv: async (file: File) => {
     const csv = await file.text();

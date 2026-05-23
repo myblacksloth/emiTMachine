@@ -5,6 +5,7 @@ import {
   CalendarClock,
   Clock,
   Download,
+  FileText,
   Hourglass,
   KeyRound,
   LayoutDashboard,
@@ -1667,6 +1668,21 @@ function AuditLogView({ onToast }: { onToast: (tone: Toast["tone"], message: str
         </div>
         <button type="button" onClick={exportCsv}>
           <Download size={16} /> Export CSV
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            window.open(
+              api.workReportPdfUrl({
+                userId: filterUserId || undefined,
+                dateFrom: filterDateFrom || undefined,
+                dateTo: filterDateTo || undefined
+              }),
+              "_blank"
+            )
+          }
+        >
+          <FileText size={16} /> Download PDF
         </button>
       </div>
 
