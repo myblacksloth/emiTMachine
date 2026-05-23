@@ -1755,15 +1755,6 @@ input[type="datetime-local"] {
     line-height: 1;
   }
 
-  .quick-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .quick-actions button {
-    min-height: 56px;
-    justify-content: center;
-  }
-
   .field input,
   .field textarea,
   .field select,
@@ -2064,20 +2055,6 @@ button svg,
 .work-band.open .clock-action {
   background: linear-gradient(135deg, #ff3b30, #ff8a4c);
   box-shadow: 0 16px 34px rgba(255, 59, 48, 0.22);
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.65rem;
-}
-
-.quick-actions button {
-  min-height: 52px;
-  border-radius: 18px;
-  justify-content: flex-start;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 24px rgba(31, 35, 45, 0.08);
 }
 
 .summary-grid {
@@ -2700,10 +2677,6 @@ button svg,
   }
 
   .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .quick-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
