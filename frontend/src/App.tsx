@@ -1604,18 +1604,37 @@ function RequestList({
           {onSelectionChange && request.status !== "pending" ? (
             <label className="request-select">
               <input type="checkbox" checked={selectedIds?.has(request.id) ?? false} onChange={() => toggleOne(request.id)} />
+              <span>Select</span>
             </label>
           ) : null}
-          <div>
-            <p className="eyebrow">{request.requester ? `${request.requester.displayName} (${request.requester.username})` : requestStatusLabel(request.status)}</p>
-            <h3>{administrativeRequestLabels[request.requestType]}</h3>
-            <p className="muted">{new Date(request.startedAt).toLocaleString()} - {new Date(request.endedAt).toLocaleString()}</p>
-            {request.note ? <p className="muted">{request.note}</p> : null}
-            {request.deletedAt ? <p className="deleted-request-note">Deleted · original status: {requestStatusLabel(request.status)}</p> : null}
-            {request.archivedAt ? <p className="deleted-request-note">Archived · {new Date(request.archivedAt).toLocaleString()}</p> : null}
+          <div className="request-content">
+            <div className="request-heading">
+              <div>
+                <p className="eyebrow">{request.requester ? `${request.requester.displayName} (${request.requester.username})` : "Administrative request"}</p>
+                <h3>{administrativeRequestLabels[request.requestType]}</h3>
+              </div>
+              <strong className={`request-status ${request.status}`}>{requestStatusLabel(request.status)}</strong>
+            </div>
+            <div className="request-dates">
+              <div>
+                <span>Start</span>
+                <strong>{new Date(request.startedAt).toLocaleString()}</strong>
+              </div>
+              <div>
+                <span>End</span>
+                <strong>{new Date(request.endedAt).toLocaleString()}</strong>
+              </div>
+            </div>
+            <div className="request-note">
+              <span>Note</span>
+              <p>{request.note || "No note"}</p>
+            </div>
+            <div className="request-badges">
+              {request.deletedAt ? <p className="deleted-request-note">Deleted · original status: {requestStatusLabel(request.status)}</p> : null}
+              {request.archivedAt ? <p className="deleted-request-note">Archived · {new Date(request.archivedAt).toLocaleString()}</p> : null}
+            </div>
           </div>
           <div className="request-actions">
-            <strong>{requestStatusLabel(request.status)}</strong>
             {onStatus && !request.deletedAt ? (
               <>
                 <button type="button" onClick={() => onStatus(request, "approved")}>Approve</button>

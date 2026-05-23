@@ -2620,6 +2620,7 @@ button svg,
 .request-grid {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .request-modal {
@@ -2630,6 +2631,7 @@ button svg,
   width: min(980px, 100%);
   max-height: min(86vh, 920px);
   overflow: auto;
+  overflow-x: hidden;
 }
 
 .history-filters,
@@ -2638,6 +2640,10 @@ button svg,
   flex-wrap: wrap;
   align-items: end;
   gap: 0.65rem;
+  min-width: 0;
+}
+
+.request-toolbar button {
   min-width: 0;
 }
 
@@ -2653,6 +2659,7 @@ button svg,
 .request-list {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .request-select-all {
@@ -2669,26 +2676,39 @@ button svg,
   font-weight: 750;
 }
 
-.request-select,
-.request-select-all input {
-  flex: 0 0 auto;
+.request-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  align-self: start;
+  border: 1px solid rgba(0, 122, 255, 0.18);
+  border-radius: var(--r-pill);
+  padding: 0.38rem 0.62rem;
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .request-select input,
 .request-select-all input {
-  width: 18px;
-  height: 18px;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
   accent-color: var(--accent);
 }
 
 .request-card {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
   gap: 1rem;
   border: 1px solid rgba(60, 60, 67, 0.12);
   border-radius: 18px;
   padding: 0.9rem;
   background: rgba(255, 255, 255, 0.64);
+  min-width: 0;
 }
 
 .request-card.approved {
@@ -2705,6 +2725,83 @@ button svg,
   background: rgba(120, 120, 128, 0.08);
 }
 
+.request-content {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.request-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.request-heading h3 {
+  margin: 0;
+}
+
+.request-status {
+  flex: 0 0 auto;
+  border-radius: var(--r-pill);
+  padding: 0.26rem 0.62rem;
+  background: rgba(120, 120, 128, 0.14);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.request-status.approved {
+  background: rgba(52, 199, 89, 0.14);
+  color: #167f39;
+}
+
+.request-status.revoked {
+  background: rgba(255, 59, 48, 0.12);
+  color: #c8261a;
+}
+
+.request-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.request-dates div,
+.request-note {
+  display: grid;
+  gap: 0.18rem;
+  border-radius: 14px;
+  padding: 0.62rem 0.7rem;
+  background: rgba(120, 120, 128, 0.08);
+  min-width: 0;
+}
+
+.request-dates span,
+.request-note span {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.request-dates strong,
+.request-note p {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.request-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .deleted-request-note {
   display: inline-flex;
   width: fit-content;
@@ -2719,8 +2816,14 @@ button svg,
 .request-actions {
   display: grid;
   gap: 0.45rem;
-  justify-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: stretch;
   align-content: start;
+  min-width: 132px;
+}
+
+.request-actions button {
+  width: 100%;
 }
 
 .overtime-setup {
@@ -2906,16 +3009,63 @@ button svg,
   .history-modal {
     width: min(100%, calc(100vw - 3rem));
     max-height: calc(100dvh - 2rem);
+    overflow-x: hidden;
   }
 
-  .activity-card,
   .request-card {
+    border-radius: 16px;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .activity-card {
     border-radius: 16px;
     flex-direction: column;
   }
 
+  .request-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .request-toolbar button {
+    width: 100%;
+  }
+
+  .request-select-all,
+  .request-select {
+    width: 100%;
+    min-height: 44px;
+    justify-content: flex-start;
+    border-radius: 14px;
+    font-size: 0.94rem;
+  }
+
+  .request-select input,
+  .request-select-all input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .request-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .request-dates {
+    grid-template-columns: 1fr;
+  }
+
+  .request-dates div,
+  .request-note {
+    padding: 0.7rem 0.75rem;
+  }
+
   .request-actions {
-    justify-items: stretch;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
   }
 
   .request-actions button {
@@ -2951,13 +3101,19 @@ button svg,
   }
 
   .history-filters {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
     align-items: stretch;
+    width: 100%;
   }
 
   .history-filters .field {
     min-width: 0;
     flex: 1 1 auto;
+  }
+
+  .history-filters button {
+    width: 100%;
   }
 
   .no-count-control {
