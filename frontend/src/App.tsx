@@ -3880,11 +3880,20 @@ function Countdowns({
             const seconds = Math.floor((remaining % 60_000) / 1000);
             return (
               <article className={`countdown ${remaining === 0 ? "done" : ""}`} key={countdown.id}>
-                <span>{countdown.title}</span>
-                <strong>
-                  {String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-                </strong>
-                <small>{countdown.linkedToCurrentSession ? "Linked to current session" : countdown.targetTimezone}</small>
+                <div className="countdown-header">
+                  <span>{countdown.title}</span>
+                  <small>{countdown.linkedToCurrentSession ? "Linked" : countdown.targetTimezone}</small>
+                </div>
+                <div className="countdown-time">
+                  <span>Remaining</span>
+                  <strong>
+                    {String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+                  </strong>
+                </div>
+                <div className="countdown-meta">
+                  <span>Target</span>
+                  <small>{new Date(countdown.targetAt).toLocaleString()}</small>
+                </div>
                 <div className="countdown-actions">
                   <button type="button" onClick={() => complete(countdown.id)}>
                     Done
