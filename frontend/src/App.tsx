@@ -1749,26 +1749,54 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
           <div className="overtime-week-list">
             {report.weeks.map((week) => (
               <article className="overtime-week" key={week.weekStart}>
-                <div>
-                  <p className="eyebrow">{week.isClosed ? "Closed week" : "Current week"}</p>
-                  <h3>{weekRangeLabel(week.weekStart)}</h3>
-                  <p className="muted">
-                    Worked {minutesLabel(week.workedMinutes)} · target {minutesLabel(week.targetMinutes)}
-                  </p>
+                <div className="overtime-week-header">
+                  <div>
+                    <p className="eyebrow">{week.isClosed ? "Closed week" : "Current week"}</p>
+                    <h3>{weekRangeLabel(week.weekStart)}</h3>
+                  </div>
+                  <span className={`overtime-state-chip ${week.deltaMinutes >= 0 ? "positive" : "negative"}`}>
+                    {week.deltaMinutes >= 0 ? "Residual" : "Deficit"}
+                  </span>
                 </div>
-                <div className="overtime-week-stats">
-                  <strong className={week.deltaMinutes >= 0 ? "positive" : "negative"}>
-                    {week.deltaMinutes >= 0 ? "+" : "-"}{minutesLabel(Math.abs(week.deltaMinutes))}
-                  </strong>
-                  <span>Overtime {minutesLabel(week.overtimeMinutes)}</span>
-                  {settings.mode === "overtime" && week.isClosed && week.overtimeMinutes > 0 ? (
-                    week.paidAt ? (
-                      <span className="paid-chip">Paid {new Date(week.paidAt).toLocaleDateString()}</span>
-                    ) : (
+                <div className="overtime-week-metrics">
+                  <div>
+                    <span>Worked</span>
+                    <strong>{minutesLabel(week.workedMinutes)}</strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong>{minutesLabel(week.targetMinutes)}</strong>
+                  </div>
+                  <div>
+                    <span>Delta</span>
+                    <strong className={week.deltaMinutes >= 0 ? "positive" : "negative"}>
+                      {week.deltaMinutes >= 0 ? "+" : "-"}{minutesLabel(Math.abs(week.deltaMinutes))}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Overtime</span>
+                    <strong>{minutesLabel(week.overtimeMinutes)}</strong>
+                  </div>
+                </div>
+                <div className="overtime-week-footer">
+                  <div className="overtime-week-statuses">
+                    <span className={`overtime-state-chip ${week.isClosed ? "closed" : "current"}`}>
+                      {week.isClosed ? "Closed" : "Current"}
+                    </span>
+                    {settings.mode === "overtime" && week.isClosed && week.overtimeMinutes > 0 ? (
+                      week.paidAt ? (
+                        <span className="paid-chip">Paid {new Date(week.paidAt).toLocaleDateString()}</span>
+                      ) : (
+                        <span className="paid-chip unpaid">Unpaid</span>
+                      )
+                    ) : null}
+                  </div>
+                  {settings.mode === "overtime" && week.isClosed && week.overtimeMinutes > 0 && !week.paidAt ? (
+                    <div className="overtime-week-actions">
                       <button type="button" onClick={() => markPaid(week.weekStart)}>
                         Mark paid
                       </button>
-                    )
+                    </div>
                   ) : null}
                 </div>
               </article>
