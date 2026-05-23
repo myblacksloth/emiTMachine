@@ -420,6 +420,105 @@ input[type="datetime-local"] {
   background: rgba(120, 120, 128, 0.1);
 }
 
+.datetime-shell {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.ios-day-strip,
+.ios-time-scroller,
+.ios-wheel {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ios-day-strip::-webkit-scrollbar,
+.ios-wheel::-webkit-scrollbar {
+  display: none;
+}
+
+.ios-day-strip {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.2rem 0.05rem;
+  scroll-snap-type: x proximity;
+}
+
+.ios-day-strip button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border-radius: var(--r-pill);
+  padding: 0 0.85rem;
+  background: rgba(120, 120, 128, 0.1);
+  color: var(--text-secondary);
+  scroll-snap-align: center;
+}
+
+.ios-day-strip button.active {
+  border-color: rgba(0, 122, 255, 0.32);
+  background: rgba(0, 122, 255, 0.14);
+  color: #005fce;
+  font-weight: 800;
+}
+
+.ios-time-scroller {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  border-radius: 20px;
+  padding: 0.45rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(242, 242, 247, 0.56)),
+    rgba(120, 120, 128, 0.08);
+}
+
+.ios-time-scroller > span {
+  color: var(--text-tertiary);
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.ios-wheel {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.1rem;
+  scroll-snap-type: x mandatory;
+}
+
+.ios-wheel button {
+  flex: 0 0 52px;
+  min-height: 46px;
+  border-radius: 15px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  scroll-snap-align: center;
+}
+
+.ios-wheel button.active {
+  border-color: rgba(0, 122, 255, 0.36);
+  background: #ffffff;
+  color: #005fce;
+  box-shadow: 0 8px 20px rgba(0, 122, 255, 0.15);
+}
+
+.time-field {
+  display: grid;
+  gap: 0.35rem;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.compact-time-scroller {
+  display: none;
+}
+
 .datetime-control input,
 .time-text-input {
   font-variant-numeric: tabular-nums;
@@ -1513,7 +1612,15 @@ input[type="datetime-local"] {
 
 /* ── Responsive: mobile ─────────────────────────────────────── */
 @media (max-width: 560px) {
-  .app-shell { padding: 0.625rem; }
+  .app-shell { padding: 0.5rem; }
+
+  body {
+    font-size: 0.96rem;
+  }
+
+  .workspace {
+    gap: 0.75rem;
+  }
 
   .auth-panel {
     border-radius: var(--r-md);
@@ -1529,6 +1636,88 @@ input[type="datetime-local"] {
     flex-direction: column;
     align-items: stretch;
     width: 100%;
+  }
+
+  .topbar {
+    gap: 0.45rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .panel {
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
+  .panel-title {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .tabs,
+  .section-nav {
+    position: sticky;
+    top: 0.35rem;
+    z-index: 20;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+    margin: 0 -0.05rem 0.75rem;
+    overflow-x: auto;
+    border-radius: 18px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    backdrop-filter: blur(22px) saturate(1.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  }
+
+  .tabs::-webkit-scrollbar,
+  .section-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs button,
+  .section-nav button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 0.85rem;
+    scroll-snap-align: center;
+    white-space: nowrap;
+  }
+
+  .field input,
+  .field textarea,
+  .field select,
+  .tag-editor input,
+  .datetime-control input,
+  .color-control input,
+  .time-text-input {
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .datetime-control {
+    grid-template-columns: 1fr 0.72fr;
+    border-radius: 16px;
+  }
+
+  .ios-day-strip {
+    margin-inline: -0.05rem;
+  }
+
+  .ios-time-scroller {
+    border-radius: 18px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .compact-time-scroller {
+    display: grid;
+  }
+
+  .ios-wheel button {
+    flex-basis: 50px;
+    min-height: 48px;
   }
 
   .modal-actions {
@@ -2472,6 +2661,28 @@ button svg,
 
   .activity-edit-grid {
     grid-template-columns: 1fr;
+  }
+
+  .activity-editor,
+  .request-modal,
+  .activity-modal,
+  .history-modal {
+    width: min(100%, calc(100vw - 1rem));
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .activity-card,
+  .request-card {
+    border-radius: 16px;
+    flex-direction: column;
+  }
+
+  .request-actions {
+    justify-items: stretch;
+  }
+
+  .request-actions button {
+    width: 100%;
   }
 
   .countdown-form {

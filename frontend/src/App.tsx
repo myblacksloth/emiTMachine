@@ -197,6 +197,28 @@ function localValueFromIso(value: string | null) {
   return date.toISOString().slice(0, 16);
 }
 
+function dayShortcutLabel(date: Date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
+  if (diffDays === -1) return "Yesterday";
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  return date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+}
+
+function dateShortcuts(selectedDate: string) {
+  const center = /^\d{4}-\d{2}-\d{2}$/.test(selectedDate) ? dateFromDateOnly(selectedDate) : new Date();
+  center.setHours(0, 0, 0, 0);
+  return Array.from({ length: 9 }, (_, index) => {
+    const date = new Date(center);
+    date.setDate(center.getDate() + index - 4);
+    return { value: localDateKey(date), label: dayShortcutLabel(date) };
+  });
+}
+
 type CriticalDialogRequest =
   | { kind: "confirm"; title: string; message: string; resolve: (value: boolean) => void }
   | { kind: "prompt"; title: string; message: string; defaultValue: string; resolve: (value: string | null) => void };
@@ -3176,34 +3198,102 @@ function TextField({
 
 function DateTimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const [date = "", time = ""] = value.split("T");
+  const [hour = "", minute = ""] = time.split(":");
+  const hours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+  const minutes = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const update = (nextDate: string, nextTime: string) => onChange(`${nextDate}T${nextTime}`);
+  const updateTimePart = (nextHour: string, nextMinute: string) => update(date, `${nextHour}:${nextMinute}`);
+  useEffect(() => {
+    shellRef.current?.querySelectorAll(".active").forEach((element) => {
+      element.scrollIntoView({ block: "nearest", inline: "center" });
+    });
+  }, [date, hour, minute]);
   return (
-    <label className="field">
+    <div className="field">
       <span>{label}</span>
-      <div className="datetime-control">
-        <input
-          aria-label={`${label} date`}
-          value={date}
-          onChange={(event) => update(event.target.value, time)}
-          inputMode="numeric"
-          placeholder="YYYY-MM-DD"
-        />
-        <input
-          aria-label={`${label} time`}
-          value={time}
-          onChange={(event) => update(date, event.target.value)}
-          inputMode="numeric"
-          placeholder="HH:MM"
-        />
+      <div className="datetime-shell" ref={shellRef}>
+        <div className="ios-day-strip" aria-label={`${label} quick day selector`}>
+          {dateShortcuts(date).map((shortcut) => (
+            <button
+              className={shortcut.value === date ? "active" : ""}
+              key={shortcut.value}
+              type="button"
+              onClick={() => update(shortcut.value, time)}
+            >
+              {shortcut.label}
+            </button>
+          ))}
+        </div>
+        <div className="ios-time-scroller" aria-label={`${label} quick time selector`}>
+          <div className="ios-wheel" aria-label={`${label} hour selector`}>
+            {hours.map((item) => (
+              <button className={item === hour ? "active" : ""} key={item} type="button" onClick={() => updateTimePart(item, minute || "00")}>
+                {item}
+              </button>
+            ))}
+          </div>
+          <span>:</span>
+          <div className="ios-wheel" aria-label={`${label} minute selector`}>
+            {[...new Set([minute, ...minutes].filter(Boolean))].sort().map((item) => (
+              <button className={item === minute ? "active" : ""} key={item} type="button" onClick={() => updateTimePart(hour || "00", item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="datetime-control">
+          <input
+            aria-label={`${label} date`}
+            value={date}
+            onChange={(event) => update(event.target.value, time)}
+            inputMode="numeric"
+            placeholder="YYYY-MM-DD"
+          />
+          <input
+            aria-label={`${label} time`}
+            value={time}
+            onChange={(event) => update(date, event.target.value)}
+            inputMode="numeric"
+            placeholder="HH:MM"
+          />
+        </div>
       </div>
-    </label>
+    </div>
   );
 }
 
 function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [hour = "", minute = ""] = value.split(":");
+  const hours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+  const minutes = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
+  const fieldRef = useRef<HTMLDivElement | null>(null);
+  const update = (nextHour: string, nextMinute: string) => onChange(`${nextHour}:${nextMinute}`);
+  useEffect(() => {
+    fieldRef.current?.querySelectorAll(".active").forEach((element) => {
+      element.scrollIntoView({ block: "nearest", inline: "center" });
+    });
+  }, [hour, minute]);
   return (
-    <>
+    <div className="time-field" ref={fieldRef}>
       <label className="tool-label">{label}</label>
+      <div className="ios-time-scroller compact-time-scroller" aria-label={`${label} quick time selector`}>
+        <div className="ios-wheel" aria-label={`${label} hour selector`}>
+          {hours.map((item) => (
+            <button className={item === hour ? "active" : ""} key={item} type="button" onClick={() => update(item, minute || "00")}>
+              {item}
+            </button>
+          ))}
+        </div>
+        <span>:</span>
+        <div className="ios-wheel" aria-label={`${label} minute selector`}>
+          {[...new Set([minute, ...minutes].filter(Boolean))].sort().map((item) => (
+            <button className={item === minute ? "active" : ""} key={item} type="button" onClick={() => update(hour || "00", item)}>
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
       <input
         className="time-text-input"
         value={value}
@@ -3212,7 +3302,7 @@ function TimeField({ label, value, onChange }: { label: string; value: string; o
         placeholder="HH:MM"
         pattern="\\d{2}:\\d{2}"
       />
-    </>
+    </div>
   );
 }
 
