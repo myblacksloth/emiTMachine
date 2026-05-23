@@ -2168,7 +2168,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
           <Plus size={16} /> Add activity
         </button>
       </div>
-      {message && !creating ? <p className="form-message error">{message}</p> : null}
+      {message && !creating && !editingId ? <p className="form-message error">{message}</p> : null}
       {loading ? <div className="loading-line">Loading activities...</div> : null}
       {activities.length === 0 && !loading ? <p className="empty-state">No activities recorded yet.</p> : null}
       {weeklyGroups.length > 0 ? (
@@ -2213,6 +2213,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
                       onCancel={() => { setEditingId(null); setDraft(null); }}
                       onSave={() => saveActivity(activity.id)}
                       saveLabel="Save activity"
+                      error={editingId === activity.id ? (message || undefined) : undefined}
                     />
                   ) : (
                     <>
@@ -2265,7 +2266,6 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
                 <h2 id="activity-modal-title">Add activity</h2>
               </div>
             </div>
-            {message ? <p className="form-message error">{message}</p> : null}
             <ActivityEditor
               draft={draft}
               tags={tags}
@@ -2273,6 +2273,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
               onCancel={cancelCreate}
               onSave={createActivity}
               saveLabel="Create activity"
+              error={message || undefined}
             />
           </section>
         </div>
@@ -2298,7 +2299,8 @@ function ActivityEditor({
   onDraft,
   onCancel,
   onSave,
-  saveLabel
+  saveLabel,
+  error
 }: {
   draft: ActivityDraft;
   tags: Tag[];
@@ -2306,6 +2308,7 @@ function ActivityEditor({
   onCancel: () => void;
   onSave: () => void;
   saveLabel: string;
+  error?: string;
 }) {
   return (
     <div className="activity-editor activity-card-editing">
@@ -2344,6 +2347,7 @@ function ActivityEditor({
         <span>Note</span>
         <textarea value={draft.note} onChange={(event) => onDraft({ ...draft, note: event.target.value })} />
       </label>
+      {error ? <p className="form-message error">{error}</p> : null}
       <div className="activity-actions">
         <button type="button" onClick={onCancel}>
           Cancel
