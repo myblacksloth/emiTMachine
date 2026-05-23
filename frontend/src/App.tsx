@@ -155,6 +155,26 @@ function requestOverlapsDay(request: AdministrativeRequest, day: Date) {
   return new Date(request.startedAt) < end && new Date(request.endedAt) > start;
 }
 
+function localDayRange(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const start = dateFromDateOnly(value);
+  if (Number.isNaN(start.getTime())) return null;
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1);
+  return { start, end };
+}
+
+function intervalOverlapsDateFilters(startedAt: string, endedAt: string | null, dateFrom: string, dateTo: string) {
+  const start = new Date(startedAt);
+  const end = endedAt ? new Date(endedAt) : new Date(start.getTime() + 1);
+  const from = localDayRange(dateFrom);
+  const to = localDayRange(dateTo);
+  if (from && end <= from.start) return false;
+  if (to && start >= to.end) return false;
+  return true;
+}
+
 function weekRangeLabel(weekStart: string) {
   const start = dateFromDateOnly(weekStart);
   const end = new Date(start);
@@ -1245,6 +1265,9 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const [historyYear, setHistoryYear] = useState("");
   const [historyMonth, setHistoryMonth] = useState("");
   const [historyUserId, setHistoryUserId] = useState("");
+  const [requestFilterUserId, setRequestFilterUserId] = useState("");
+  const [requestFilterFrom, setRequestFilterFrom] = useState("");
+  const [requestFilterTo, setRequestFilterTo] = useState("");
   const [requestType, setRequestType] = useState<AdministrativeRequestType>("vacation");
   const [startedAt, setStartedAt] = useState(defaultStartDateTimeValue());
   const [endedAt, setEndedAt] = useState(defaultEndDateTimeValue());
@@ -1413,6 +1436,25 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const requestDurationMinutes = isLocalDateTimeValue(startedAt) && isLocalDateTimeValue(endedAt)
     ? Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000))
     : null;
+  const requestUserOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const request of reviewRequests) {
+      if (request.requester) options.set(request.userId, request.requester.displayName || request.requester.username);
+    }
+    return Array.from(options.entries()).sort((first, second) => first[1].localeCompare(second[1]));
+  }, [reviewRequests]);
+  const matchesRequestFilters = (request: AdministrativeRequest) => {
+    if (canReview && requestFilterUserId && request.userId !== requestFilterUserId) return false;
+    return intervalOverlapsDateFilters(request.startedAt, request.endedAt, requestFilterFrom, requestFilterTo);
+  };
+  const filteredRequests = requests.filter(matchesRequestFilters);
+  const filteredPending = pending.filter(matchesRequestFilters);
+  const filteredDecided = decided.filter(matchesRequestFilters);
+  const resetRequestFilters = () => {
+    setRequestFilterUserId("");
+    setRequestFilterFrom("");
+    setRequestFilterTo("");
+  };
 
   return (
     <section className="request-grid">
@@ -1427,6 +1469,36 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
           </button>
         </div>
         {message ? <p className="form-message error">{message}</p> : null}
+        <div className="request-filter-bar">
+          {canReview ? (
+            <label className="field">
+              <span>User</span>
+              <select value={requestFilterUserId} onChange={(event) => setRequestFilterUserId(event.target.value)}>
+                <option value="">All users</option>
+                {requestUserOptions.map(([userId, label]) => (
+                  <option value={userId} key={userId}>{label}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <label className="field">
+            <span>From</span>
+            <input
+              type="date"
+              value={requestFilterFrom}
+              onChange={(event) => {
+                const value = event.target.value;
+                setRequestFilterFrom(value);
+                if (requestFilterTo && value && requestFilterTo < value) setRequestFilterTo(value);
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>To</span>
+            <input type="date" value={requestFilterTo} onChange={(event) => setRequestFilterTo(event.target.value)} />
+          </label>
+          <button type="button" onClick={resetRequestFilters}>Reset filters</button>
+        </div>
       </section>
 
       {createOpen ? (
@@ -1486,7 +1558,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
           </div>
         </div>
         <RequestList
-          requests={requests}
+          requests={filteredRequests}
           onDelete={deleteRequest}
           selectedIds={selectedOwnRequestIds}
           onSelectionChange={setSelectedOwnRequestIds}
@@ -1499,7 +1571,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
             <div className="panel-title">
               <h2>Requests to review</h2>
             </div>
-            <RequestList requests={pending} onStatus={setStatus} />
+            <RequestList requests={filteredPending} onStatus={setStatus} />
           </section>
           <section className="panel stack">
             <div className="panel-title">
@@ -1513,7 +1585,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
               </button>
             </div>
             <RequestList
-              requests={decided}
+              requests={filteredDecided}
               onStatus={setStatus}
               selectedIds={selectedReviewRequestIds}
               onSelectionChange={setSelectedReviewRequestIds}
@@ -2118,6 +2190,8 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [managerAssignments, setManagerAssignments] = useState<ManagerAssignment[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedSessions, setSelectedSessions] = useState<ActivitySession[]>([]);
+  const [sessionFilterFrom, setSessionFilterFrom] = useState("");
+  const [sessionFilterTo, setSessionFilterTo] = useState("");
   const [selectedOvertime, setSelectedOvertime] = useState<OvertimeReport | null>(null);
   const [summary, setSummary] = useState<{ sessions: number; total_seconds: string | number; average_session_seconds: string | number; days_worked: number } | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
@@ -2125,6 +2199,9 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [message, setMessage] = useState("");
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+  const filteredSelectedSessions = selectedSessions.filter((session) =>
+    intervalOverlapsDateFilters(session.startedAt, session.endedAt, sessionFilterFrom, sessionFilterTo)
+  );
 
   const loadUsers = async () => {
     setMessage("");
@@ -2494,6 +2571,27 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             <Metric label="Days" value={String(summary.days_worked ?? 0)} icon={<Sparkles size={18} />} />
           </section>
         ) : null}
+        <div className="admin-session-filters">
+          <label className="field">
+            <span>Activities from</span>
+            <input
+              type="date"
+              value={sessionFilterFrom}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSessionFilterFrom(value);
+                if (sessionFilterTo && value && sessionFilterTo < value) setSessionFilterTo(value);
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>Activities to</span>
+            <input type="date" value={sessionFilterTo} onChange={(event) => setSessionFilterTo(event.target.value)} />
+          </label>
+          <button type="button" onClick={() => { setSessionFilterFrom(""); setSessionFilterTo(""); }}>
+            Reset filters
+          </button>
+        </div>
         {selectedOvertime?.settings.enabled ? (
           <section className="overtime-admin-box">
             <div className="panel-title compact-title">
@@ -2522,7 +2620,8 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           </section>
         ) : null}
         <div className="activity-list">
-          {selectedSessions.map((session) => (
+          {filteredSelectedSessions.length === 0 ? <p className="empty-state">No activities match the current filters.</p> : null}
+          {filteredSelectedSessions.map((session) => (
             <article className="activity-card" key={session.id}>
               <div className="activity-main">
                 <div>

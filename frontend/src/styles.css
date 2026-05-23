@@ -2715,6 +2715,8 @@ button svg,
 }
 
 .history-filters,
+.request-filter-bar,
+.admin-session-filters,
 .request-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2723,6 +2725,14 @@ button svg,
   min-width: 0;
 }
 
+.request-filter-bar .field,
+.admin-session-filters .field {
+  min-width: min(170px, 100%);
+  flex: 1 1 170px;
+}
+
+.request-filter-bar button,
+.admin-session-filters button,
 .request-toolbar button {
   min-width: 0;
 }
@@ -3244,6 +3254,22 @@ button svg,
     width: 100%;
   }
 
+  .request-filter-bar,
+  .admin-session-filters {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .request-filter-bar .field,
+  .admin-session-filters .field {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .request-filter-bar button,
+  .admin-session-filters button,
   .request-toolbar button {
     width: 100%;
   }
