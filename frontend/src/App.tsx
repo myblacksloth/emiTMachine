@@ -3,6 +3,7 @@ import {
   AlarmClock,
   BarChart3,
   CalendarClock,
+  ChevronDown,
   Clock,
   Download,
   FileText,
@@ -552,6 +553,7 @@ function Dashboard({
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
   const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin" | "audit">("dashboard");
   const [showMore, setShowMore] = useState(false);
+  const [chartsExpanded, setChartsExpanded] = useState(false);
 
   const moreViews = ["overtime", "tags", "tools", "countdowns", "admin", "audit"] as const;
   const isMoreActive = (moreViews as readonly string[]).includes(view);
@@ -646,7 +648,22 @@ function Dashboard({
             <Metric label="Presence / smart" value={`${minutesLabel(data.summary.presenceMinutes)} / ${minutesLabel(data.summary.smartWorkingMinutes)}`} icon={<BarChart3 size={18} />} />
           </section>
 
-          <section className="chart-grid" aria-label="Time charts">
+          <button
+            type="button"
+            className="charts-toggle"
+            onClick={() => setChartsExpanded(!chartsExpanded)}
+            aria-expanded={chartsExpanded}
+            aria-controls="dash-charts"
+          >
+            <span><BarChart3 size={15} /> Charts</span>
+            <ChevronDown size={14} className={chartsExpanded ? "chevron-open" : ""} />
+          </button>
+
+          <section
+            id="dash-charts"
+            className={`chart-grid${chartsExpanded ? "" : " charts-collapsed"}`}
+            aria-label="Time charts"
+          >
             <Chart title="Daily hours" buckets={data.charts.daily} />
             <Chart title="Weekly hours" buckets={data.charts.weekly} />
             <Chart title="Monthly hours" buckets={data.charts.monthly} />

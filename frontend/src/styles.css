@@ -3283,3 +3283,101 @@ p.small {
 
   /* Sign out: already display:none via .topbar-signout rule — no change */
 }
+
+/* ── Dashboard mobile-first ─────────────────────────────────── */
+
+/* Charts toggle: hidden on desktop, charts always visible */
+.charts-toggle {
+  display: none;
+}
+
+/* On desktop: charts-collapsed class has no effect */
+/* (chart-grid is always grid on desktop via .chart-grid rule) */
+
+@media (max-width: 560px) {
+  /* ── Work band: stack vertically, clock at the bottom ─── */
+  .work-band {
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+    padding: 1.1rem 1.25rem 1.15rem;
+  }
+
+  /* Session label font slightly smaller to prevent overflow at 360px */
+  .session-state strong {
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+  }
+
+  /* Clock button: full width, taller tap target, thumb-friendly */
+  .clock-action {
+    width: 100%;
+    min-height: 52px;
+    font-size: 1.05rem;
+    justify-content: center;
+  }
+
+  /* ── Summary grid: 2×2 compact cards ─────────────────── */
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .metric {
+    padding: 0.85rem 0.9rem;
+  }
+
+  /* Value fits 2 columns at 360px: ~160px each */
+  .metric strong {
+    font-size: 1.45rem;
+    letter-spacing: -0.025em;
+  }
+
+  .metric span {
+    font-size: 0.72rem;
+  }
+
+  /* ── Charts: collapsible toggle button ────────────────── */
+  .charts-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    min-height: 44px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .charts-toggle > span {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .charts-toggle svg:last-child {
+    transition: transform 0.2s var(--ease);
+    flex-shrink: 0;
+  }
+
+  /* Chevron rotates 180° when panel is open */
+  .chevron-open {
+    transform: rotate(180deg);
+  }
+
+  /* Charts hidden until user taps the toggle */
+  .charts-collapsed {
+    display: none;
+  }
+
+  /* When visible: single-column stack (each chart full width) */
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
