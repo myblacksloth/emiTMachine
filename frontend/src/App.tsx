@@ -1393,6 +1393,9 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const decided = reviewRequests.filter((request) => request.status !== "pending");
   const selectedOwnRequestIdsArray = Array.from(selectedOwnRequestIds);
   const selectedReviewRequestIdsArray = Array.from(selectedReviewRequestIds);
+  const requestDurationMinutes = isLocalDateTimeValue(startedAt) && isLocalDateTimeValue(endedAt)
+    ? Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000))
+    : null;
 
   return (
     <section className="request-grid">
@@ -1419,20 +1422,28 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
               </div>
             </div>
             {message ? <p className="form-message error">{message}</p> : null}
-            <label className="field">
-              <span>Type</span>
-              <select value={requestType} onChange={(event) => setRequestType(event.target.value as AdministrativeRequestType)}>
-                <option value="vacation">Vacation</option>
-                <option value="leave">Leave</option>
-                <option value="smart_working">Smart working</option>
-              </select>
-            </label>
-            <DateTimeField label="Start" value={startedAt} onChange={setStartedAt} />
-            <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
-            <label className="field">
-              <span>Note</span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} />
-            </label>
+            <div className="request-form-body">
+              <label className="field">
+                <span>Type</span>
+                <select value={requestType} onChange={(event) => setRequestType(event.target.value as AdministrativeRequestType)}>
+                  <option value="vacation">Vacation</option>
+                  <option value="leave">Leave</option>
+                  <option value="smart_working">Smart working</option>
+                </select>
+              </label>
+              <DateTimeField label="Start" value={startedAt} onChange={setStartedAt} />
+              <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
+              {requestDurationMinutes !== null && requestDurationMinutes > 0 ? (
+                <div className="request-duration" aria-live="polite">
+                  <span>Estimated duration</span>
+                  <strong>{minutesLabel(requestDurationMinutes)}</strong>
+                </div>
+              ) : null}
+              <label className="field">
+                <span>Note</span>
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+              </label>
+            </div>
             <div className="modal-actions">
               <button type="button" onClick={() => setCreateOpen(false)}>Cancel</button>
               <button className="primary-action" type="submit">
