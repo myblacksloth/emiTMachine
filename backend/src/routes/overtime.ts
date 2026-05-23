@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../services/audit.js";
 
 const router = Router();
 
@@ -144,6 +145,13 @@ router.post("/weekly-target", async (req, res, next) => {
     }
 
     req.log?.info("overtime weekly target set", { userId: req.user!.id, weeklyWorkMinutes: input.weeklyWorkMinutes });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "overtime_target_set",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { minutes: input.weeklyWorkMinutes }
+    });
     res.status(201).json(await getOvertimeReport(req.user!.id));
   } catch (error) {
     next(error);
@@ -172,6 +180,13 @@ router.post("/payments", async (req, res, next) => {
     );
 
     req.log?.info("overtime payment marked", { userId: req.user!.id, weekStart: input.weekStart, overtimeMinutes: week.overtimeMinutes });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "overtime_paid",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { weekStart: input.weekStart }
+    });
     res.status(201).json(await getOvertimeReport(req.user!.id));
   } catch (error) {
     next(error);

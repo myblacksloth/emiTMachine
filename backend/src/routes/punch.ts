@@ -4,6 +4,7 @@ import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { assertNoApprovedAdministrativeRequestOverlap } from "../services/administrativeRequests.js";
+import { logAudit } from "../services/audit.js";
 import { assertTagsAreCompatible, assertUserTags } from "../services/tags.js";
 import { isoDateTimeSchema, uuidSchema } from "../utils/validators.js";
 
@@ -88,6 +89,13 @@ router.post("/in", async (req, res, next) => {
       return sessionResult.rows[0];
     });
 
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "manual_clock_in",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { source: "manual" }
+    });
     res.status(201).json({ session });
   } catch (error) {
     next(error);
@@ -130,6 +138,13 @@ router.post("/out", async (req, res, next) => {
       return sessionResult.rows[0];
     });
 
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "manual_clock_out",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { source: "manual" }
+    });
     res.json({ session });
   } catch (error) {
     next(error);

@@ -170,3 +170,23 @@ export type Toast = {
   tone: "success" | "error" | "info";
   message: string;
 };
+
+export type AuditLog = {
+  id: string;
+  userId: string | null;
+  userUsername: string | null;
+  targetUserId: string | null;
+  targetUserUsername: string | null;
+  eventType: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type AuditLogPage = {
+  logs: AuditLog[];
+  total: number;
+  page: number;
+  limit: number;
+};

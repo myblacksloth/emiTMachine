@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  ScrollText,
   ShieldCheck,
   Sparkles,
   Square,
@@ -29,6 +30,8 @@ import type {
   AdminUser,
   AdministrativeRequest,
   AdministrativeRequestType,
+  AuditLog,
+  AuditLogPage,
   AuthMode,
   ChartBucket,
   DashboardData,
@@ -545,7 +548,7 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin">("dashboard");
+  const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin" | "audit">("dashboard");
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -601,6 +604,11 @@ function Dashboard({
             <ShieldCheck size={16} /> <span>Admin</span>
           </button>
         ) : null}
+        {data.user.role === "root" ? (
+          <button className={view === "audit" ? "active" : ""} onClick={() => setView("audit")} type="button">
+            <ScrollText size={16} /> <span>Audit log</span>
+          </button>
+        ) : null}
       </nav>
 
       {error ? <div className="global-error">{error}</div> : null}
@@ -645,6 +653,7 @@ function Dashboard({
       {view === "countdowns" ? <Countdowns countdowns={data.countdowns} activeSessionId={data.activeSession?.id ?? null} onRefresh={onRefresh} onToast={onToast} /> : null}
       {view === "profile" ? <ProfileSettings data={data} onToast={onToast} onRefresh={onRefresh} /> : null}
       {view === "admin" && data.user.role !== "user" ? <AdminPanel currentRole={data.user.role} onToast={onToast} /> : null}
+      {view === "audit" && data.user.role === "root" ? <AuditLogView onToast={onToast} /> : null}
 
       {confirming ? (
         <PunchDialog
@@ -1518,6 +1527,277 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
                 </div>
               </article>
             ))}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+const AUDIT_EVENT_LABELS: Record<string, string> = {
+  login: "Login",
+  logout: "Logout",
+  password_change: "Password change",
+  totp_setup: "TOTP setup",
+  totp_reset: "TOTP reset",
+  passkey_added: "Passkey added",
+  passkey_removed: "Passkey removed",
+  manual_clock_in: "Manual clock-in",
+  manual_clock_out: "Manual clock-out",
+  activity_created: "Activity created",
+  activity_updated: "Activity updated",
+  activity_deleted: "Activity deleted",
+  csv_exported: "CSV exported",
+  csv_imported: "CSV imported",
+  overtime_target_set: "Overtime target set",
+  overtime_paid: "Overtime marked paid",
+  overtime_paid_revoked: "Overtime payment revoked",
+  recovery_code_used: "Recovery code used",
+  password_recovery: "Password recovery"
+};
+
+function AuditLogView({ onToast }: { onToast: (tone: Toast["tone"], message: string) => void }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [page, setPage] = useState<AuditLogPage | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // filter state
+  const [filterUserId, setFilterUserId] = useState("");
+  const [filterTargetUserId, setFilterTargetUserId] = useState("");
+  const [filterEventType, setFilterEventType] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+
+  // applied filters (only update on Search)
+  const [appliedUserId, setAppliedUserId] = useState("");
+  const [appliedTargetUserId, setAppliedTargetUserId] = useState("");
+  const [appliedEventType, setAppliedEventType] = useState("");
+  const [appliedDateFrom, setAppliedDateFrom] = useState("");
+  const [appliedDateTo, setAppliedDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const PAGE_LIMIT = 50;
+
+  useEffect(() => {
+    api.adminUsers()
+      .then(setUsers)
+      .catch(() => { /* non-fatal — user picker still works without the list */ });
+  }, []);
+
+  const fetchLogs = async (pg: number, uid: string, tuid: string, et: string, df: string, dt: string) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await api.auditLogs({
+        userId: uid || undefined,
+        targetUserId: tuid || undefined,
+        eventType: et || undefined,
+        dateFrom: df || undefined,
+        dateTo: dt || undefined,
+        page: pg,
+        limit: PAGE_LIMIT
+      });
+      setPage(result);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Unable to load audit logs.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchLogs(currentPage, appliedUserId, appliedTargetUserId, appliedEventType, appliedDateFrom, appliedDateTo);
+  }, [currentPage, appliedUserId, appliedTargetUserId, appliedEventType, appliedDateFrom, appliedDateTo]);
+
+  const applyFilters = () => {
+    setCurrentPage(1);
+    setAppliedUserId(filterUserId);
+    setAppliedTargetUserId(filterTargetUserId);
+    setAppliedEventType(filterEventType);
+    setAppliedDateFrom(filterDateFrom);
+    setAppliedDateTo(filterDateTo);
+  };
+
+  const resetFilters = () => {
+    setFilterUserId("");
+    setFilterTargetUserId("");
+    setFilterEventType("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setCurrentPage(1);
+    setAppliedUserId("");
+    setAppliedTargetUserId("");
+    setAppliedEventType("");
+    setAppliedDateFrom("");
+    setAppliedDateTo("");
+  };
+
+  const exportCsv = () => {
+    const url = api.auditExportUrl({
+      userId: appliedUserId || undefined,
+      targetUserId: appliedTargetUserId || undefined,
+      eventType: appliedEventType || undefined,
+      dateFrom: appliedDateFrom || undefined,
+      dateTo: appliedDateTo || undefined
+    });
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const totalPages = page ? Math.max(1, Math.ceil(page.total / PAGE_LIMIT)) : 1;
+
+  const metadataSnippet = (metadata: AuditLog["metadata"]) => {
+    if (metadata === null || metadata === undefined) return null;
+    const text = JSON.stringify(metadata, null, 2);
+    const truncated = text.length > 80 ? text.slice(0, 80) + "…" : text;
+    return <code className="audit-meta-code" title={text}>{truncated}</code>;
+  };
+
+  const userLabel = (id: string | null, username: string | null) => {
+    if (!id && !username) return <span className="muted">—</span>;
+    return <span>{username ?? id}</span>;
+  };
+
+  return (
+    <section className="panel stack audit-log-panel">
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">root console</p>
+          <h2>Audit log</h2>
+        </div>
+        <button type="button" onClick={exportCsv}>
+          <Download size={16} /> Export CSV
+        </button>
+      </div>
+
+      <div className="audit-filter-bar">
+        <label className="field audit-filter-field">
+          <span>Actor</span>
+          <select
+            value={filterUserId}
+            onChange={(e) => setFilterUserId(e.target.value)}
+          >
+            <option value="">All actors</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.username}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field audit-filter-field">
+          <span>Target user</span>
+          <select
+            value={filterTargetUserId}
+            onChange={(e) => setFilterTargetUserId(e.target.value)}
+          >
+            <option value="">All targets</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.username}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field audit-filter-field">
+          <span>Event type</span>
+          <select
+            value={filterEventType}
+            onChange={(e) => setFilterEventType(e.target.value)}
+          >
+            <option value="">All types</option>
+            {Object.entries(AUDIT_EVENT_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field audit-filter-field">
+          <span>From</span>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+          />
+        </label>
+
+        <label className="field audit-filter-field">
+          <span>To</span>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+          />
+        </label>
+
+        <div className="audit-filter-actions">
+          <button type="button" className="primary-action" onClick={applyFilters}>
+            Search
+          </button>
+          <button type="button" onClick={resetFilters}>
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {message ? <p className="form-message error">{message}</p> : null}
+      {loading ? <div className="loading-line">Loading audit logs...</div> : null}
+
+      {!loading && page && page.logs.length === 0 ? (
+        <p className="empty-state">No audit log entries match the current filters.</p>
+      ) : null}
+
+      {page && page.logs.length > 0 ? (
+        <>
+          <div className="audit-table-wrap">
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th>Date / Time</th>
+                  <th>Actor</th>
+                  <th>Target</th>
+                  <th>Event</th>
+                  <th>IP</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.logs.map((log) => (
+                  <tr key={log.id}>
+                    <td className="audit-cell-nowrap">
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                    <td>{userLabel(log.userId, log.userUsername)}</td>
+                    <td>{userLabel(log.targetUserId, log.targetUserUsername)}</td>
+                    <td>
+                      <span className="audit-event-badge">
+                        {AUDIT_EVENT_LABELS[log.eventType] ?? log.eventType}
+                      </span>
+                    </td>
+                    <td className="audit-cell-mono">
+                      {log.ipAddress ?? <span className="muted">—</span>}
+                    </td>
+                    <td>{metadataSnippet(log.metadata)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="audit-pagination">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              Previous
+            </button>
+            <span className="audit-page-label">Page {currentPage} of {totalPages}</span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Next
+            </button>
           </div>
         </>
       ) : null}

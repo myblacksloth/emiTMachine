@@ -5,6 +5,7 @@ import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { createSession, clearSessionCookie, setSessionCookie } from "../services/sessions.js";
+import { logAudit } from "../services/audit.js";
 import { decryptTotpSecret, hashPassword, sha256, verifyPassword } from "../utils/crypto.js";
 import { emailSchema, passwordSchema, usernameSchema } from "../utils/validators.js";
 
@@ -158,6 +159,12 @@ router.post("/login", async (req, res, next) => {
     const session = await createSession(pool, user.id);
     setSessionCookie(res, session.token, session.expiresAt);
     req.log?.info("login succeeded", { userId: user.id, username: user.username });
+    await logAudit({
+      userId: user.id,
+      eventType: "login",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined
+    });
     res.json({ user: publicUser(user) });
   } catch (error) {
     next(error);
@@ -169,6 +176,12 @@ router.post("/logout", requireAuth, async (req, res, next) => {
     await pool.query("update app_sessions set revoked_at = now() where id = $1", [req.sessionId]);
     clearSessionCookie(res);
     req.log?.info("logout succeeded", { userId: req.user!.id });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "logout",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined
+    });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -178,7 +191,7 @@ router.post("/logout", requireAuth, async (req, res, next) => {
 router.post("/recover-password", async (req, res, next) => {
   try {
     const input = recoverPasswordSchema.parse(req.body);
-    await withTransaction(async (client) => {
+    const recoveredUserId = await withTransaction(async (client) => {
       const userResult = await client.query(
         `select id, totp_enabled, totp_secret
          from users
@@ -226,8 +239,15 @@ router.post("/recover-password", async (req, res, next) => {
       ]);
       await client.query("update app_sessions set revoked_at = now() where user_id = $1 and revoked_at is null", [user.id]);
       req.log?.info("password recovered", { userId: user.id, username: input.username });
+      return user.id as string;
     });
 
+    await logAudit({
+      userId: recoveredUserId,
+      eventType: "password_recovery",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined
+    });
     res.status(204).send();
   } catch (error) {
     next(error);

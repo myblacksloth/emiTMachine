@@ -5,6 +5,7 @@ import { z } from "zod";
 import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../services/audit.js";
 import { assertTagsAreCompatible } from "../services/tags.js";
 import { isoDateTimeSchema } from "../utils/validators.js";
 
@@ -44,6 +45,13 @@ router.get("/export", async (req, res, next) => {
     res.header("Content-Type", "text/csv; charset=utf-8");
     res.header("Content-Disposition", `attachment; filename="emitmachine-export.csv"`);
     req.log?.info("csv exported", { userId: req.user!.id, rows: result.rowCount });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "csv_exported",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { rows: result.rowCount ?? 0 }
+    });
     res.send(csv);
   } catch (error) {
     next(error);
@@ -136,6 +144,13 @@ router.post("/import", async (req, res, next) => {
     });
 
     req.log?.info("csv imported", { userId: req.user!.id, importId: result.importId, importedEvents: result.importedEvents });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "csv_imported",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { rows: rows.length }
+    });
     res.status(201).json(result);
   } catch (error) {
     next(error);

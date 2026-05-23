@@ -6,6 +6,7 @@ import { config } from "../config.js";
 import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../services/audit.js";
 import { decryptTotpSecret, encryptTotpSecret } from "../utils/crypto.js";
 
 const router = Router();
@@ -50,6 +51,12 @@ router.post("/verify", requireAuth, async (req, res, next) => {
 
     await pool.query("update users set totp_enabled = true where id = $1", [req.user!.id]);
     req.log?.info("totp enabled", { userId: req.user!.id, username: req.user!.username });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "totp_setup",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined
+    });
     res.json({ totpEnabled: true });
   } catch (error) {
     next(error);
@@ -60,6 +67,12 @@ router.delete("/", requireAuth, async (req, res, next) => {
   try {
     await pool.query("update users set totp_secret = null, totp_enabled = false where id = $1", [req.user!.id]);
     req.log?.warn("totp disabled", { userId: req.user!.id, username: req.user!.username });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "totp_reset",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined
+    });
     res.status(204).send();
   } catch (error) {
     next(error);

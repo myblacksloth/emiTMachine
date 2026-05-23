@@ -4,6 +4,7 @@ import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
 import { assertNoApprovedAdministrativeRequestOverlap } from "../services/administrativeRequests.js";
+import { logAudit } from "../services/audit.js";
 import { assertTagsAreCompatible, assertUserTags } from "../services/tags.js";
 import { isoDateTimeSchema, paginationSchema, uuidSchema } from "../utils/validators.js";
 
@@ -259,6 +260,13 @@ router.post("/sessions", async (req, res, next) => {
     });
 
     req.log?.info("activity created manually", { userId: req.user!.id, sessionId: session.id, reason: input.reason });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "activity_created",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { sessionId: session.id }
+    });
     res.status(201).json({ session });
   } catch (error) {
     next(error);
@@ -423,6 +431,13 @@ router.patch("/sessions/:id", async (req, res, next) => {
     });
 
     req.log?.info("activity updated", { userId: req.user!.id, sessionId, reason: input.reason });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "activity_updated",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { sessionId }
+    });
     res.json({ session });
   } catch (error) {
     next(error);
@@ -462,6 +477,13 @@ router.delete("/sessions/:id", async (req, res, next) => {
     }
 
     req.log?.info("activity deleted", { userId: req.user!.id, sessionId });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "activity_deleted",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { sessionId }
+    });
     res.status(204).send();
   } catch (error) {
     next(error);

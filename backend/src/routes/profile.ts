@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../services/audit.js";
 import { hashPassword, verifyPassword } from "../utils/crypto.js";
 import { emailSchema, passwordSchema } from "../utils/validators.js";
 
@@ -92,6 +93,12 @@ router.patch("/password", async (req, res, next) => {
       req.user!.id,
       await hashPassword(input.newPassword)
     ]);
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "password_change",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined
+    });
     res.status(204).send();
   } catch (error) {
     next(error);

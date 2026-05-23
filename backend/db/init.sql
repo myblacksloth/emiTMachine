@@ -443,24 +443,43 @@ CREATE TABLE auth_rate_limits (
 
 CREATE INDEX auth_rate_limits_blocked_idx ON auth_rate_limits (blocked_until) WHERE blocked_until IS NOT NULL;
 
-CREATE TABLE audit_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  event_type text NOT NULL,
-  severity text NOT NULL DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'critical')),
-  ip_address inet,
-  user_agent text,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT audit_logs_event_type_not_blank CHECK (length(btrim(event_type)) > 0)
+CREATE TYPE audit_event_type AS ENUM (
+  'login',
+  'logout',
+  'password_change',
+  'totp_setup',
+  'totp_reset',
+  'passkey_added',
+  'passkey_removed',
+  'manual_clock_in',
+  'manual_clock_out',
+  'activity_created',
+  'activity_updated',
+  'activity_deleted',
+  'csv_exported',
+  'csv_imported',
+  'overtime_target_set',
+  'overtime_paid',
+  'overtime_paid_revoked',
+  'recovery_code_used',
+  'password_recovery'
 );
 
-CREATE INDEX audit_logs_user_created_idx ON audit_logs (user_id, created_at DESC);
-CREATE INDEX audit_logs_actor_created_idx ON audit_logs (actor_user_id, created_at DESC);
-CREATE INDEX audit_logs_event_created_idx ON audit_logs (event_type, created_at DESC);
+CREATE TABLE audit_logs (
+  id             uuid              PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid              REFERENCES users(id) ON DELETE SET NULL,
+  target_user_id uuid              REFERENCES users(id) ON DELETE SET NULL,
+  event_type     audit_event_type  NOT NULL,
+  ip_address     inet,
+  user_agent     text,
+  metadata       jsonb,
+  created_at     timestamptz       NOT NULL DEFAULT now()
+);
 
-CREATE VIEW audit_events AS SELECT * FROM audit_logs;
+CREATE INDEX audit_logs_user_id_idx        ON audit_logs (user_id,        created_at DESC);
+CREATE INDEX audit_logs_target_user_id_idx ON audit_logs (target_user_id, created_at DESC);
+CREATE INDEX audit_logs_event_type_idx     ON audit_logs (event_type,     created_at DESC);
+CREATE INDEX audit_logs_created_at_idx     ON audit_logs (created_at DESC);
 
 CREATE TABLE countdowns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

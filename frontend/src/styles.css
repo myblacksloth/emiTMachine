@@ -2921,3 +2921,120 @@ button svg,
 p.small {
   font-size: 0.75rem;
 }
+
+/* ── Audit log ──────────────────────────────────────────────── */
+.audit-log-panel {
+  width: 100%;
+}
+
+.audit-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.audit-filter-field {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.audit-filter-actions {
+  display: flex;
+  gap: 0.375rem;
+  align-items: flex-end;
+  padding-bottom: 0;
+  flex: 0 0 auto;
+}
+
+.audit-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.audit-table th {
+  background: var(--bg-page);
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 0.875rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.audit-table td {
+  padding: 0.6rem 0.875rem;
+  border-bottom: 1px solid var(--separator);
+  color: var(--text-primary);
+  vertical-align: top;
+}
+
+.audit-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.audit-table tbody tr:hover td {
+  background: rgba(120, 120, 128, 0.05);
+}
+
+.audit-cell-nowrap {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  font-size: 0.8125rem;
+}
+
+.audit-cell-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.audit-event-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--r-pill);
+  background: var(--accent-light);
+  color: var(--blue);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.audit-meta-code {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  cursor: default;
+}
+
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+}
+
+.audit-page-label {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}

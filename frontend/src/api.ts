@@ -1,4 +1,4 @@
-import type { ActivitySession, AdminUser, AdministrativeRequest, AdministrativeRequestStatus, AdministrativeRequestType, Countdown, DashboardData, ManagerAssignment, ManagerSummary, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
+import type { ActivitySession, AdminUser, AdministrativeRequest, AdministrativeRequestStatus, AdministrativeRequestType, AuditLog, AuditLogPage, Countdown, DashboardData, ManagerAssignment, ManagerSummary, OvertimeMode, OvertimeReport, Tag, UserRole } from "./types";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -775,6 +775,42 @@ export const api = {
   },
   generateRecoveryCodes: () =>
     request<{ codes: string[] }>("/api/auth/recovery/codes", { method: "POST" }),
+  auditLogs: (params: {
+    userId?: string;
+    targetUserId?: string;
+    eventType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<AuditLogPage> => {
+    const query = new URLSearchParams();
+    if (params.userId) query.set("userId", params.userId);
+    if (params.targetUserId) query.set("targetUserId", params.targetUserId);
+    if (params.eventType) query.set("eventType", params.eventType);
+    if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+    if (params.dateTo) query.set("dateTo", params.dateTo);
+    if (params.page != null) query.set("page", String(params.page));
+    if (params.limit != null) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    return request<{ logs: AuditLog[]; total: number; page: number; limit: number }>(`/api/audit${qs ? `?${qs}` : ""}`);
+  },
+  auditExportUrl: (params: {
+    userId?: string;
+    targetUserId?: string;
+    eventType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): string => {
+    const query = new URLSearchParams();
+    if (params.userId) query.set("userId", params.userId);
+    if (params.targetUserId) query.set("targetUserId", params.targetUserId);
+    if (params.eventType) query.set("eventType", params.eventType);
+    if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+    if (params.dateTo) query.set("dateTo", params.dateTo);
+    const qs = query.toString();
+    return `${apiBaseUrl}/api/audit/export${qs ? `?${qs}` : ""}`;
+  },
   exportCsvUrl: `${apiBaseUrl}/api/csv/export`,
   importCsv: async (file: File) => {
     const csv = await file.text();

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { pool, withTransaction } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../services/audit.js";
 import { getOvertimeReport } from "./overtime.js";
 import { hashPassword, randomToken } from "../utils/crypto.js";
 import { emailSchema, paginationSchema, uuidSchema } from "../utils/validators.js";
@@ -401,6 +402,14 @@ router.delete("/users/:id/overtime-payments/:weekStart", async (req, res, next) 
     );
     if (!result.rows[0]) throw new HttpError(404, "Payment status not found or cannot be changed by this admin");
     req.log?.info("overtime payment removed by admin", { actorUserId: req.user!.id, userId, weekStart });
+    await logAudit({
+      userId: req.user!.id,
+      targetUserId: userId,
+      eventType: "overtime_paid_revoked",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { weekStart }
+    });
     res.status(204).send();
   } catch (error) {
     next(error);

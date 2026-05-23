@@ -15,9 +15,10 @@ import { config } from "../config.js";
 import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../services/audit.js";
 import { createSession, setSessionCookie } from "../services/sessions.js";
 import { sha256 } from "../utils/crypto.js";
-import { usernameSchema } from "../utils/validators.js";
+import { usernameSchema, uuidSchema } from "../utils/validators.js";
 
 const router = Router();
 const challengeTtlMs = 10 * 60 * 1000;
@@ -217,6 +218,13 @@ router.post("/register/verify", requireAuth, async (req, res, next) => {
       label: input.label ?? "Passkey",
       credentialId: credential.id
     });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "passkey_added",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { label: input.label ?? "Passkey", credentialId: credential.id }
+    });
     res.status(201).json({ ok: true });
   } catch (error) {
     next(error);
@@ -347,6 +355,49 @@ router.post("/login/verify", async (req, res, next) => {
       credentialId
     });
     res.json({ ok: true, user: publicUser(passkey) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Passkey management ────────────────────────────────────────────────────────
+
+router.get("/", requireAuth, async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `select id, device_name, created_at, last_used_at
+       from passkeys
+       where user_id = $1
+       order by created_at asc`,
+      [req.user!.id]
+    );
+    res.json({ passkeys: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res, next) => {
+  try {
+    const passkeyId = uuidSchema.parse(req.params.id);
+    const result = await pool.query(
+      `delete from passkeys
+       where id = $1 and user_id = $2
+       returning id, device_name`,
+      [passkeyId, req.user!.id]
+    );
+    if (!result.rows[0]) {
+      throw new HttpError(404, "Passkey not found");
+    }
+    req.log?.info("passkey removed", { userId: req.user!.id, passkeyId });
+    await logAudit({
+      userId: req.user!.id,
+      eventType: "passkey_removed",
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] as string | undefined,
+      metadata: { passkeyId, deviceName: result.rows[0].device_name }
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
