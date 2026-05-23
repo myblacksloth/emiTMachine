@@ -1208,6 +1208,10 @@ input[type="datetime-local"] {
   animation: backdropIn var(--duration) var(--ease);
 }
 
+.critical-backdrop {
+  z-index: 45;
+}
+
 @keyframes backdropIn {
   from { opacity: 0; }
   to   { opacity: 1; }

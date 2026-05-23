@@ -320,7 +320,7 @@ function App() {
 function Shell({ children, toasts }: { children: ReactNode; toasts: Toast[] }) {
   return (
     <div className="app-shell">
-      <CriticalDialogHost />
+      {children}
       <div className="toast-region" aria-live="polite">
         {toasts.map((toast) => (
           <div key={toast.id} className={`toast ${toast.tone}`}>
@@ -328,7 +328,7 @@ function Shell({ children, toasts }: { children: ReactNode; toasts: Toast[] }) {
           </div>
         ))}
       </div>
-      {children}
+      <CriticalDialogHost />
     </div>
   );
 }
@@ -359,7 +359,7 @@ function CriticalDialogHost() {
   };
 
   return (
-    <div className="modal-backdrop" role="presentation">
+    <div className="modal-backdrop critical-backdrop" role="presentation">
       <section className="modal critical-modal" role="dialog" aria-modal="true" aria-labelledby="critical-title">
         <div>
           <p className="eyebrow">Action required</p>
