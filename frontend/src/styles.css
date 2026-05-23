@@ -3531,3 +3531,69 @@ p.small {
     overflow-wrap: anywhere;
   }
 }
+
+/* ── ActivityPanel — form & filter mobile polish ─────────────── */
+@media (max-width: 560px) {
+  /* 1. Week-tab strip: horizontal scroll instead of multi-row wrap */
+  .week-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.3rem;
+    /* let scroll container reach screen edge under the panel padding */
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+  }
+
+  .week-tabs button {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  /* 2. Tag picker: clear fieldset browser defaults that cause overflow */
+  .tag-picker {
+    border: none;
+    margin-inline: 0;
+    padding-inline: 0;
+    min-width: 0;
+  }
+
+  /* Larger touch target on tag checkboxes */
+  .tag-picker label {
+    min-height: 44px;
+    padding-inline: 14px;
+    gap: 8px;
+  }
+
+  /* 3. Note textarea: slightly taller so thumb doesn't obscure content */
+  .activity-editor .field textarea {
+    min-height: 100px;
+  }
+
+  /* 4. Error message inside editor: full-width, clear separation */
+  .activity-editor .form-message.error {
+    border-radius: 12px;
+    padding: 0.7rem 0.9rem;
+    margin-top: 0.15rem;
+  }
+
+  /* 5. Week summary keeps 2×2 grid on mobile — 4 metrics fit fine at 2-col */
+  .week-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* 6. Ensure datetime-local inputs inside the edit grid stay full-width */
+  .activity-edit-grid .field,
+  .activity-edit-grid input[type="datetime-local"] {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* 7. Activity modal: full-screen on very small phones, scrollable */
+  .activity-modal {
+    max-height: calc(100dvh - max(env(safe-area-inset-top, 0px), 0.5rem) - max(env(safe-area-inset-bottom, 0px), 0.5rem) - 2rem);
+    overflow-y: auto;
+  }
+}
