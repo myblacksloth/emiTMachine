@@ -4907,3 +4907,185 @@ button:disabled,
     opacity: 0.72;
   }
 }
+
+/* ── Mobile horizontal overflow hardening ───────────────────── */
+.app-shell,
+.workspace,
+.panel,
+.modal,
+.activity-card,
+.request-card,
+.admin-user,
+.tag-editor,
+.countdown,
+.time-tool-card,
+.overtime-week,
+.audit-log-panel,
+.calendar-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.panel-title,
+.topbar,
+.work-band,
+.activity-main,
+.activity-actions,
+.calendar-actions,
+.request-toolbar,
+.request-filter-bar,
+.history-filters,
+.admin-session-filters,
+.admin-user-actions,
+.admin-user-danger-actions,
+.admin-maintenance-actions,
+.selected-user-data-actions,
+.overtime-week-actions,
+.tag-editor-actions,
+.countdown-actions,
+.csv-actions,
+.modal-actions {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.form-message,
+.empty-state,
+.muted,
+.profile-long-text,
+.selected-user-meta,
+.admin-user-meta span,
+.request-note,
+.deleted-request-note,
+.codes,
+.audit-meta-code,
+.activity-detail-grid strong,
+.request-dates strong,
+.countdown-meta small,
+.manager-list,
+.manager-chip-list span,
+.file-input input[type="file"] {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.copy-id-button,
+.inline-copy-id,
+.request-id-copy,
+.audit-cell-mono,
+.audit-cell-nowrap,
+.time-result,
+.codes {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.activity-main > div,
+.request-content,
+.request-heading > div,
+.admin-user-header > *,
+.admin-user-select,
+.calendar-activity > div,
+.countdown-header,
+.countdown-time,
+.countdown-meta,
+.overtime-week > div,
+.panel-title > div {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .app-shell,
+  .workspace,
+  .panel,
+  .modal,
+  .activity-modal,
+  .request-modal,
+  .history-modal,
+  .activity-detail-modal {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .summary-grid,
+  .chart-grid,
+  .activity-edit-grid,
+  .request-dates,
+  .request-heading,
+  .history-filters,
+  .request-filter-bar,
+  .admin-session-filters,
+  .admin-user-header,
+  .admin-user-meta,
+  .countdown-form,
+  .csv-actions,
+  .tag-create-row,
+  .tag-editor-actions,
+  .selected-user-data-actions,
+  .admin-maintenance-actions,
+  .overtime-week-footer,
+  .overtime-week-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-summary,
+  .week-summary,
+  .overtime-week-metrics,
+  .request-actions,
+  .activity-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar,
+  .topbar-actions,
+  .calendar-actions,
+  .request-toolbar,
+  .admin-system-row,
+  .admin-user-actions,
+  .admin-user-danger-actions,
+  .countdown-actions,
+  .modal-actions {
+    width: 100%;
+  }
+
+  .topbar-actions,
+  .calendar-actions,
+  .activity-actions,
+  .request-toolbar,
+  .admin-user-actions,
+  .admin-user-danger-actions,
+  .countdown-actions {
+    flex-wrap: wrap;
+  }
+
+  .week-tabs,
+  .tabs,
+  .section-nav,
+  .bottom-nav-tray,
+  .bottom-nav-bar,
+  .audit-table-wrap,
+  .history-modal,
+  .codes {
+    max-width: 100%;
+  }
+
+  .week-tabs,
+  .audit-table-wrap,
+  .codes {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .form-message strong,
+  .temporary-password,
+  .copy-id-button,
+  .inline-copy-id,
+  .request-id-copy {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
