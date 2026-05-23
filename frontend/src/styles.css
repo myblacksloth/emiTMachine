@@ -262,6 +262,20 @@ legend {
   margin: 0;
 }
 
+/* Contains eyebrow + h1; must shrink without pushing actions off-screen */
+.topbar-user {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+.topbar-user .eyebrow {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .topbar-actions {
   display: flex;
   gap: 0.5rem;
@@ -3217,4 +3231,55 @@ p.small {
     border-color: transparent;
     box-shadow: none;
   }
+}
+
+/* ── Topbar mobile overrides ────────────────────────────────── */
+@media (max-width: 560px) {
+  /* Single compact row — override the column layout set at ≤920px */
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0 0.45rem;
+  }
+
+  /* User info block shrinks, never pushes actions off-screen */
+  .topbar-user {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* Hide the decorative h1 — saves ~2rem of vertical space */
+  .topbar h1 {
+    display: none;
+  }
+
+  /* Eyebrow becomes the primary label: larger, still truncated */
+  .topbar-user .eyebrow {
+    font-size: 0.82rem;
+    margin-bottom: 0;
+  }
+
+  /* Actions go back to a horizontal row, shrink to icon widths */
+  .topbar-actions {
+    flex-direction: row;
+    width: auto;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  /* Refresh: icon-only on mobile — label hidden, button stays square */
+  .topbar-refresh {
+    padding: 0 0.55rem;
+    min-width: 40px;
+  }
+
+  .topbar-refresh span {
+    display: none;
+  }
+
+  /* Sign out: already display:none via .topbar-signout rule — no change */
 }

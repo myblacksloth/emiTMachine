@@ -568,13 +568,13 @@ function Dashboard({
   return (
     <main className="workspace">
       <header className="topbar">
-        <div>
+        <div className="topbar-user">
           <p className="eyebrow">Signed in as {data.user.username || data.user.name}</p>
           <h1>Today feels workable.</h1>
         </div>
         <div className="topbar-actions">
-          <button type="button" onClick={onRefresh} disabled={loading}>
-            <RefreshCw size={16} /> Refresh
+          <button type="button" className="topbar-refresh" aria-label="Refresh" onClick={onRefresh} disabled={loading}>
+            <RefreshCw size={16} /><span>Refresh</span>
           </button>
           <button type="button" className="topbar-signout" onClick={onLogout}>
             <LogOut size={16} /> Sign out
