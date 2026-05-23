@@ -3354,3 +3354,45 @@ p.small {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Activities mobile improvements ────────────────────────── */
+@media (max-width: 560px) {
+  /* Keep duration badge on the right — revert any column override */
+  .activity-main {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  /* Text content shrinks to fill available space without overflow */
+  .activity-main > div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* Duration badge stays pinned right, doesn't grow */
+  .activity-main > strong {
+    flex-shrink: 0;
+    align-self: flex-start;
+    font-size: 0.82rem;
+    padding: 0.3rem 0.55rem;
+  }
+
+  /* Edit/Delete and Cancel/Save side by side */
+  .activity-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex-direction: unset;
+    align-items: unset;
+  }
+
+  /* Tighter card padding on small screens */
+  .activity-card {
+    gap: 0.65rem;
+    padding: 0.85rem;
+  }
+
+  /* Allow long notes/tags to wrap without forcing horizontal scroll */
+  .activity-card .muted {
+    overflow-wrap: anywhere;
+  }
+}
