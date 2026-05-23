@@ -583,7 +583,7 @@ function Dashboard({
           <button type="button" onClick={onRefresh} disabled={loading}>
             <RefreshCw size={16} /> Refresh
           </button>
-          <button type="button" onClick={onLogout}>
+          <button type="button" className="topbar-signout" onClick={onLogout}>
             <LogOut size={16} /> Sign out
           </button>
         </div>
@@ -692,6 +692,10 @@ function Dashboard({
           }}
         />
       ) : null}
+
+      <button type="button" className="mobile-signout" onClick={onLogout}>
+        <LogOut size={16} /> Sign out
+      </button>
     </main>
   );
 }

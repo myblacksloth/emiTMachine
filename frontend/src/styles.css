@@ -2794,6 +2794,31 @@ button svg,
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+
+  .topbar-signout {
+    display: none;
+  }
+
+  .mobile-signout {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.5rem;
+    color: var(--red);
+    border-color: rgba(255, 59, 48, 0.22);
+    background: rgba(255, 59, 48, 0.06);
+  }
+
+  .mobile-signout:hover:not(:disabled) {
+    background: rgba(255, 59, 48, 0.10);
+    border-color: rgba(255, 59, 48, 0.35);
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.mobile-signout {
+  display: none;
 }
 
 /* ── Time Tools ─────────────────────────────────────────────── */
