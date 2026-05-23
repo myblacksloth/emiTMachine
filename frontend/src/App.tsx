@@ -10,6 +10,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   Save,
@@ -550,6 +551,15 @@ function Dashboard({
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
   const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin" | "audit">("dashboard");
+  const [showMore, setShowMore] = useState(false);
+
+  const moreViews = ["overtime", "tags", "tools", "countdowns", "admin", "audit"] as const;
+  const isMoreActive = (moreViews as readonly string[]).includes(view);
+
+  function navTo(v: typeof view) {
+    setView(v);
+    setShowMore(false);
+  }
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -673,6 +683,117 @@ function Dashboard({
       <button type="button" className="mobile-signout" onClick={onLogout}>
         <LogOut size={16} /> Sign out
       </button>
+
+      {/* ── Bottom navigation (mobile only, ≤560px) ───────────── */}
+      <nav className="bottom-nav" aria-label="Main navigation">
+        {showMore && (
+          <div className="bottom-nav-tray" id="bottom-nav-tray" role="menu">
+            <button
+              type="button"
+              className={view === "overtime" ? "active" : ""}
+              aria-current={view === "overtime" ? "page" : undefined}
+              onClick={() => navTo("overtime")}
+            >
+              <Hourglass size={20} /><span>Overtime</span>
+            </button>
+            <button
+              type="button"
+              className={view === "tags" ? "active" : ""}
+              aria-current={view === "tags" ? "page" : undefined}
+              onClick={() => navTo("tags")}
+            >
+              <Tags size={20} /><span>Tags</span>
+            </button>
+            <button
+              type="button"
+              className={view === "tools" ? "active" : ""}
+              aria-current={view === "tools" ? "page" : undefined}
+              onClick={() => navTo("tools")}
+            >
+              <Clock size={20} /><span>Tools</span>
+            </button>
+            <button
+              type="button"
+              className={view === "countdowns" ? "active" : ""}
+              aria-current={view === "countdowns" ? "page" : undefined}
+              onClick={() => navTo("countdowns")}
+            >
+              <AlarmClock size={20} /><span>Countdowns</span>
+            </button>
+            {data.user.role !== "user" && (
+              <button
+                type="button"
+                className={view === "admin" ? "active" : ""}
+                aria-current={view === "admin" ? "page" : undefined}
+                onClick={() => navTo("admin")}
+              >
+                <ShieldCheck size={20} /><span>Admin</span>
+              </button>
+            )}
+            {data.user.role === "root" && (
+              <button
+                type="button"
+                className={view === "audit" ? "active" : ""}
+                aria-current={view === "audit" ? "page" : undefined}
+                onClick={() => navTo("audit")}
+              >
+                <ScrollText size={20} /><span>Audit</span>
+              </button>
+            )}
+          </div>
+        )}
+        <div className="bottom-nav-bar">
+          <button
+            type="button"
+            className={view === "dashboard" ? "active" : ""}
+            aria-current={view === "dashboard" ? "page" : undefined}
+            onClick={() => navTo("dashboard")}
+          >
+            <LayoutDashboard size={22} /><span>Dashboard</span>
+          </button>
+          <button
+            type="button"
+            className={view === "activities" ? "active" : ""}
+            aria-current={view === "activities" ? "page" : undefined}
+            onClick={() => navTo("activities")}
+          >
+            <CalendarClock size={22} /><span>Activities</span>
+          </button>
+          <button
+            type="button"
+            className={view === "calendar" ? "active" : ""}
+            aria-current={view === "calendar" ? "page" : undefined}
+            onClick={() => navTo("calendar")}
+          >
+            <CalendarClock size={22} /><span>Calendar</span>
+          </button>
+          <button
+            type="button"
+            className={view === "requests" ? "active" : ""}
+            aria-current={view === "requests" ? "page" : undefined}
+            onClick={() => navTo("requests")}
+          >
+            <ShieldCheck size={22} /><span>Requests</span>
+          </button>
+          <button
+            type="button"
+            className={view === "profile" ? "active" : ""}
+            aria-current={view === "profile" ? "page" : undefined}
+            onClick={() => navTo("profile")}
+          >
+            <UserRound size={22} /><span>Profile</span>
+          </button>
+          <button
+            type="button"
+            className={isMoreActive || showMore ? "active" : ""}
+            aria-expanded={showMore}
+            aria-controls="bottom-nav-tray"
+            onClick={() => setShowMore((s) => !s)}
+          >
+            <MoreHorizontal size={22} /><span>More</span>
+          </button>
+        </div>
+      </nav>
     </main>
   );
 }
