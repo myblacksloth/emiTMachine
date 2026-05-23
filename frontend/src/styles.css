@@ -2752,17 +2752,51 @@ button svg,
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .admin-user-select {
   justify-content: space-between;
   width: 100%;
   min-height: 42px;
+  min-width: 0;
 }
 
 .admin-user-select span {
   color: var(--text-tertiary);
   font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.admin-user-select strong,
+.admin-user-select span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.admin-user-meta span,
+.selected-user-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-meta span {
+  border-radius: 12px;
+  padding: 0.45rem 0.6rem;
+  background: rgba(120, 120, 128, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -2827,6 +2861,16 @@ button svg,
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.admin-user-danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  border-top: 1px solid rgba(255, 59, 48, 0.18);
+  border-radius: 14px;
+  padding: 0.65rem;
+  background: rgba(255, 59, 48, 0.06);
 }
 
 .manager-chip-list {
@@ -3570,6 +3614,73 @@ button svg,
 
   .admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-grid > .panel {
+    min-width: 0;
+  }
+
+  .admin-grid .panel-title {
+    align-items: stretch;
+  }
+
+  .admin-grid .panel-title > div {
+    min-width: 0;
+  }
+
+  .admin-system-row,
+  .admin-maintenance-actions,
+  .selected-user-data-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .admin-maintenance-actions .download-link,
+  .selected-user-data-actions .download-link,
+  .admin-system-row button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .admin-user {
+    padding: 0.875rem;
+  }
+
+  .admin-user-header,
+  .admin-user-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-id-button,
+  .inline-copy-id {
+    width: 100%;
+    max-width: 100%;
+    justify-content: flex-start;
+    min-height: 44px;
+  }
+
+  .admin-user-actions,
+  .admin-user-danger-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-actions button,
+  .admin-user-actions select,
+  .admin-user-danger-actions button {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .manager-chip-list {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .manager-chip-list span {
+    justify-content: space-between;
+    min-width: 0;
   }
 
   .tag-manager-grid {

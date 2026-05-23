@@ -2493,6 +2493,10 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                     {user.publicId}
                   </button>
                 </div>
+                <div className="admin-user-meta">
+                  <span title={user.displayName || user.username}>{user.displayName || user.username}</span>
+                  <span title={user.email || "Email not set"}>{user.email || "Email not set"}</span>
+                </div>
                 {isPendingAdmin ? (
                   <div className="pending-admin-banner">
                     <strong>Approval pending</strong>
@@ -2530,13 +2534,13 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                       ) : null}
                     </>
                   ) : null}
-                  {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
-                    <>
-                      <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
-                      <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
-                    </>
-                  ) : null}
                 </div>
+                {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
+                  <div className="admin-user-danger-actions" aria-label={`Dangerous actions for ${user.username}`}>
+                    <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
+                    <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
+                  </div>
+                ) : null}
                 {user.role === "admin" && user.adminApproved ? (
                 <div className="manager-chip-list">
                   {managerAssignments.filter((assignment) => assignment.managerUserId === user.id).map((assignment) => {
@@ -2582,7 +2586,11 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 </button>
               </p>
             ) : null}
-            {selectedUser ? <p className="muted">Name: {selectedUser.displayName || selectedUser.username} · Email: {selectedUser.email || "not set"}</p> : null}
+            {selectedUser ? (
+              <p className="muted selected-user-meta" title={`${selectedUser.displayName || selectedUser.username} · ${selectedUser.email || "not set"}`}>
+                Name: {selectedUser.displayName || selectedUser.username} · Email: {selectedUser.email || "not set"}
+              </p>
+            ) : null}
           </div>
           {selectedUser ? (
             <div className="selected-user-data-actions">
