@@ -619,6 +619,47 @@ input[type="datetime-local"] {
   border-radius: 18px;
   padding: 0.55rem;
   background: rgba(120, 120, 128, 0.1);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.color-preview-picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  border-radius: 16px;
+  padding: 0.55rem;
+  background: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.color-preview-picker > span {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.78), 0 8px 18px rgba(31, 35, 45, 0.14);
+}
+
+.color-preview-picker strong {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.color-preview-picker input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .color-swatches {
@@ -643,6 +684,10 @@ input[type="datetime-local"] {
 .color-swatches button.active {
   outline: 3px solid rgba(0, 122, 255, 0.24);
   border-color: rgba(255, 255, 255, 1);
+}
+
+.color-text-input {
+  min-width: 0;
 }
 
 /* ── Feedback messages ──────────────────────────────────────── */
@@ -1152,6 +1197,7 @@ input[type="datetime-local"] {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
   align-items: end;
   gap: 0.875rem;
+  min-width: 0;
 }
 
 .tag-create-row .primary-action {
@@ -1168,6 +1214,7 @@ input[type="datetime-local"] {
   border-radius: 20px;
   padding: 0.875rem;
   background: rgba(255, 255, 255, 0.58);
+  min-width: 0;
 }
 
 .tag-editor-heading {
@@ -1184,8 +1231,8 @@ input[type="datetime-local"] {
 }
 
 .tag-preview-dot {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.75), 0 6px 14px rgba(31, 35, 45, 0.16);
   flex: 0 0 auto;
@@ -1195,6 +1242,10 @@ input[type="datetime-local"] {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.tag-editor-actions button {
+  flex: 1 1 120px;
 }
 
 /* ── Tag picker ─────────────────────────────────────────────── */
@@ -3249,6 +3300,61 @@ button svg,
 
   .tag-create-row {
     grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .tag-create-row .primary-action {
+    width: 100%;
+    min-height: 52px;
+  }
+
+  .tag-list {
+    grid-template-columns: 1fr;
+  }
+
+  .tag-editor {
+    border-radius: 16px;
+    padding: 0.8rem;
+  }
+
+  .tag-editor-heading {
+    align-items: center;
+  }
+
+  .tag-preview-dot {
+    width: 42px;
+    height: 42px;
+  }
+
+  .tag-editor-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .tag-editor-actions button {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .color-control {
+    padding: 0.65rem;
+  }
+
+  .color-preview-picker {
+    grid-template-columns: 64px minmax(0, 1fr);
+    border-radius: 18px;
+  }
+
+  .color-preview-picker > span {
+    width: 64px;
+    height: 64px;
+  }
+
+  .color-swatches button {
+    width: 42px;
+    height: 42px;
+    min-height: 42px;
+    flex-basis: 42px;
   }
 
   .time-tools-grid {

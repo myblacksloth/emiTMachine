@@ -3888,6 +3888,11 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
     <div className="field">
       <span>{label}</span>
       <div className="color-control">
+        <label className="color-preview-picker">
+          <span style={{ background: value }} />
+          <strong>{value}</strong>
+          <input type="color" value={value} onChange={(event) => onChange(event.target.value)} aria-label={`${label} picker`} />
+        </label>
         <div className="color-swatches">
           {swatches.map((swatch) => (
             <button
@@ -3900,7 +3905,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
             />
           ))}
         </div>
-        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="#27b3a8" />
+        <input className="color-text-input" value={value} onChange={(event) => onChange(event.target.value)} placeholder="#27b3a8" />
       </div>
     </div>
   );
