@@ -1101,7 +1101,7 @@ function MonthlyCalendarPanel() {
       </div>
 
       {selectedActivity ? (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop bottom-sheet-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
             <div className="panel-title compact-title">
               <div>
@@ -1140,7 +1140,7 @@ function MonthlyCalendarPanel() {
         </div>
       ) : null}
       {selectedRequest ? (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop bottom-sheet-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
             <div className="panel-title compact-title">
               <div>
