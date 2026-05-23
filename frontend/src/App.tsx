@@ -207,6 +207,18 @@ function localValueFromIso(value: string | null) {
   return date.toISOString().slice(0, 16);
 }
 
+function localValuePlusMinutes(value: string, minutes: number) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  date.setMinutes(date.getMinutes() + minutes - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+function constrainedEndValue(nextStart: string, currentEnd: string, minimumMinutes = 60) {
+  if (!isLocalDateTimeValue(nextStart) || !isLocalDateTimeValue(currentEnd)) return currentEnd;
+  return new Date(currentEnd) <= new Date(nextStart) ? localValuePlusMinutes(nextStart, minimumMinutes) : currentEnd;
+}
+
 
 type CriticalDialogRequest =
   | { kind: "confirm"; title: string; message: string; resolve: (value: boolean) => void }
@@ -1270,6 +1282,11 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
     setCreateOpen(true);
   };
 
+  const updateRequestStart = (value: string) => {
+    setStartedAt(value);
+    setEndedAt((current) => constrainedEndValue(value, current));
+  };
+
   const createRequest = async (event: FormEvent) => {
     event.preventDefault();
     if (!isLocalDateTimeValue(startedAt) || !isLocalDateTimeValue(endedAt)) {
@@ -1431,7 +1448,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
                   <option value="smart_working">Smart working</option>
                 </select>
               </label>
-              <DateTimeField label="Start" value={startedAt} onChange={setStartedAt} />
+              <DateTimeField label="Start" value={startedAt} onChange={updateRequestStart} />
               <DateTimeField label="End" value={endedAt} onChange={setEndedAt} />
               {requestDurationMinutes !== null && requestDurationMinutes > 0 ? (
                 <div className="request-duration" aria-live="polite">
@@ -1793,9 +1810,11 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
                   </div>
                   {settings.mode === "overtime" && week.isClosed && week.overtimeMinutes > 0 && !week.paidAt ? (
                     <div className="overtime-week-actions">
-                      <button type="button" onClick={() => markPaid(week.weekStart)}>
-                        Mark paid
-                      </button>
+                      <SlideToConfirm
+                        label="Slide to mark paid"
+                        variant="in"
+                        onConfirm={() => markPaid(week.weekStart)}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -2879,10 +2898,13 @@ function ActivityEditor({
   saveLabel: string;
   error?: string;
 }) {
+  const updateStart = (value: string) => {
+    onDraft({ ...draft, startedAt: value, endedAt: constrainedEndValue(value, draft.endedAt) });
+  };
   return (
     <div className="activity-editor activity-card-editing">
       <div className="activity-edit-grid">
-        <DateTimeField label="Start" value={draft.startedAt} onChange={(value) => onDraft({ ...draft, startedAt: value })} />
+        <DateTimeField label="Start" value={draft.startedAt} onChange={updateStart} />
         <DateTimeField label="End" value={draft.endedAt} onChange={(value) => onDraft({ ...draft, endedAt: value })} />
         <TextField label="Start timezone" value={draft.startTimezone} onChange={(value) => onDraft({ ...draft, startTimezone: value })} />
         <TextField label="End timezone" value={draft.endTimezone} onChange={(value) => onDraft({ ...draft, endTimezone: value })} />

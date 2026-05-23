@@ -2954,10 +2954,12 @@ button svg,
 .overtime-week-actions {
   display: grid;
   gap: 0.45rem;
-  min-width: 132px;
+  width: min(320px, 100%);
+  min-width: min(260px, 100%);
 }
 
-.overtime-week-actions button {
+.overtime-week-actions button,
+.overtime-week-actions .slide-confirm {
   width: 100%;
 }
 
