@@ -529,6 +529,7 @@ input[type="datetime-local"] {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.875rem;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -1101,7 +1102,7 @@ input[type="datetime-local"] {
 
 .tag-create-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.2fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
   align-items: end;
   gap: 0.875rem;
 }
@@ -1680,10 +1681,28 @@ input[type="datetime-local"] {
   .tabs button,
   .section-nav button {
     flex: 0 0 auto;
-    min-height: 44px;
-    padding: 0 0.85rem;
+    min-width: 68px;
+    min-height: 52px;
+    padding: 0.32rem 0.7rem;
+    flex-direction: column;
+    gap: 0.25rem;
     scroll-snap-align: center;
     white-space: nowrap;
+  }
+
+  .section-nav button span,
+  .tabs button span {
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+
+  .quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-actions button {
+    min-height: 56px;
+    justify-content: center;
   }
 
   .field input,
@@ -1748,7 +1767,7 @@ body {
 
 .app-shell {
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
 }
 
 .auth-layout {
@@ -1779,6 +1798,8 @@ body {
 .auth-copy {
   position: relative;
   padding: 2rem 0;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .auth-copy::after {
@@ -1793,7 +1814,7 @@ body {
 }
 
 .auth-copy h1 {
-  font-size: 4rem;
+  font-size: clamp(2.2rem, 5vw, 4rem);
   letter-spacing: 0;
   max-width: 620px;
 }
@@ -1903,7 +1924,7 @@ button svg,
 }
 
 .topbar h1 {
-  font-size: 2.55rem;
+  font-size: clamp(1.6rem, 5vw, 2.55rem);
 }
 
 .work-band {
@@ -1972,7 +1993,7 @@ button svg,
 .clock-action {
   position: relative;
   z-index: 1;
-  min-width: 170px;
+  min-width: min(170px, 100%);
   min-height: 56px;
   font-size: 1.05rem;
 }
@@ -1980,6 +2001,20 @@ button svg,
 .work-band.open .clock-action {
   background: linear-gradient(135deg, #ff3b30, #ff8a4c);
   box-shadow: 0 16px 34px rgba(255, 59, 48, 0.22);
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.quick-actions button {
+  min-height: 52px;
+  border-radius: 18px;
+  justify-content: flex-start;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(31, 35, 45, 0.08);
 }
 
 .summary-grid {
@@ -2076,6 +2111,17 @@ button svg,
 .activity-panel {
   display: grid;
   gap: 1rem;
+}
+
+.activity-main h3 {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.activity-time-range {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 750;
 }
 
 .activity-list {
@@ -2179,6 +2225,8 @@ button svg,
   padding: 0.35rem;
   border-radius: 18px;
   background: rgba(120, 120, 128, 0.1);
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .week-tabs button {
@@ -2210,6 +2258,7 @@ button svg,
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   border-radius: 16px;
   padding: 0.75rem;
@@ -2414,11 +2463,12 @@ button svg,
   flex-wrap: wrap;
   align-items: end;
   gap: 0.65rem;
+  min-width: 0;
 }
 
 .history-filters .field {
-  min-width: 150px;
-  flex: 1;
+  min-width: min(150px, 100%);
+  flex: 1 1 150px;
 }
 
 .activity-modal {
@@ -2583,11 +2633,19 @@ button svg,
 
   .auth-copy h1,
   .topbar h1 {
-    font-size: 2.7rem;
+    font-size: clamp(1.8rem, 5vw, 2.7rem);
   }
 
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .countdown-form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .calendar-weekdays,
@@ -2703,6 +2761,38 @@ button svg,
 
   .time-tools-grid {
     grid-template-columns: 1fr;
+  }
+
+  .summary-grid.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .history-filters .field {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .no-count-control {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .auth-panel .tabs {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 0.75rem;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 

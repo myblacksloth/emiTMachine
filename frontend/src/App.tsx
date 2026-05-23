@@ -591,32 +591,32 @@ function Dashboard({
 
       <nav className="section-nav" aria-label="Workspace sections">
         <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")} type="button">
-          <LayoutDashboard size={16} /> Dashboard
+          <LayoutDashboard size={16} /> <span>Dashboard</span>
         </button>
         <button className={view === "activities" ? "active" : ""} onClick={() => setView("activities")} type="button">
-          <CalendarClock size={16} /> Activities
+          <CalendarClock size={16} /> <span>Activities</span>
         </button>
         <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">
-          <CalendarClock size={16} /> Calendar
+          <CalendarClock size={16} /> <span>Calendar</span>
         </button>
         <button className={view === "requests" ? "active" : ""} onClick={() => setView("requests")} type="button">
-          <ShieldCheck size={16} /> Administrative Requests
+          <ShieldCheck size={16} /> <span>Requests</span>
         </button>
         <button className={view === "overtime" ? "active" : ""} onClick={() => setView("overtime")} type="button">
-          <Hourglass size={16} /> Overtime
+          <Hourglass size={16} /> <span>Overtime</span>
         </button>
         <button className={view === "tags" ? "active" : ""} onClick={() => setView("tags")} type="button">
-          <Tags size={16} /> Tags
+          <Tags size={16} /> <span>Tags</span>
         </button>
         <button className={view === "tools" ? "active" : ""} onClick={() => setView("tools")} type="button">
-          <Clock size={16} /> Tools
+          <Clock size={16} /> <span>Tools</span>
         </button>
         <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")} type="button">
-          <UserRound size={16} /> Profile
+          <UserRound size={16} /> <span>Profile</span>
         </button>
         {data.user.role !== "user" ? (
           <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")} type="button">
-            <ShieldCheck size={16} /> Admin
+            <ShieldCheck size={16} /> <span>Admin</span>
           </button>
         ) : null}
       </nav>
@@ -635,6 +635,21 @@ function Dashboard({
             <button className="clock-action" type="button" onClick={() => setConfirming(data.activeSession ? "out" : "in")}>
               {data.activeSession ? <Square size={18} /> : <Zap size={18} />}
               {data.activeSession ? "Clock out" : "Clock in"}
+            </button>
+          </section>
+
+          <section className="quick-actions" aria-label="Quick actions">
+            <button type="button" onClick={() => setView("activities")}>
+              <Plus size={16} /> Add activity
+            </button>
+            <button type="button" onClick={() => setView("calendar")}>
+              <CalendarClock size={16} /> Month
+            </button>
+            <button type="button" onClick={() => setView("requests")}>
+              <ShieldCheck size={16} /> Request
+            </button>
+            <button type="button" onClick={() => setView("tools")}>
+              <Clock size={16} /> Tools
             </button>
           </section>
 
@@ -2231,7 +2246,14 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
                       <div className="activity-main">
                         <div>
                           <p className="eyebrow">{activity.endedAt ? "Closed session" : "Open session"}</p>
-                          <h3>{new Date(activity.startedAt).toLocaleString()} - {activity.endedAt ? new Date(activity.endedAt).toLocaleString() : "now"}</h3>
+                          <h3>
+                            <span>{new Date(activity.startedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+                            <span className="activity-time-range">
+                              {new Date(activity.startedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                              {" - "}
+                              {activity.endedAt ? new Date(activity.endedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "now"}
+                            </span>
+                          </h3>
                           <p className="muted">
                             {activity.durationMinutes === null ? "Running" : minutesLabel(activity.durationMinutes)}
                             {activity.noCountMinutes > 0 ? ` · No count ${minutesLabel(activity.noCountMinutes)}` : ""}
