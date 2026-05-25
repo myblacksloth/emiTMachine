@@ -1198,6 +1198,9 @@ input[type="datetime-local"] {
 
 .profile-section {
   align-content: start;
+  gap: 0;
+  padding: 0.75rem;
+  overflow: hidden;
 }
 
 .profile-section summary {
@@ -1205,40 +1208,64 @@ input[type="datetime-local"] {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  min-height: 44px;
-  color: var(--text-primary);
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 1.05rem;
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 750;
   list-style: none;
+  box-shadow: var(--shadow-card);
+  transition:
+    background var(--duration) var(--ease),
+    border-color var(--duration) var(--ease),
+    color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.profile-section summary:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .profile-section summary::-webkit-details-marker {
   display: none;
 }
 
-.profile-section summary::after {
-  content: "⌄";
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  background: rgba(120, 120, 128, 0.12);
-  color: var(--text-tertiary);
-  font-size: 1rem;
-  line-height: 1;
-  transition: transform var(--duration) var(--ease);
+.profile-section summary > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.profile-section[open] summary::after {
+.profile-section summary > svg {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition:
+    transform 0.2s var(--ease),
+    color var(--duration) var(--ease);
+}
+
+.profile-section[open] summary {
+  border-color: rgba(0, 122, 255, 0.24);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text-primary);
+}
+
+.profile-section[open] summary > svg {
   transform: rotate(180deg);
+  color: var(--text-link);
 }
 
 .profile-section-body {
   display: grid;
   gap: 0.875rem;
   min-width: 0;
+  padding: 1rem 0.25rem 0.25rem;
 }
 
 .profile-long-text {

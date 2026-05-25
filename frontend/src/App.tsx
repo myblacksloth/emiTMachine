@@ -3605,8 +3605,8 @@ function ProfileSettings({
 
   return (
     <section className="settings-grid">
-      <details className="panel stack profile-section" open>
-        <summary>Account</summary>
+      <details className="panel stack profile-section">
+        <summary><span>Account</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <div className="profile-section-body">
           <p className="muted profile-long-text">User ID: <strong>{data.user.publicId || "Not assigned"}</strong></p>
           <p className="muted">This identifier is generated automatically and can be changed by an admin.</p>
@@ -3623,8 +3623,8 @@ function ProfileSettings({
         </div>
       </details>
 
-      <details className="panel stack profile-section" open>
-        <summary>Name and email</summary>
+      <details className="panel stack profile-section">
+        <summary><span>Name and email</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <form
           className="profile-section-body stack"
           onSubmit={async (event) => {
@@ -3643,8 +3643,8 @@ function ProfileSettings({
         </form>
       </details>
 
-      <details className="panel stack profile-section" open>
-        <summary>Password</summary>
+      <details className="panel stack profile-section">
+        <summary><span>Password</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <form
           className="profile-section-body stack"
           onSubmit={async (event) => {
@@ -3665,8 +3665,8 @@ function ProfileSettings({
         </form>
       </details>
 
-      <details className="panel stack profile-section" open>
-        <summary>TOTP</summary>
+      <details className="panel stack profile-section">
+        <summary><span>TOTP</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <div className="profile-section-body stack">
           <p className="muted">{data.user.totpEnabled ? "TOTP is enabled for this account." : "Set up an authenticator app with a QR code."}</p>
           <button
@@ -3699,8 +3699,8 @@ function ProfileSettings({
         </div>
       </details>
 
-      <details className="panel stack profile-section" open>
-        <summary>Passkeys</summary>
+      <details className="panel stack profile-section">
+        <summary><span>Passkeys</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <form
           className="profile-section-body stack"
           onSubmit={async (event) => {
@@ -3730,8 +3730,8 @@ function ProfileSettings({
         </form>
       </details>
 
-      <details className="panel stack profile-section" open>
-        <summary>Recovery codes</summary>
+      <details className="panel stack profile-section">
+        <summary><span>Recovery codes</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <div className="profile-section-body stack">
           {recoveryCodes.length === 0 ? (
             <>
