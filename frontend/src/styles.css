@@ -1912,20 +1912,27 @@ input[type="datetime-local"] {
 .file-input {
   display: grid;
   gap: 0.5rem;
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--r-sm);
+  border: 1.5px dashed rgba(0, 122, 255, 0.26);
+  border-radius: 20px;
   padding: 1rem;
-  background: var(--bg-input);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72)),
+    rgba(0, 122, 255, 0.06);
   cursor: pointer;
   min-width: 0;
   transition:
+    transform var(--duration) var(--ease),
     border-color var(--duration) var(--ease),
-    background var(--duration) var(--ease);
+    background var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
 }
 
 .file-input:hover {
   border-color: var(--blue);
-  background: var(--accent-light);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(232, 243, 255, 0.86)),
+    rgba(0, 122, 255, 0.08);
+  box-shadow: 0 12px 30px rgba(0, 122, 255, 0.12);
 }
 
 .file-input span {
@@ -1936,6 +1943,47 @@ input[type="datetime-local"] {
   font-weight: 600;
   color: var(--text-secondary);
   min-width: 0;
+}
+
+.csv-dropzone {
+  position: relative;
+  place-items: center;
+  min-height: 150px;
+  text-align: center;
+}
+
+.csv-dropzone.drag-active {
+  border-color: var(--blue);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(219, 239, 255, 0.92)),
+    rgba(0, 122, 255, 0.12);
+  box-shadow: 0 18px 38px rgba(0, 122, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.csv-dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #007aff, #4cc9f0);
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.22);
+}
+
+.csv-dropzone strong {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.csv-dropzone small {
+  max-width: 28rem;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .file-input input[type="file"] {

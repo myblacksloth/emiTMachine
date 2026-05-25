@@ -3592,6 +3592,7 @@ function ProfileSettings({
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [remainingCount, setRemainingCount] = useState(data.user.recoveryCodeCount);
   const [importResult, setImportResult] = useState("");
+  const [csvDragActive, setCsvDragActive] = useState(false);
   const passkeyWarning = api.passkeyEnvironmentWarning();
 
   const recoveryBlob = useMemo(() => new Blob([recoveryCodes.join("\n")], { type: "text/plain" }), [recoveryCodes]);
@@ -3602,6 +3603,12 @@ function ProfileSettings({
       .then(setManagers)
       .catch(() => setManagers([]));
   }, []);
+
+  const importCsvRestore = async (file: File) => {
+    if (!(await confirmCritical(`Import CSV file "${file.name}"? This can create new records.`))) return;
+    const result = await api.importCsv(file);
+    setImportResult(`${result.importedRows} rows imported. ${result.invalidRows} rows need review.`);
+  };
 
   return (
     <section className="settings-grid">
@@ -3787,20 +3794,37 @@ function ProfileSettings({
           <a className="download-link" href={api.exportCsvUrl}>
             <Download size={16} /> Download CSV export
           </a>
-          <label className="file-input">
-            <span><UploadCloud size={16} /> Upload CSV restore</span>
+          <label
+            className={`file-input csv-dropzone${csvDragActive ? " drag-active" : ""}`}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setCsvDragActive(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setCsvDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCsvDragActive(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setCsvDragActive(false);
+              const file = event.dataTransfer.files?.[0];
+              if (file) void importCsvRestore(file);
+            }}
+          >
+            <span className="csv-dropzone-icon"><UploadCloud size={22} /></span>
+            <strong>Upload CSV restore</strong>
+            <small>Drop a CSV file here or tap to choose one.</small>
             <input
               type="file"
               accept=".csv,text/csv"
               onChange={async (event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
-                if (!(await confirmCritical(`Import CSV file "${file.name}"? This can create new records.`))) {
-                  event.target.value = "";
-                  return;
-                }
-                const result = await api.importCsv(file);
-                setImportResult(`${result.importedRows} rows imported. ${result.invalidRows} rows need review.`);
+                await importCsvRestore(file);
+                event.target.value = "";
               }}
             />
           </label>
