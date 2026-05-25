@@ -394,7 +394,7 @@ function CriticalDialogHost() {
     setDialog(null);
   };
 
-  return (
+  return createPortal(
     <div className="modal-backdrop critical-backdrop" role="presentation">
       <section className="modal critical-modal" role="dialog" aria-modal="true" aria-labelledby="critical-title">
         <div>
@@ -417,7 +417,8 @@ function CriticalDialogHost() {
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
 

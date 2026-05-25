@@ -1408,7 +1408,7 @@ input[type="datetime-local"] {
 }
 
 .critical-backdrop {
-  z-index: 45;
+  z-index: 120;
 }
 
 @keyframes backdropIn {
