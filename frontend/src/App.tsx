@@ -1275,6 +1275,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const [historyYear, setHistoryYear] = useState("");
   const [historyMonth, setHistoryMonth] = useState("");
   const [historyUserId, setHistoryUserId] = useState("");
+  const [historyFiltersOpen, setHistoryFiltersOpen] = useState(false);
   const [requestFilterId, setRequestFilterId] = useState("");
   const [requestFilterUserId, setRequestFilterUserId] = useState("");
   const [requestFilterFrom, setRequestFilterFrom] = useState("");
@@ -1403,8 +1404,14 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
     setHistoryYear("");
     setHistoryMonth("");
     setHistoryUserId("");
+    setHistoryFiltersOpen(false);
     setHistoryOpen(true);
     await loadHistory({ year: "", month: "", userId: "" }, true);
+  };
+
+  const applyHistoryFilters = async () => {
+    await loadHistory();
+    setHistoryFiltersOpen(false);
   };
 
   const archiveRequests = async (requestIds: string[], clearSelection: () => void) => {
@@ -1466,6 +1473,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
   const filteredRequests = requests.filter(matchesRequestFilters);
   const filteredPending = pending.filter(matchesRequestFilters);
   const filteredDecided = decided.filter(matchesRequestFilters);
+  const activeHistoryFilterCount = [historyYear, historyMonth, historyUserId].filter(Boolean).length;
   const resetRequestFilters = () => {
     setRequestFilterId("");
     setRequestFilterUserId("");
@@ -1643,35 +1651,43 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
                 <h2 id="history-modal-title">Historical requests</h2>
               </div>
             </div>
-            <div className="history-filters">
-              <label className="field">
-                <span>Year</span>
-                <input value={historyYear} onChange={(event) => setHistoryYear(event.target.value)} placeholder="2026" inputMode="numeric" />
-              </label>
-              <label className="field">
-                <span>Month</span>
-                <select value={historyMonth} onChange={(event) => setHistoryMonth(event.target.value)}>
-                  <option value="">All</option>
-                  {Array.from({ length: 12 }, (_, index) => (
-                    <option value={String(index + 1)} key={index + 1}>
-                      {new Date(2026, index, 1).toLocaleDateString(undefined, { month: "long" })}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>User</span>
-                <select value={historyUserId} onChange={(event) => setHistoryUserId(event.target.value)}>
-                  <option value="">All</option>
-                  {historyUserOptions.map((requester) => (
-                    <option value={requester.userId} key={requester.publicId}>
-                      {requester.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" onClick={() => loadHistory()}>Apply filters</button>
-            </div>
+            <section className={`history-filter-panel ${historyFiltersOpen ? "open" : ""}`} aria-label="Historical request filters">
+              <button className="history-filter-toggle" type="button" onClick={() => setHistoryFiltersOpen((open) => !open)} aria-expanded={historyFiltersOpen}>
+                <span>Filters</span>
+                <small>{activeHistoryFilterCount > 0 ? `${activeHistoryFilterCount} active` : "All requests"}</small>
+              </button>
+              {historyFiltersOpen ? (
+                <div className="history-filters">
+                  <label className="field">
+                    <span>Year</span>
+                    <input value={historyYear} onChange={(event) => setHistoryYear(event.target.value)} placeholder="2026" inputMode="numeric" />
+                  </label>
+                  <label className="field">
+                    <span>Month</span>
+                    <select value={historyMonth} onChange={(event) => setHistoryMonth(event.target.value)}>
+                      <option value="">All</option>
+                      {Array.from({ length: 12 }, (_, index) => (
+                        <option value={String(index + 1)} key={index + 1}>
+                          {new Date(2026, index, 1).toLocaleDateString(undefined, { month: "long" })}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>User</span>
+                    <select value={historyUserId} onChange={(event) => setHistoryUserId(event.target.value)}>
+                      <option value="">All</option>
+                      {historyUserOptions.map((requester) => (
+                        <option value={requester.userId} key={requester.publicId}>
+                          {requester.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button type="button" onClick={applyHistoryFilters}>Apply filters</button>
+                </div>
+              ) : null}
+            </section>
             <RequestList requests={historyRequests} />
             <div className="modal-actions">
               <button type="button" onClick={exportHistory}>

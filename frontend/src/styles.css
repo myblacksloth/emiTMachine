@@ -3173,6 +3173,31 @@ button svg,
   min-width: 0;
 }
 
+.history-filter-panel {
+  display: grid;
+  gap: 0.65rem;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.history-filter-toggle {
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  border-color: rgba(0, 122, 255, 0.16);
+  background: rgba(0, 122, 255, 0.07);
+}
+
+.history-filter-toggle span {
+  font-weight: 850;
+}
+
+.history-filter-toggle small {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .request-filter-bar .field,
 .admin-session-filters .field {
   min-width: min(170px, 100%);
@@ -3805,7 +3830,7 @@ button svg,
   }
 
   .request-modal > .form-message,
-  .history-modal .history-filters,
+  .history-modal .history-filter-panel,
   .profile-editor-modal > .muted,
   .profile-editor-modal .profile-editor-fields {
     flex: 0 0 auto;
@@ -5324,6 +5349,48 @@ button:disabled,
   .overtime-week-footer,
   .overtime-week-header {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .history-modal .history-filter-panel {
+    gap: 0.45rem;
+  }
+
+  .history-filter-toggle {
+    min-height: 46px;
+    padding: 0.65rem 0.8rem;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+
+  .history-filter-toggle small {
+    font-size: 0.78rem;
+  }
+
+  .history-modal .history-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.65rem;
+    border: 1px solid rgba(60, 60, 67, 0.1);
+    border-radius: 18px;
+    background: rgba(120, 120, 128, 0.06);
+  }
+
+  .history-modal .history-filters .field {
+    min-width: 0;
+    gap: 0.28rem;
+  }
+
+  .history-modal .history-filters .field:nth-of-type(3),
+  .history-modal .history-filters button {
+    grid-column: 1 / -1;
+  }
+
+  .history-modal .history-filters input,
+  .history-modal .history-filters select,
+  .history-modal .history-filters button {
+    min-height: 44px;
+    padding-block: 0.55rem;
   }
 
   .calendar-summary,
