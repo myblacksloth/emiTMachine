@@ -2388,6 +2388,16 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", `${user.username} approved.`);
   };
 
+  const changeUserRole = async (user: AdminUser, role: "user" | "admin") => {
+    const action = role === "admin" ? "make this user an admin" : "revoke admin rights from this user";
+    const detail = role === "user" ? " Responsible-user assignments owned by this admin will be removed." : "";
+    if (!(await confirmCritical(`Do you want to ${action} for ${user.username}?${detail}`))) return;
+    await api.setUserRole(user.id, role);
+    await loadUsers();
+    await loadSelectedUserData(user.id);
+    onToast("success", role === "admin" ? `${user.username} is now an admin.` : `${user.username} is now a standard user.`);
+  };
+
   const toggleEditPermission = async (user: AdminUser) => {
     if (!(await confirmCritical(`${user.canEditSessions ? "Disable" : "Enable"} session editing for ${user.username}?`))) return;
     await api.setUserEditPermission(user.id, !user.canEditSessions);
@@ -2639,6 +2649,12 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 <div className="admin-user-actions">
                   {currentRole === "root" && isPendingAdmin ? (
                     <button className="approve-admin-action" type="button" onClick={() => approveAdmin(user)}>Approve admin</button>
+                  ) : null}
+                  {currentRole === "root" && user.role === "user" ? (
+                    <button className="approve-admin-action" type="button" onClick={() => changeUserRole(user, "admin")}>Make admin</button>
+                  ) : null}
+                  {currentRole === "root" && user.role === "admin" ? (
+                    <button type="button" onClick={() => changeUserRole(user, "user")}>Revoke admin</button>
                   ) : null}
                   {user.role === "admin" && user.adminApproved ? (
                     <button type="button" onClick={() => addManagedUser(user)}>Add managed user</button>

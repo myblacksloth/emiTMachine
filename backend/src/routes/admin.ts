@@ -37,6 +37,10 @@ const registrationSchema = z.object({
   enabled: z.boolean()
 });
 
+const userRoleSchema = z.object({
+  role: z.enum(["user", "admin"])
+});
+
 const importRowsSchema = z.array(z.record(z.unknown())).default([]);
 
 const userDataPayloadSchema = z.object({
@@ -185,6 +189,42 @@ router.post("/users/:id/approve-admin", async (req, res, next) => {
     if (!result.rows[0]) throw new HttpError(404, "Pending admin not found");
     req.log?.info("admin approved", { actorUserId: req.user!.id, userId });
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/users/:id/role", async (req, res, next) => {
+  try {
+    requireRoot(req);
+    const userId = uuidSchema.parse(req.params.id);
+    const input = userRoleSchema.parse(req.body);
+    if (userId === req.user!.id) throw new HttpError(400, "Root cannot change its own role");
+
+    const updated = await withTransaction(async (client) => {
+      const result = await client.query(
+        `update users
+         set role = $2,
+             admin_approved = true,
+             updated_at = now()
+         where id = $1 and role <> 'root'
+         returning id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
+                   overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
+                   status, disabled_at, created_at, last_login_at`,
+        [userId, input.role]
+      );
+      if (!result.rows[0]) throw new HttpError(404, "User not found or role cannot be changed");
+
+      if (input.role === "user") {
+        // A user demoted from admin can no longer be responsible for other users.
+        await client.query("delete from user_managers where manager_user_id = $1", [userId]);
+      }
+
+      return result.rows[0];
+    });
+
+    req.log?.info("user role changed", { actorUserId: req.user!.id, userId, role: input.role });
+    res.json({ user: updated });
   } catch (error) {
     next(error);
   }
