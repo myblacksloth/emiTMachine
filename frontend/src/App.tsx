@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState, type HTMLAttributes, type PointerEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   AlarmClock,
   BarChart3,
@@ -2900,7 +2901,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       </div>
       <p className="muted">Review, correct, or delete recorded work sessions. This is currently enabled for every user and is ready to become an admin-controlled permission.</p>
       <div className="activity-actions">
-        <button type="button" onClick={startCreate}>
+        <button className="activity-add-action" type="button" onClick={startCreate}>
           <Plus size={16} /> Add activity
         </button>
       </div>
@@ -2993,8 +2994,8 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
           </div>
         </section>
       ) : null}
-      {creating && draft ? (
-        <div className="modal-backdrop" role="presentation">
+      {creating && draft ? createPortal(
+        <div className="modal-backdrop activity-modal-backdrop" role="presentation">
           <section className="modal activity-modal" role="dialog" aria-modal="true" aria-labelledby="activity-modal-title">
             <div className="panel-title compact-title">
               <div>
@@ -3012,7 +3013,8 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
               error={message || undefined}
             />
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </section>
   );
