@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState, type HTMLAttributes, type PointerEvent, type ReactNode } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlarmClock,
@@ -2318,12 +2318,19 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [profileEditor, setProfileEditor] = useState<{ user: AdminUser; displayName: string; email: string } | null>(null);
   const [profileEditorSaving, setProfileEditorSaving] = useState(false);
+  const [showOrgGraph, setShowOrgGraph] = useState(false);
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
   const selectedUserManagers: AdminUser[] = selectedUser
     ? managerAssignments
         .filter((a: ManagerAssignment) => a.userId === selectedUser.id)
         .map((a: ManagerAssignment) => users.find((u: AdminUser) => u.id === a.managerUserId))
+        .filter((u): u is AdminUser => u !== undefined)
+    : [];
+  const selectedUserManagedUsers: AdminUser[] = selectedUser
+    ? managerAssignments
+        .filter((a: ManagerAssignment) => a.managerUserId === selectedUser.id)
+        .map((a: ManagerAssignment) => users.find((u: AdminUser) => u.id === a.userId))
         .filter((u): u is AdminUser => u !== undefined)
     : [];
   const canUseAdminUserDataTools = (user: AdminUser | null) =>
@@ -2633,9 +2640,14 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             <p className="eyebrow">{currentRole} console</p>
             <h2>Users</h2>
           </div>
-          <button type="button" onClick={loadUsers}>
-            <RefreshCw size={16} /> Refresh
-          </button>
+          <div className="admin-header-actions">
+            <button type="button" onClick={() => setShowOrgGraph(true)}>
+              <UserRound size={16} /> Org chart
+            </button>
+            <button type="button" onClick={loadUsers}>
+              <RefreshCw size={16} /> Refresh
+            </button>
+          </div>
         </div>
         {currentRole === "root" ? (
           <div className="admin-system-row">
@@ -2732,22 +2744,6 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                     <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
                   </div>
                 ) : null}
-                {user.role === "admin" && user.adminApproved ? (
-                <div className="manager-chip-list">
-                  {managerAssignments.filter((assignment) => assignment.managerUserId === user.id).map((assignment) => {
-                    const target = users.find((candidate) => candidate.id === assignment.userId);
-                    if (!target) return null;
-                    return (
-                      <span key={`${assignment.managerUserId}-${assignment.userId}`}>
-                        {target.username}
-                        <button type="button" aria-label={`Remove ${target.username}`} onClick={() => removeManagedUser(user, target)}>
-                          x
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : null}
               </article>
             );
           })}
@@ -2786,6 +2782,19 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
               <p className="muted selected-user-managers">
                 Admin: {selectedUserManagers.map((m) => m.username).join(", ")}
               </p>
+            ) : null}
+            {selectedUser?.role === "admin" && selectedUser.adminApproved && selectedUserManagedUsers.length > 0 ? (
+              <div className="selected-user-managed">
+                <p className="eyebrow">Managed users</p>
+                <div className="manager-chip-list">
+                  {selectedUserManagedUsers.map((target) => (
+                    <span key={target.id}>
+                      {target.username}
+                      <button type="button" aria-label={`Remove ${target.username}`} onClick={() => removeManagedUser(selectedUser, target)}>×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
             ) : null}
           </div>
           {selectedUser && (canExportSelectedUserData || canUseSelectedUserDataTools) ? (
@@ -2934,7 +2943,131 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           document.body
         )
       : null}
+    {showOrgGraph ? createPortal(
+      <OrgGraphModal
+        users={users}
+        assignments={managerAssignments}
+        highlightId={selectedUserId}
+        onClose={() => setShowOrgGraph(false)}
+        onSelect={(id) => { setSelectedUserId(id); setShowOrgGraph(false); }}
+      />,
+      document.body
+    ) : null}
     </>
+  );
+}
+
+function OrgGraphModal({
+  users,
+  assignments,
+  highlightId,
+  onClose,
+  onSelect
+}: {
+  users: AdminUser[];
+  assignments: ManagerAssignment[];
+  highlightId: string;
+  onClose: () => void;
+  onSelect: (id: string) => void;
+}) {
+  const NODE_W = 124;
+  const NODE_H = 48;
+  const COL_GAP = 18;
+  const ROW_GAP = 72;
+  const PAD = 28;
+
+  const roots  = users.filter((u) => u.role === "root");
+  const admins = users.filter((u) => u.role === "admin");
+  const regular = users.filter((u) => u.role === "user");
+  const rows = [roots, admins, regular].filter((r) => r.length > 0);
+
+  const maxPerRow = Math.max(...rows.map((r) => r.length), 1);
+  const svgW = maxPerRow * (NODE_W + COL_GAP) - COL_GAP + PAD * 2;
+  const svgH = PAD + rows.length * (NODE_H + ROW_GAP) - ROW_GAP + PAD;
+
+  const pos = new Map<string, { x: number; y: number }>();
+  rows.forEach((row, ri) => {
+    const rowW = row.length * (NODE_W + COL_GAP) - COL_GAP;
+    const startX = (svgW - rowW) / 2;
+    const y = PAD + ri * (NODE_H + ROW_GAP);
+    row.forEach((user, ci) => {
+      pos.set(user.id, { x: startX + ci * (NODE_W + COL_GAP), y });
+    });
+  });
+
+  const roleColor = (u: AdminUser) =>
+    u.role === "root" ? "#007AFF" : u.role === "admin" ? "#34C759" : "#8E8E93";
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="modal org-graph-modal" role="dialog" aria-modal="true" aria-label="Org chart" onClick={(e: ReactMouseEvent) => e.stopPropagation()}>
+        <div className="panel-title compact-title">
+          <div>
+            <p className="eyebrow">Admin panel</p>
+            <h2>Org chart</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="org-graph-legend">
+          <span><i style={{ background: "#007AFF" }} />Root</span>
+          <span><i style={{ background: "#34C759" }} />Admin</span>
+          <span><i style={{ background: "#8E8E93" }} />User</span>
+          <span className="org-graph-legend-hint">Click a node to select the user</span>
+        </div>
+        <div className="org-graph-scroll">
+          <svg width={svgW} height={svgH} style={{ display: "block", minWidth: "100%" }}>
+            <defs>
+              <marker id="org-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6 Z" fill="rgba(60,60,67,0.35)" />
+              </marker>
+            </defs>
+            {assignments.map((a) => {
+              const from = pos.get(a.managerUserId);
+              const to   = pos.get(a.userId);
+              if (!from || !to) return null;
+              return (
+                <line
+                  key={`${a.managerUserId}-${a.userId}`}
+                  x1={from.x + NODE_W / 2} y1={from.y + NODE_H}
+                  x2={to.x   + NODE_W / 2} y2={to.y}
+                  stroke="rgba(60,60,67,0.28)" strokeWidth="1.5"
+                  markerEnd="url(#org-arrow)"
+                />
+              );
+            })}
+            {users.map((user) => {
+              const p = pos.get(user.id);
+              if (!p) return null;
+              const hl    = user.id === highlightId;
+              const color = roleColor(user);
+              const isPending = user.role === "admin" && !user.adminApproved;
+              const label = user.username.length > 13 ? user.username.slice(0, 12) + "…" : user.username;
+              return (
+                <g key={user.id} style={{ cursor: "pointer" }} onClick={() => onSelect(user.id)}>
+                  <rect
+                    x={p.x} y={p.y} width={NODE_W} height={NODE_H} rx="14"
+                    fill={hl ? color : `${color}1a`}
+                    stroke={color}
+                    strokeWidth={hl ? 2.5 : 1.5}
+                    strokeDasharray={isPending ? "5 3" : undefined}
+                  />
+                  <text x={p.x + NODE_W / 2} y={p.y + NODE_H / 2 - 7}
+                    textAnchor="middle" fontSize="12" fontWeight={hl ? "800" : "600"}
+                    fill={hl ? "#fff" : "#1C1C1E"} style={{ userSelect: "none", pointerEvents: "none" }}>
+                    {label}
+                  </text>
+                  <text x={p.x + NODE_W / 2} y={p.y + NODE_H / 2 + 10}
+                    textAnchor="middle" fontSize="10"
+                    fill={hl ? "rgba(255,255,255,0.75)" : "#8E8E93"} style={{ userSelect: "none", pointerEvents: "none" }}>
+                    {user.role}{isPending ? " · pending" : ""}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </div>
   );
 }
 
