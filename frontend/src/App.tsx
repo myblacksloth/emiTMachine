@@ -30,6 +30,7 @@ import {
   Trash2,
   UploadCloud,
   UserRound,
+  X,
   Zap
 } from "lucide-react";
 import { api } from "./api";
@@ -397,6 +398,7 @@ function CriticalDialogHost() {
   return createPortal(
     <div className="modal-backdrop critical-backdrop" role="presentation">
       <section className="modal critical-modal" role="dialog" aria-modal="true" aria-labelledby="critical-title">
+        <ModalCloseButton onClick={() => close(false)} />
         <div>
           <p className="eyebrow">Action required</p>
           <h2 id="critical-title">{dialog.title}</h2>
@@ -419,6 +421,14 @@ function CriticalDialogHost() {
       </section>
     </div>,
     document.body
+  );
+}
+
+function ModalCloseButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button className="modal-close-button" type="button" onClick={onClick} disabled={disabled} aria-label="Close modal">
+      <X size={16} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -1143,6 +1153,7 @@ function MonthlyCalendarPanel() {
       {selectedActivity ? createPortal(
         <div className="modal-backdrop bottom-sheet-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
+            <ModalCloseButton onClick={() => setSelectedActivity(null)} />
             <div className="panel-title compact-title">
               <div>
                 <p className="eyebrow">{selectedActivity.endedAt ? "Closed activity" : "Open activity"}</p>
@@ -1183,6 +1194,7 @@ function MonthlyCalendarPanel() {
       {selectedRequest ? createPortal(
         <div className="modal-backdrop bottom-sheet-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
+            <ModalCloseButton onClick={() => setSelectedRequest(null)} />
             <div className="panel-title compact-title">
               <div>
                 <p className="eyebrow">Approved administrative request</p>
@@ -1538,6 +1550,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
       {createOpen ? createPortal(
         <div className="modal-backdrop" role="presentation">
           <form className="modal request-modal" role="dialog" aria-modal="true" aria-labelledby="request-modal-title" onSubmit={createRequest}>
+            <ModalCloseButton onClick={() => setCreateOpen(false)} />
             <div className="panel-title compact-title">
               <div>
                 <p className="eyebrow">Administrative Requests</p>
@@ -1645,6 +1658,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
       {historyOpen ? createPortal(
         <div className="modal-backdrop" role="presentation">
           <section className="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+            <ModalCloseButton onClick={() => setHistoryOpen(false)} />
             <div className="panel-title compact-title">
               <div>
                 <p className="eyebrow">Administrative Requests</p>
@@ -2754,14 +2768,12 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             if (event.target === event.currentTarget && !profileEditorSaving) setProfileEditor(null);
           }}>
             <form className="modal profile-editor-modal" onSubmit={submitProfileEditor} role="dialog" aria-modal="true" aria-labelledby="profile-editor-title">
+              <ModalCloseButton onClick={() => setProfileEditor(null)} disabled={profileEditorSaving} />
               <div className="compact-title">
                 <div>
                   <p className="eyebrow">Selected user</p>
                   <h3 id="profile-editor-title">Edit name and email</h3>
                 </div>
-                <button type="button" className="ghost-action" onClick={() => setProfileEditor(null)} disabled={profileEditorSaving}>
-                  Close
-                </button>
               </div>
               <p className="muted">Update the visible name and contact email for {profileEditor.user.username}.</p>
               <div className="profile-editor-fields">
@@ -3094,6 +3106,7 @@ function ActivityPanel({ tags, onRefresh, onToast }: { tags: Tag[]; onRefresh: (
       {creating && draft ? createPortal(
         <div className="modal-backdrop activity-modal-backdrop" role="presentation">
           <section className="modal activity-modal" role="dialog" aria-modal="true" aria-labelledby="activity-modal-title">
+            <ModalCloseButton onClick={cancelCreate} />
             <div className="panel-title compact-title">
               <div>
                 <p className="eyebrow">Manual activity</p>
@@ -3244,6 +3257,7 @@ function PunchDialog({
   return createPortal(
     <div className="modal-backdrop" role="presentation">
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="punch-title">
+        <ModalCloseButton onClick={onClose} disabled={busy} />
         <h2 id="punch-title">Confirm {mode === "in" ? "clock in" : "clock out"}</h2>
         <p className="muted">Review the client time before recording this event.</p>
         <DateTimeField label="Event time" value={occurredAt} onChange={setOccurredAt} />

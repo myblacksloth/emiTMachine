@@ -1423,6 +1423,7 @@ input[type="datetime-local"] {
 }
 
 .modal {
+  position: relative;
   width: min(520px, 100%);
   max-height: calc(100vh - 2rem);
   max-height: calc(100dvh - 2rem);
@@ -1437,6 +1438,38 @@ input[type="datetime-local"] {
   display: grid;
   gap: 1rem;
   animation: modalIn 0.25s var(--ease);
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 5;
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  border-color: rgba(60, 60, 67, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
+  box-shadow: 0 8px 18px rgba(31, 35, 45, 0.08);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+.modal-close-button:hover:not(:disabled),
+.modal-close-button:focus-visible {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(0, 122, 255, 0.22);
+}
+
+.modal > .compact-title,
+.critical-modal > div:first-of-type,
+.modal > h2:first-of-type {
+  padding-right: 2.8rem;
 }
 
 .critical-modal {
@@ -3738,6 +3771,22 @@ button svg,
     background: rgba(60, 60, 67, 0.22);
     justify-self: center;
     margin-bottom: 0.2rem;
+  }
+
+  .modal-close-button {
+    top: 0.7rem;
+    right: 0.7rem;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .modal > .compact-title,
+  .critical-modal > div:first-of-type,
+  .modal > h2:first-of-type {
+    padding-right: 3.1rem;
   }
 
   .critical-backdrop {
