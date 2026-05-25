@@ -2318,6 +2318,12 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [profileEditorSaving, setProfileEditorSaving] = useState(false);
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+  const canUseAdminUserDataTools = (user: AdminUser | null) =>
+    !!user && user.role !== "root" && (currentRole === "root" || user.role === "user");
+  const canExportAdminUserData = (user: AdminUser | null) =>
+    !!user && (currentRole === "root" || user.role === "user");
+  const canUseSelectedUserDataTools = canUseAdminUserDataTools(selectedUser);
+  const canExportSelectedUserData = canExportAdminUserData(selectedUser);
   const filteredSelectedSessions = selectedSessions.filter((session) =>
     intervalOverlapsDateFilters(session.startedAt, session.endedAt, sessionFilterFrom, sessionFilterTo)
   );
@@ -2352,10 +2358,12 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const loadSelectedUserData = async (userId: string) => {
     if (!userId) return;
     try {
+      const targetUser = users.find((user) => user.id === userId) ?? null;
+      const canLoadOvertime = canUseAdminUserDataTools(targetUser);
       const [summaryPayload, sessions, overtime] = await Promise.all([
         api.adminUserSummary(userId),
         api.adminUserSessions(userId),
-        api.adminUserOvertime(userId).catch(() => null)
+        canLoadOvertime ? api.adminUserOvertime(userId).catch(() => null) : Promise.resolve(null)
       ]);
       setSummary(summaryPayload.summary);
       setSelectedSessions(sessions);
@@ -2518,6 +2526,10 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
 
   const importSelectedUserData = async (file: File | null) => {
     if (!selectedUser || !file) return;
+    if (!canUseSelectedUserDataTools) {
+      setMessage("This user cannot be imported by the current admin account.");
+      return;
+    }
     if (
       !(await confirmCritical(
         `Import this JSON backup into ${selectedUser.username}? Current sessions, tags, countdowns, overtime payments, and administrative requests for this user will be replaced.`
@@ -2713,23 +2725,29 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
               </p>
             ) : null}
           </div>
-          {selectedUser ? (
+          {selectedUser && (canExportSelectedUserData || canUseSelectedUserDataTools) ? (
             <div className="selected-user-data-actions">
-              <a className="download-link" href={api.adminUserExportUrl(selectedUser.id)}>
-                <Download size={16} /> Export user data
-              </a>
-              <label className="download-link upload-link">
-                <UploadCloud size={16} /> Import user data
-                <input
-                  accept=".json,application/json"
-                  type="file"
-                  onChange={(event) => {
-                    void importSelectedUserData(event.target.files?.[0] ?? null);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </label>
+              {canExportSelectedUserData ? (
+                <a className="download-link" href={api.adminUserExportUrl(selectedUser.id)}>
+                  <Download size={16} /> Export user data
+                </a>
+              ) : null}
+              {canUseSelectedUserDataTools ? (
+                <label className="download-link upload-link">
+                  <UploadCloud size={16} /> Import user data
+                  <input
+                    accept=".json,application/json"
+                    type="file"
+                    onChange={(event) => {
+                      void importSelectedUserData(event.target.files?.[0] ?? null);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              ) : null}
             </div>
+          ) : selectedUser ? (
+            <p className="muted selected-user-permission-note">Export and import are available only for users this admin account can manage.</p>
           ) : null}
         </div>
         {summary ? (

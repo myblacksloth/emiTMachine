@@ -97,7 +97,20 @@ function requireRoot(req: Request) {
   }
 }
 
-async function assertCanExportImportUser(req: Request, userId: string) {
+async function assertCanExportUser(req: Request, userId: string) {
+  const result = await pool.query(
+    `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
+            overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
+            status, disabled_at, created_at, last_login_at
+     from users
+     where id = $1 and ($2::text = 'root' or role = 'user')`,
+    [userId, req.user!.role]
+  );
+  if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be exported by this admin");
+  return result.rows[0];
+}
+
+async function assertCanImportUser(req: Request, userId: string) {
   const result = await pool.query(
     `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
             overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
@@ -587,7 +600,7 @@ router.get("/users/:id/export", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
-    const user = await assertCanExportImportUser(req, userId);
+    const user = await assertCanExportUser(req, userId);
     const tables = {
       tags: await pool.query("select * from tags where user_id = $1 order by created_at, name", [userId]),
       time_sessions: await pool.query("select * from time_sessions where user_id = $1 order by started_at, created_at", [userId]),
@@ -628,7 +641,7 @@ router.post("/users/:id/import", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
-    await assertCanExportImportUser(req, userId);
+    await assertCanImportUser(req, userId);
     const parsed = userDataImportSchema.parse(req.body);
     const data = "data" in parsed ? parsed.data : parsed;
 
