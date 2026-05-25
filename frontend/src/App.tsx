@@ -1784,8 +1784,24 @@ function RequestList({
           <div className="request-actions">
             {onStatus && !request.deletedAt ? (
               <>
-                <button type="button" onClick={() => onStatus(request, "approved")}>Approve</button>
-                <button className="danger-action" type="button" onClick={() => onStatus(request, "revoked")}>Revoke</button>
+                <button
+                  className={request.status === "approved" ? "request-action-current" : ""}
+                  type="button"
+                  disabled={request.status === "approved"}
+                  aria-disabled={request.status === "approved"}
+                  onClick={() => onStatus(request, "approved")}
+                >
+                  Approve
+                </button>
+                <button
+                  className={`danger-action${request.status === "revoked" ? " request-action-current" : ""}`}
+                  type="button"
+                  disabled={request.status === "revoked"}
+                  aria-disabled={request.status === "revoked"}
+                  onClick={() => onStatus(request, "revoked")}
+                >
+                  Revoke
+                </button>
               </>
             ) : null}
             {onDelete && !request.deletedAt ? (

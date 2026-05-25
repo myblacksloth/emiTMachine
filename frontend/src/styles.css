@@ -3360,6 +3360,12 @@ button svg,
   width: 100%;
 }
 
+.request-actions button.request-action-current:disabled {
+  border-style: dashed;
+  opacity: 0.82;
+  cursor: default;
+}
+
 .overtime-setup {
   display: grid;
   gap: 0.75rem;
