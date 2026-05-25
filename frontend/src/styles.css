@@ -1408,6 +1408,9 @@ input[type="datetime-local"] {
   box-sizing: border-box;
   isolation: isolate;
   overscroll-behavior: contain;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: backdropIn var(--duration) var(--ease);
@@ -1428,6 +1431,8 @@ input[type="datetime-local"] {
   max-height: calc(100vh - 2rem);
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   background: var(--bg-card);
   background-clip: padding-box;
@@ -3146,7 +3151,8 @@ button svg,
 .request-modal {
   width: min(560px, 100%);
   border-radius: 28px;
-  overflow: hidden;
+  overflow: auto;
+  overflow-x: hidden;
   isolation: isolate;
 }
 
@@ -3156,6 +3162,8 @@ button svg,
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .request-duration {
@@ -3254,7 +3262,11 @@ button svg,
 }
 
 .activity-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   width: min(760px, 100%);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   border-radius: 28px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(247, 250, 255, 0.9)),
@@ -3268,6 +3280,11 @@ button svg,
 }
 
 .activity-modal .activity-editor {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(60, 60, 67, 0.1);
   border-radius: 22px;
   padding: 1rem;

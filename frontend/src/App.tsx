@@ -261,6 +261,9 @@ type CriticalDialogRequest =
   | { kind: "prompt"; title: string; message: string; defaultValue: string; resolve: (value: string | null) => void };
 
 let criticalDialogHandler: ((request: CriticalDialogRequest) => void) | null = null;
+let openModalCount = 0;
+let originalBodyOverflow = "";
+let originalHtmlOverflow = "";
 
 function confirmCritical(message: string, title = "Confirm action") {
   return new Promise<boolean>((resolve) => {
@@ -272,6 +275,25 @@ function promptCritical(message: string, defaultValue = "", title = "Edit value"
   return new Promise<string | null>((resolve) => {
     criticalDialogHandler?.({ kind: "prompt", title, message, defaultValue, resolve });
   });
+}
+
+function useModalBodyScrollLock() {
+  useEffect(() => {
+    openModalCount += 1;
+    if (openModalCount === 1) {
+      originalBodyOverflow = document.body.style.overflow;
+      originalHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    }
+    return () => {
+      openModalCount = Math.max(0, openModalCount - 1);
+      if (openModalCount === 0) {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      }
+    };
+  }, []);
 }
 
 function App() {
@@ -425,6 +447,7 @@ function CriticalDialogHost() {
 }
 
 function ModalCloseButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
+  useModalBodyScrollLock();
   return (
     <button className="modal-close-button" type="button" onClick={onClick} disabled={disabled} aria-label="Close modal">
       <X size={16} aria-hidden="true" />
