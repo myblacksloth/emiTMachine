@@ -2509,8 +2509,8 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
               <article className={`admin-user ${selectedUserId === user.id ? "active" : ""} ${isPendingAdmin ? "pending-admin" : ""}`} key={user.id}>
                 <div className="admin-user-header">
                   <button className="admin-user-select" type="button" onClick={() => setSelectedUserId(user.id)}>
-                    <strong>{user.username}</strong>
-                    <span>{user.role}{isPendingAdmin ? " · pending" : ""}</span>
+                    <span className="admin-user-name">{user.username}</span>
+                    <span className="admin-user-role">{user.role}{isPendingAdmin ? " · pending" : ""}</span>
                   </button>
                   <button className="copy-id-button" type="button" onClick={() => copyUserId(user)} title="Copy user ID" aria-label={`Copy user ID ${user.publicId}`}>
                     {user.publicId}
