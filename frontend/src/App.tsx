@@ -1140,7 +1140,7 @@ function MonthlyCalendarPanel() {
         })}
       </div>
 
-      {selectedActivity ? (
+      {selectedActivity ? createPortal(
         <div className="modal-backdrop bottom-sheet-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
             <div className="panel-title compact-title">
@@ -1177,9 +1177,10 @@ function MonthlyCalendarPanel() {
               <button type="button" onClick={() => setSelectedActivity(null)}>Close</button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
-      {selectedRequest ? (
+      {selectedRequest ? createPortal(
         <div className="modal-backdrop bottom-sheet-backdrop" role="presentation">
           <section className="modal activity-detail-modal" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
             <div className="panel-title compact-title">
@@ -1211,7 +1212,8 @@ function MonthlyCalendarPanel() {
               <button type="button" onClick={() => setSelectedRequest(null)}>Close</button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </section>
   );
@@ -1525,7 +1527,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
         </div>
       </section>
 
-      {createOpen ? (
+      {createOpen ? createPortal(
         <div className="modal-backdrop" role="presentation">
           <form className="modal request-modal" role="dialog" aria-modal="true" aria-labelledby="request-modal-title" onSubmit={createRequest}>
             <div className="panel-title compact-title">
@@ -1567,7 +1569,8 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
               </button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       ) : null}
 
       <section className="panel stack">
@@ -1631,7 +1634,7 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
         </div>
       </section>
 
-      {historyOpen ? (
+      {historyOpen ? createPortal(
         <div className="modal-backdrop" role="presentation">
           <section className="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
             <div className="panel-title compact-title">
@@ -1680,7 +1683,8 @@ function AdministrativeRequestsPanel({ userRole, onToast }: { userRole: "user" |
               <button type="button" onClick={() => setHistoryOpen(false)}>Close</button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </section>
   );
@@ -3145,7 +3149,7 @@ function PunchDialog({
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" role="presentation">
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="punch-title">
         <h2 id="punch-title">Confirm {mode === "in" ? "clock in" : "clock out"}</h2>
@@ -3185,7 +3189,8 @@ function PunchDialog({
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
 
