@@ -36,27 +36,52 @@ Pending admins cannot sign in with password or passkey until root approves them 
 
 ## Admin Dashboard
 
-Admins and root users see an `Admin` tab in the main workspace.
+Admins and root users see an `Admin` tab in the main workspace. The dashboard is split into two panels: a left user list and a right detail panel for the currently selected user.
 
 Admins/root can:
 
-- list all users;
+- list and search all users (by UUID, username, or email);
 - update the application-level User ID for users they are allowed to manage;
 - update name and email for users they are allowed to manage;
 - assign users to approved admin responsibles according to the responsibility rules;
 - review administrative requests for users they are responsible for;
-- inspect a selected user's session summary;
-- inspect a selected user's sessions;
+- inspect a selected user's session summary, session history, and overtime data;
 - reset credentials for users they are allowed to manage;
 - delete users they are allowed to manage;
-- enable or disable session editing for individual users.
+- enable or disable session editing for individual users;
+- enable or disable overtime tracking for individual users and switch between `overtime` and `time_bank` (banca ore) mode.
 
 Root can additionally:
 
+- promote a `user` to `admin` role ("Make admin");
+- revoke `admin` rights and transfer managed users to another admin;
 - approve pending admin registrations;
 - lock or reopen new user registration;
 - download a JSON application dump;
 - clean administrative requests that ended before the current month.
+
+### Selected User Detail Panel
+
+When a user is selected, the right panel shows:
+
+- username, User ID, display name, and email;
+- **Admin** — the admins responsible for the selected user (if any);
+- **Managed users** — for admin users, the list of users assigned to them, with a quick-remove button per user;
+- session summary metrics (sessions, total time, average, worked days);
+- session filter by date range;
+- overtime summary and paid-week list (when overtime is enabled);
+- full session history.
+
+### Org Chart
+
+The **Org chart** button (next to Refresh in the admin panel header) opens a graphical visualization of the full user hierarchy.
+
+- Nodes are arranged in three rows: root at the top, admins in the middle, users at the bottom.
+- Edges connect each admin to the users they manage.
+- The currently selected user is highlighted with a filled node.
+- Pending admins appear with a dashed node border.
+- Clicking a node selects that user in the detail panel and closes the graph.
+- On mobile the graph opens as a bottom sheet.
 
 ## Responsibles
 
