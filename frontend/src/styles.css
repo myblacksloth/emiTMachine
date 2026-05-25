@@ -2733,7 +2733,47 @@ button svg,
 }
 
 .activity-add-action {
+  width: 100%;
   min-width: 132px;
+  border-color: rgba(0, 122, 255, 0.26);
+  background:
+    linear-gradient(135deg, rgba(0, 122, 255, 0.98), rgba(76, 201, 240, 0.94)),
+    #007aff;
+  color: #ffffff;
+  font-weight: 850;
+  box-shadow: 0 14px 30px rgba(0, 122, 255, 0.22);
+  position: relative;
+  overflow: hidden;
+}
+
+.activity-add-action::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-120%);
+  transition: transform 0.55s var(--ease);
+}
+
+.activity-add-action:hover:not(:disabled) {
+  border-color: rgba(0, 122, 255, 0.42);
+  background:
+    linear-gradient(135deg, #006ee6, #35c5ee),
+    #007aff;
+  box-shadow: 0 18px 36px rgba(0, 122, 255, 0.28);
+}
+
+.activity-add-action:hover:not(:disabled)::before {
+  transform: translateX(120%);
+}
+
+.activity-add-action svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+}
+
+.activity-panel > .activity-actions {
+  justify-content: stretch;
 }
 
 .danger-action {
@@ -5236,5 +5276,16 @@ button:disabled,
     max-width: 100%;
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
+
+  .activity-panel > .activity-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .activity-panel > .activity-actions .activity-add-action {
+    width: 100%;
+    max-width: none;
   }
 }
