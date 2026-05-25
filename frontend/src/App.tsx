@@ -2260,6 +2260,8 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [profileEditor, setProfileEditor] = useState<{ user: AdminUser; displayName: string; email: string } | null>(null);
+  const [profileEditorSaving, setProfileEditorSaving] = useState(false);
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
   const filteredSelectedSessions = selectedSessions.filter((session) =>
@@ -2334,20 +2336,34 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const updateUserProfile = async (user: AdminUser) => {
-    const displayName = await promptCritical(`Name for ${user.username}`, user.displayName || user.username, "Edit name");
-    if (displayName === null) return;
-    const trimmedName = displayName.trim();
+    setMessage("");
+    setProfileEditor({
+      user,
+      displayName: user.displayName || user.username,
+      email: user.email ?? ""
+    });
+  };
+
+  const submitProfileEditor = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!profileEditor) return;
+    const trimmedName = profileEditor.displayName.trim();
     if (!trimmedName) {
       setMessage("Name cannot be empty.");
       return;
     }
-    const email = await promptCritical(`Email for ${user.username}`, user.email ?? "", "Edit email");
-    if (email === null) return;
-    if (!(await confirmCritical(`Update name and email for ${user.username}?`))) return;
-    await api.setUserProfile(user.id, trimmedName, email);
-    await loadUsers();
-    await loadSelectedUserData(user.id);
-    onToast("success", "User profile updated.");
+    setProfileEditorSaving(true);
+    try {
+      await api.setUserProfile(profileEditor.user.id, trimmedName, profileEditor.email.trim());
+      await loadUsers();
+      await loadSelectedUserData(profileEditor.user.id);
+      setProfileEditor(null);
+      onToast("success", "User profile updated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update user profile.");
+    } finally {
+      setProfileEditorSaving(false);
+    }
   };
 
   const findUserForManagerInput = (value: string) => {
@@ -2479,6 +2495,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   return (
+    <>
     <section className="admin-grid">
       <section className="panel stack">
         <div className="panel-title">
@@ -2715,6 +2732,49 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
         </div>
       </section>
     </section>
+    {profileEditor
+      ? createPortal(
+          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !profileEditorSaving) setProfileEditor(null);
+          }}>
+            <form className="modal profile-editor-modal" onSubmit={submitProfileEditor} role="dialog" aria-modal="true" aria-labelledby="profile-editor-title">
+              <div className="compact-title">
+                <div>
+                  <p className="eyebrow">Selected user</p>
+                  <h3 id="profile-editor-title">Edit name and email</h3>
+                </div>
+                <button type="button" className="ghost-action" onClick={() => setProfileEditor(null)} disabled={profileEditorSaving}>
+                  Close
+                </button>
+              </div>
+              <p className="muted">Update the visible name and contact email for {profileEditor.user.username}.</p>
+              <div className="profile-editor-fields">
+                <TextField
+                  label="Name"
+                  value={profileEditor.displayName}
+                  onChange={(displayName) => setProfileEditor((current) => current ? { ...current, displayName } : current)}
+                  autoComplete="name"
+                />
+                <TextField
+                  label="Email"
+                  value={profileEditor.email}
+                  onChange={(email) => setProfileEditor((current) => current ? { ...current, email } : current)}
+                  type="email"
+                  autoComplete="email"
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setProfileEditor(null)} disabled={profileEditorSaving}>Cancel</button>
+                <button className="primary-action" type="submit" disabled={profileEditorSaving}>
+                  {profileEditorSaving ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body
+        )
+      : null}
+    </>
   );
 }
 
