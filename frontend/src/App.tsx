@@ -2320,6 +2320,12 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [profileEditorSaving, setProfileEditorSaving] = useState(false);
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+  const selectedUserManagers: AdminUser[] = selectedUser
+    ? managerAssignments
+        .filter((a: ManagerAssignment) => a.userId === selectedUser.id)
+        .map((a: ManagerAssignment) => users.find((u: AdminUser) => u.id === a.managerUserId))
+        .filter((u): u is AdminUser => u !== undefined)
+    : [];
   const canUseAdminUserDataTools = (user: AdminUser | null) =>
     !!user && user.role !== "root" && (currentRole === "root" || user.role === "user");
   const canExportAdminUserData = (user: AdminUser | null) =>
@@ -2774,6 +2780,11 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
             {selectedUser ? (
               <p className="muted selected-user-meta" title={`${selectedUser.displayName || selectedUser.username} · ${selectedUser.email || "not set"}`}>
                 Name: {selectedUser.displayName || selectedUser.username} · Email: {selectedUser.email || "not set"}
+              </p>
+            ) : null}
+            {selectedUserManagers.length > 0 ? (
+              <p className="muted selected-user-managers">
+                Admin: {selectedUserManagers.map((m) => m.username).join(", ")}
               </p>
             ) : null}
           </div>
