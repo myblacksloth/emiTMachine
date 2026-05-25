@@ -2917,6 +2917,19 @@ button svg,
   gap: 0.75rem;
 }
 
+.admin-user-search {
+  padding: 0.75rem;
+  border: 1px solid rgba(60, 60, 67, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.admin-search-count {
+  margin: -0.25rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
 .admin-user {
   display: grid;
   gap: 0.6rem;

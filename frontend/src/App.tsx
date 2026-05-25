@@ -2313,6 +2313,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [profileEditor, setProfileEditor] = useState<{ user: AdminUser; displayName: string; email: string } | null>(null);
   const [profileEditorSaving, setProfileEditorSaving] = useState(false);
 
@@ -2320,6 +2321,18 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   const filteredSelectedSessions = selectedSessions.filter((session) =>
     intervalOverlapsDateFilters(session.startedAt, session.endedAt, sessionFilterFrom, sessionFilterTo)
   );
+  const normalizedUserSearchQuery = userSearchQuery.trim().toLowerCase();
+  const filteredUsers = normalizedUserSearchQuery
+    ? users.filter((user) => {
+        const searchableFields = [
+          user.id,
+          user.publicId,
+          user.username,
+          user.email ?? ""
+        ].filter((value) => value.trim().length > 0);
+        return searchableFields.some((value) => value.toLowerCase().includes(normalizedUserSearchQuery));
+      })
+    : users;
 
   const loadUsers = async () => {
     setMessage("");
@@ -2572,8 +2585,23 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
         {temporaryPassword ? (
           <p className="form-message">Temporary password: <strong>{temporaryPassword}</strong></p>
         ) : null}
+        <label className="field admin-user-search">
+          <span>Search users</span>
+          <input
+            value={userSearchQuery}
+            onChange={(event) => setUserSearchQuery(event.target.value)}
+            placeholder="UUID, username, or email"
+            autoComplete="off"
+          />
+        </label>
+        {normalizedUserSearchQuery ? (
+          <p className="muted admin-search-count">
+            {filteredUsers.length} of {users.length} user{users.length === 1 ? "" : "s"} shown
+          </p>
+        ) : null}
         <div className="admin-user-list">
-          {users.map((user) => {
+          {filteredUsers.length === 0 ? <p className="empty-state">No users match this search.</p> : null}
+          {filteredUsers.map((user) => {
             const isPendingAdmin = user.role === "admin" && !user.adminApproved;
             return (
               <article className={`admin-user ${selectedUserId === user.id ? "active" : ""} ${isPendingAdmin ? "pending-admin" : ""}`} key={user.id}>
