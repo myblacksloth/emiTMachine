@@ -38,7 +38,8 @@ const registrationSchema = z.object({
 });
 
 const userRoleSchema = z.object({
-  role: z.enum(["user", "admin"])
+  role: z.enum(["user", "admin"]),
+  replacementManagerId: uuidSchema.optional()
 });
 
 const importRowsSchema = z.array(z.record(z.unknown())).default([]);
@@ -202,6 +203,24 @@ router.patch("/users/:id/role", async (req, res, next) => {
     if (userId === req.user!.id) throw new HttpError(400, "Root cannot change its own role");
 
     const updated = await withTransaction(async (client) => {
+      const subordinateResult = input.role === "user"
+        ? await client.query("select user_id from user_managers where manager_user_id = $1", [userId])
+        : { rows: [] };
+      if (input.role === "user" && subordinateResult.rows.length > 0) {
+        if (!input.replacementManagerId) {
+          throw new HttpError(400, "Replacement admin UUID is required before revoking this admin role");
+        }
+        if (input.replacementManagerId === userId) {
+          throw new HttpError(400, "Replacement admin must be different from the revoked admin");
+        }
+        const replacementResult = await client.query(
+          `select id from users
+           where id = $1 and role = 'admin' and admin_approved = true and disabled_at is null`,
+          [input.replacementManagerId]
+        );
+        if (!replacementResult.rows[0]) throw new HttpError(404, "Replacement admin not found or not approved");
+      }
+
       const result = await client.query(
         `update users
          set role = $2,
@@ -216,6 +235,16 @@ router.patch("/users/:id/role", async (req, res, next) => {
       if (!result.rows[0]) throw new HttpError(404, "User not found or role cannot be changed");
 
       if (input.role === "user") {
+        if (subordinateResult.rows.length > 0 && input.replacementManagerId) {
+          await client.query(
+            `insert into user_managers (user_id, manager_user_id, assigned_by_user_id)
+             select user_id, $2, $3
+             from user_managers
+             where manager_user_id = $1
+             on conflict (user_id, manager_user_id) do nothing`,
+            [userId, input.replacementManagerId, req.user!.id]
+          );
+        }
         // A user demoted from admin can no longer be responsible for other users.
         await client.query("delete from user_managers where manager_user_id = $1", [userId]);
       }
@@ -223,7 +252,7 @@ router.patch("/users/:id/role", async (req, res, next) => {
       return result.rows[0];
     });
 
-    req.log?.info("user role changed", { actorUserId: req.user!.id, userId, role: input.role });
+    req.log?.info("user role changed", { actorUserId: req.user!.id, userId, role: input.role, replacementManagerId: input.replacementManagerId });
     res.json({ user: updated });
   } catch (error) {
     next(error);

@@ -656,10 +656,10 @@ export const api = {
   removeManagedUser: (managerId: string, userId: string) =>
     request<void>(`/api/admin/users/${managerId}/managed-users/${userId}`, { method: "DELETE" }),
   approveAdmin: (id: string) => request<void>(`/api/admin/users/${id}/approve-admin`, { method: "POST" }),
-  setUserRole: (id: string, role: "user" | "admin") =>
+  setUserRole: (id: string, role: "user" | "admin", replacementManagerId?: string) =>
     request<{ user: BackendAdminUser }>(`/api/admin/users/${id}/role`, {
       method: "PATCH",
-      body: JSON.stringify({ role })
+      body: JSON.stringify({ role, replacementManagerId })
     }).then((payload) => mapAdminUser(payload.user)),
   setUserPublicId: (id: string, publicId: string) =>
     request<{ publicId: string }>(`/api/admin/users/${id}/public-id`, {

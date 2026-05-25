@@ -3057,18 +3057,6 @@ button svg,
   font-weight: 650;
 }
 
-.approve-admin-action {
-  border-color: rgba(52, 199, 89, 0.35);
-  background: linear-gradient(135deg, #34c759, #30d158);
-  color: #ffffff;
-  font-weight: 800;
-  box-shadow: 0 12px 28px rgba(52, 199, 89, 0.28);
-}
-
-.approve-admin-action:hover:not(:disabled) {
-  border-color: rgba(52, 199, 89, 0.6);
-  background: linear-gradient(135deg, #2fbd52, #28c84d);
-}
 
 .copy-id-button,
 .inline-copy-id {

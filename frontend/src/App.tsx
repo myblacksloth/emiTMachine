@@ -258,7 +258,7 @@ function constrainedEndValue(nextStart: string, currentEnd: string, minimumMinut
 
 type CriticalDialogRequest =
   | { kind: "confirm"; title: string; message: string; resolve: (value: boolean) => void }
-  | { kind: "prompt"; title: string; message: string; defaultValue: string; resolve: (value: string | null) => void };
+  | { kind: "prompt"; title: string; message: string; defaultValue: string; required?: boolean; resolve: (value: string | null) => void };
 
 let criticalDialogHandler: ((request: CriticalDialogRequest) => void) | null = null;
 let openModalCount = 0;
@@ -271,9 +271,9 @@ function confirmCritical(message: string, title = "Confirm action") {
   });
 }
 
-function promptCritical(message: string, defaultValue = "", title = "Edit value") {
+function promptCritical(message: string, defaultValue = "", title = "Edit value", options: { required?: boolean } = {}) {
   return new Promise<string | null>((resolve) => {
-    criticalDialogHandler?.({ kind: "prompt", title, message, defaultValue, resolve });
+    criticalDialogHandler?.({ kind: "prompt", title, message, defaultValue, required: options.required, resolve });
   });
 }
 
@@ -407,8 +407,10 @@ function CriticalDialogHost() {
   }, []);
 
   if (!dialog) return null;
+  const promptValueMissing = dialog.kind === "prompt" && dialog.required && inputValue.trim().length === 0;
 
   const close = (confirmed: boolean) => {
+    if (confirmed && promptValueMissing) return;
     if (dialog.kind === "confirm") {
       dialog.resolve(confirmed);
     } else {
@@ -429,14 +431,14 @@ function CriticalDialogHost() {
         {dialog.kind === "prompt" ? (
           <label className="field">
             <span>Value</span>
-            <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} autoFocus />
+            <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} required={dialog.required} autoFocus />
           </label>
         ) : null}
         <div className="modal-actions">
           <button type="button" onClick={() => close(false)}>
             Cancel
           </button>
-          <button className="primary-action" type="button" onClick={() => close(true)}>
+          <button className="primary-action" type="button" onClick={() => close(true)} disabled={promptValueMissing}>
             Confirm
           </button>
         </div>
@@ -2390,12 +2392,46 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
 
   const changeUserRole = async (user: AdminUser, role: "user" | "admin") => {
     const action = role === "admin" ? "make this user an admin" : "revoke admin rights from this user";
-    const detail = role === "user" ? " Responsible-user assignments owned by this admin will be removed." : "";
+    const managedAssignments = managerAssignments.filter((assignment) => assignment.managerUserId === user.id);
+    let replacementManagerId: string | undefined;
+    if (role === "user" && managedAssignments.length > 0) {
+      const replacementUuid = await promptCritical(
+        `${user.username} is responsible for ${managedAssignments.length} user${managedAssignments.length === 1 ? "" : "s"}. Enter the UUID of another approved admin to transfer them before revoking admin rights.`,
+        "",
+        "Replacement admin required",
+        { required: true }
+      );
+      if (replacementUuid === null) return;
+      const normalizedReplacementUuid = replacementUuid.trim().toLowerCase();
+      if (!normalizedReplacementUuid) {
+        setMessage("Admin rights cannot be revoked without a replacement admin UUID.");
+        return;
+      }
+      const replacement = users.find(
+        (candidate) =>
+          candidate.id.toLowerCase() === normalizedReplacementUuid ||
+          candidate.publicId.toLowerCase() === normalizedReplacementUuid
+      );
+      if (!replacement || replacement.id === user.id || replacement.role !== "admin" || !replacement.adminApproved) {
+        setMessage("Replacement admin UUID must belong to another approved admin.");
+        return;
+      }
+      replacementManagerId = replacement.id;
+    }
+    const detail = role === "user" && replacementManagerId ? " Subordinate users will be transferred to the replacement admin." : "";
     if (!(await confirmCritical(`Do you want to ${action} for ${user.username}?${detail}`))) return;
-    await api.setUserRole(user.id, role);
-    await loadUsers();
-    await loadSelectedUserData(user.id);
-    onToast("success", role === "admin" ? `${user.username} is now an admin.` : `${user.username} is now a standard user.`);
+    try {
+      setMessage("");
+      await api.setUserRole(user.id, role, replacementManagerId);
+      await loadUsers();
+      setManagerAssignments(await api.managerAssignments());
+      await loadSelectedUserData(user.id);
+      onToast("success", role === "admin" ? `${user.username} is now an admin.` : `${user.username} is now a standard user.`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to change user role.";
+      setMessage(errorMessage);
+      onToast("error", errorMessage);
+    }
   };
 
   const toggleEditPermission = async (user: AdminUser) => {
