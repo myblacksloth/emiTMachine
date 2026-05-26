@@ -3805,6 +3805,13 @@ function TimeTools() {
   ]);
   const [sumResult, setSumResult] = useState<string | null>(null);
 
+  const [tcBase, setTcBase] = useState("");
+  const [tcEntries, setTcEntries] = useState<{ h: string; m: string; sign: "+" | "-" }[]>([
+    { h: "", m: "", sign: "+" },
+    { h: "", m: "", sign: "+" },
+  ]);
+  const [tcResult, setTcResult] = useState<string | null>(null);
+
   const [liveTarget, setLiveTarget] = useState("");
   const [, tick] = useState(0);
 
@@ -3886,6 +3893,19 @@ function TimeTools() {
       : h > 0 ? `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
       : m > 0 ? `${m}m ${String(s).padStart(2, "0")}s`
       : `${s}s`;
+  }
+
+  function calcTimeResult() {
+    const base = parseHHMM(tcBase);
+    if (base === null) { setTcResult("Enter a valid start time"); return; }
+    let total = base;
+    for (const e of tcEntries) {
+      const minutes = (parseInt(e.h) || 0) * 60 + (parseInt(e.m) || 0);
+      total += e.sign === "-" ? -minutes : minutes;
+    }
+    const days = Math.floor(total / 1440);
+    const timeStr = toHHMM(total);
+    setTcResult(days !== 0 ? `${timeStr} (${days > 0 ? "+" : ""}${days}g)` : timeStr);
   }
 
   function calcSum() {
@@ -4014,6 +4034,57 @@ function TimeTools() {
             </button>
           </div>
           <div className="time-result">{sumResult ?? "—"}</div>
+        </div>
+
+        <div className="time-tool-card">
+          <div className="tool-header"><Clock size={15} /><strong>Time calculator</strong></div>
+          <p className="muted small">Apply durations to a start time to get the final clock time</p>
+          <div className="tool-row sum-entry-row">
+            <TimeField label="Start" value={tcBase} onChange={(v) => { setTcBase(v); setTcResult(null); }} />
+          </div>
+          {tcEntries.map((entry: { h: string; m: string; sign: "+" | "-" }, i: number) => (
+            <div key={i} className="tool-row sum-entry-row">
+              <button
+                type="button"
+                className={`sum-sign-btn${entry.sign === "-" ? " minus" : ""}`}
+                aria-label={`Toggle sign for row ${i + 1}`}
+                onClick={() => { const n = [...tcEntries]; n[i] = { ...n[i], sign: entry.sign === "+" ? "-" : "+" }; setTcEntries(n); setTcResult(null); }}
+              >
+                {entry.sign}
+              </button>
+              <input
+                type="number" min="0" max="999" placeholder="0"
+                value={entry.h}
+                onChange={(e: { target: { value: string } }) => { const n = [...tcEntries]; n[i] = { ...n[i], h: e.target.value }; setTcEntries(n); setTcResult(null); }}
+                className="tool-num"
+              />
+              <span className="muted">h</span>
+              <input
+                type="number" min="0" max="59" placeholder="0"
+                value={entry.m}
+                onChange={(e: { target: { value: string } }) => { const n = [...tcEntries]; n[i] = { ...n[i], m: e.target.value }; setTcEntries(n); setTcResult(null); }}
+                className="tool-num"
+              />
+              <span className="muted">m</span>
+              {tcEntries.length > 2 ? (
+                <button
+                  type="button" className="sum-remove-btn" aria-label="Remove row"
+                  onClick={() => { setTcEntries(tcEntries.filter((_: { h: string; m: string; sign: "+" | "-" }, j: number) => j !== i)); setTcResult(null); }}
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+          ))}
+          <div className="sum-actions">
+            <button type="button" className="sum-add-btn" onClick={() => { setTcEntries([...tcEntries, { h: "", m: "", sign: "+" }]); setTcResult(null); }}>
+              <Plus size={14} /> Add
+            </button>
+            <button type="button" className="sum-calc-btn" onClick={calcTimeResult}>
+              = Calculate
+            </button>
+          </div>
+          <div className="time-result">{tcResult ?? "—"}</div>
         </div>
 
       </div>

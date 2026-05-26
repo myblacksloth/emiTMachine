@@ -66,3 +66,23 @@ Result format:
 - `−Xh YYm` for a negative total (when subtractions exceed additions).
 
 Extra rows can be removed with the **×** button that appears when more than two rows are present.
+
+---
+
+### Time Calculator
+
+Applies a sequence of duration additions and subtractions to a starting clock time and shows the resulting clock time.
+
+- **Start** — the base time of day (HH:MM).
+- Duration rows — each has a sign toggle (**+** / **−**), an hours field, and a minutes field. All rows default to `+`.
+- Click **Add** to insert additional rows.
+- Click **= Calculate** to compute the result.
+
+Modifying any field resets the displayed result.
+
+Result format:
+- `HH:MM` when the result falls on the same calendar day.
+- `HH:MM (+Ng)` when the result is N days after the start date (e.g. crossing midnight by adding many hours).
+- `HH:MM (-Ng)` when the result is N days before the start date (e.g. subtracting more hours than the start time holds).
+
+If the start time is left empty, the button shows an inline error instead of computing.
