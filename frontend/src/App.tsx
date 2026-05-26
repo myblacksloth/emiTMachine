@@ -2378,12 +2378,9 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     return user.role !== "root" && managedUserIds.has(user.id);
   };
 
-  // Narrower check: only true for operations that are too destructive to allow admin→admin.
-  // Admins can delete/wipe only role='user' accounts; root can delete/wipe any non-root.
-  const canDelete = (user: AdminUser): boolean => {
-    if (currentRole === "root") return user.role !== "root";
-    return user.role === "user" && managedUserIds.has(user.id);
-  };
+  // Delete and wipe-data are root-only — admins cannot delete or wipe any account.
+  const canDelete = (user: AdminUser): boolean =>
+    currentRole === "root" && user.role !== "root";
 
   const canUseAdminUserDataTools = (user: AdminUser | null) =>
     !!user && canManage(user);

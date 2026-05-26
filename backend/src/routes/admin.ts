@@ -560,18 +560,14 @@ router.post("/users/:id/reset-password", async (req, res, next) => {
 
 router.delete("/users/:id", async (req, res, next) => {
   try {
-    requireAdmin(req);
+    requireRoot(req);
     const userId = uuidSchema.parse(req.params.id);
     if (userId === req.user!.id) throw new HttpError(400, "You cannot delete your own account");
-    await assertCanManageUser(req, userId);
-    // Admins cannot delete other admin accounts — only root can
     const result = await pool.query(
-      req.user!.role === "root"
-        ? `delete from users where id = $1 returning id`
-        : `delete from users where id = $1 and role = 'user' returning id`,
+      `delete from users where id = $1 and role <> 'root' returning id`,
       [userId]
     );
-    if (!result.rows[0]) throw new HttpError(403, "Admin accounts can only be deleted by root");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -580,15 +576,14 @@ router.delete("/users/:id", async (req, res, next) => {
 
 router.delete("/users/:id/data", async (req, res, next) => {
   try {
-    requireAdmin(req);
+    requireRoot(req);
     const userId = uuidSchema.parse(req.params.id);
     if (userId === req.user!.id) throw new HttpError(400, "You cannot wipe your own data");
-    await assertCanManageUser(req, userId);
-    // Admins cannot wipe data of other admin accounts — only root can
-    if (req.user!.role !== "root") {
-      const roleCheck = await pool.query("select 1 from users where id = $1 and role = 'user'", [userId]);
-      if (!roleCheck.rows[0]) throw new HttpError(403, "Admin accounts can only be wiped by root");
-    }
+    const check = await pool.query(
+      `select 1 from users where id = $1 and role <> 'root'`,
+      [userId]
+    );
+    if (!check.rows[0]) throw new HttpError(404, "User not found");
     await withTransaction(async (client) => {
       await client.query("delete from time_sessions where user_id = $1", [userId]);
       await client.query("delete from administrative_requests where user_id = $1", [userId]);
