@@ -2735,7 +2735,11 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           </p>
         ) : null}
         <div className="admin-user-list">
-          {filteredUsers.length === 0 ? <p className="empty-state">No users match this search.</p> : null}
+          {filteredUsers.length === 0 ? (
+            <p className="empty-state">
+              {normalizedUserSearchQuery ? "No users match this search." : "No managed users."}
+            </p>
+          ) : null}
           {filteredUsers.map((user) => {
             const isPendingAdmin = user.role === "admin" && !user.adminApproved;
             return (

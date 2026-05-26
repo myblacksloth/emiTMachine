@@ -190,12 +190,35 @@ router.use(requireAuth);
 router.get("/users", async (req, res, next) => {
   try {
     requireAdmin(req);
+    const cols = `id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
+                  overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
+                  status, disabled_at, created_at, last_login_at`;
+    if (req.user!.role === "root") {
+      const result = await pool.query(
+        `select ${cols} from users
+         order by case role when 'root' then 0 when 'admin' then 1 else 2 end, created_at desc`
+      );
+      return res.json({ users: result.rows });
+    }
+    // Non-root admin: return only role='user' accounts in their recursive managed subtree
     const result = await pool.query(
-      `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
-              overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
-              status, disabled_at, created_at, last_login_at
+      `with recursive managed_tree as (
+         select um.user_id
+         from user_managers um
+         where um.manager_user_id = $1
+
+         union
+
+         select um.user_id
+         from user_managers um
+         join managed_tree mt on mt.user_id = um.manager_user_id
+       )
+       select ${cols}
        from users
-       order by case role when 'root' then 0 when 'admin' then 1 else 2 end, created_at desc`
+       where id in (select user_id from managed_tree)
+         and role = 'user'
+       order by created_at desc`,
+      [req.user!.id]
     );
     res.json({ users: result.rows });
   } catch (error) {
