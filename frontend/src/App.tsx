@@ -259,6 +259,7 @@ function constrainedEndValue(nextStart: string, currentEnd: string, minimumMinut
 
 type CriticalDialogRequest =
   | { kind: "confirm"; title: string; message: string; resolve: (value: boolean) => void }
+  | { kind: "confirm-typed"; title: string; message: string; requiredText: string; resolve: (value: boolean) => void }
   | { kind: "prompt"; title: string; message: string; defaultValue: string; required?: boolean; resolve: (value: string | null) => void };
 
 let criticalDialogHandler: ((request: CriticalDialogRequest) => void) | null = null;
@@ -269,6 +270,12 @@ let originalHtmlOverflow = "";
 function confirmCritical(message: string, title = "Confirm action") {
   return new Promise<boolean>((resolve) => {
     criticalDialogHandler?.({ kind: "confirm", title, message, resolve });
+  });
+}
+
+function confirmTyped(message: string, requiredText = "confirm", title = "Confirm action") {
+  return new Promise<boolean>((resolve) => {
+    criticalDialogHandler?.({ kind: "confirm-typed", title, message, requiredText, resolve });
   });
 }
 
@@ -409,10 +416,12 @@ function CriticalDialogHost() {
 
   if (!dialog) return null;
   const promptValueMissing = dialog.kind === "prompt" && dialog.required && inputValue.trim().length === 0;
+  const typedMismatch = dialog.kind === "confirm-typed" && inputValue !== dialog.requiredText;
 
   const close = (confirmed: boolean) => {
     if (confirmed && promptValueMissing) return;
-    if (dialog.kind === "confirm") {
+    if (confirmed && typedMismatch) return;
+    if (dialog.kind === "confirm" || dialog.kind === "confirm-typed") {
       dialog.resolve(confirmed);
     } else {
       dialog.resolve(confirmed ? inputValue : null);
@@ -435,13 +444,32 @@ function CriticalDialogHost() {
             <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} required={dialog.required} autoFocus />
           </label>
         ) : null}
+        {dialog.kind === "confirm-typed" ? (
+          <label className="field">
+            <span>Type <strong>{dialog.requiredText}</strong> to confirm</span>
+            <input
+              value={inputValue}
+              onChange={(event: { target: { value: string } }) => setInputValue(event.target.value)}
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={dialog.requiredText}
+            />
+          </label>
+        ) : null}
         <div className="modal-actions">
           <button type="button" onClick={() => close(false)}>
             Cancel
           </button>
-          <button className="primary-action" type="button" onClick={() => close(true)} disabled={promptValueMissing}>
-            Confirm
-          </button>
+          {dialog.kind === "confirm-typed" ? (
+            <button className="danger-action" type="button" onClick={() => close(true)} disabled={typedMismatch}>
+              Delete
+            </button>
+          ) : (
+            <button className="primary-action" type="button" onClick={() => close(true)} disabled={promptValueMissing}>
+              Confirm
+            </button>
+          )}
         </div>
       </section>
     </div>,
@@ -2563,7 +2591,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
   };
 
   const deleteUser = async (user: AdminUser) => {
-    if (!(await confirmCritical(`Delete ${user.username} permanently?`))) return;
+    if (!(await confirmTyped(`Delete ${user.username} permanently? This action cannot be undone.`, "confirm", "Delete user"))) return;
     await api.deleteUser(user.id);
     setSelectedUserId("");
     await loadUsers();
