@@ -2362,10 +2362,25 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
         .map((a: ManagerAssignment) => users.find((u: AdminUser) => u.id === a.userId))
         .filter((u): u is AdminUser => u !== undefined)
     : [];
+  // Set of user IDs that the current admin can manage.
+  // For root this is unused (root manages all non-root users).
+  // For admin, the backend's GET /manager-assignments already returns only the
+  // admin's recursive managed subtree, so every userId in those assignments is manageable.
+  const managedUserIds = useMemo<Set<string>>(
+    () => new Set(managerAssignments.map((a: ManagerAssignment) => a.userId)),
+    [managerAssignments]
+  );
+
+  // Returns true when the current admin/root is allowed to manage (view/edit/delete) a user.
+  const canManage = (user: AdminUser): boolean => {
+    if (currentRole === "root") return user.role !== "root";
+    return user.role === "user" && managedUserIds.has(user.id);
+  };
+
   const canUseAdminUserDataTools = (user: AdminUser | null) =>
-    !!user && user.role !== "root" && (currentRole === "root" || user.role === "user");
+    !!user && canManage(user);
   const canExportAdminUserData = (user: AdminUser | null) =>
-    !!user && (currentRole === "root" || user.role === "user");
+    !!user && canManage(user);
   const canUseSelectedUserDataTools = canUseAdminUserDataTools(selectedUser);
   const canExportSelectedUserData = canExportAdminUserData(selectedUser);
   const filteredSelectedSessions = selectedSessions.filter((session) =>
@@ -2757,18 +2772,18 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                   {user.role === "admin" && user.adminApproved ? (
                     <button type="button" onClick={() => addManagedUser(user)}>Add managed user</button>
                   ) : null}
-                  {currentRole === "root" || user.role === "user" ? (
+                  {canManage(user) ? (
                     <button type="button" onClick={() => updatePublicId(user)}>Edit user ID</button>
                   ) : null}
-                  {currentRole === "root" || user.role === "user" ? (
+                  {canManage(user) ? (
                     <button type="button" onClick={() => updateUserProfile(user)}>Edit name/email</button>
                   ) : null}
-                  {user.role !== "root" ? (
+                  {canManage(user) ? (
                     <button type="button" onClick={() => toggleEditPermission(user)}>
                       {user.canEditSessions ? "Disable edits" : "Enable edits"}
                     </button>
                   ) : null}
-                  {user.role !== "root" ? (
+                  {canManage(user) ? (
                     <>
                       <button type="button" onClick={() => toggleOvertimePermission(user)}>
                         {user.overtimeEnabled ? "Disable overtime" : "Enable overtime"}
@@ -2782,7 +2797,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                     </>
                   ) : null}
                 </div>
-                {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
+                {canManage(user) ? (
                   <div className="admin-user-danger-actions" aria-label={`Dangerous actions for ${user.username}`}>
                     <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
                     <button className="danger-action" type="button" onClick={() => wipeUserData(user)}>Wipe data</button>

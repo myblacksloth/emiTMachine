@@ -61,6 +61,38 @@ const userDataImportSchema = z.union([
   userDataPayloadSchema
 ]);
 
+/**
+ * Enforces the management hierarchy for write and read operations on a specific user.
+ * Root can act on any non-root user.
+ * Admin can act only on role='user' accounts that are in their direct or indirect managed subtree.
+ */
+async function assertCanManageUser(req: Request, userId: string): Promise<void> {
+  if (req.user!.role === "root") {
+    const check = await pool.query("select 1 from users where id = $1 and role <> 'root'", [userId]);
+    if (!check.rows[0]) throw new HttpError(403, "Root users cannot be managed");
+    return;
+  }
+  const result = await pool.query(
+    `with recursive managed_tree as (
+       select um.user_id
+       from user_managers um
+       where um.manager_user_id = $2
+
+       union
+
+       select um.user_id
+       from user_managers um
+       join managed_tree mt on mt.user_id = um.manager_user_id
+     )
+     select 1 from users
+     where id = $1
+       and role = 'user'
+       and id in (select user_id from managed_tree)`,
+    [userId, req.user!.id]
+  );
+  if (!result.rows[0]) throw new HttpError(403, "You can only manage users assigned to you");
+}
+
 async function assertCanManageResponsibleUser(req: Request, userId: string) {
   if (req.user?.role === "root") {
     return;
@@ -103,28 +135,23 @@ function requireRoot(req: Request) {
 }
 
 async function assertCanExportUser(req: Request, userId: string) {
+  await assertCanManageUser(req, userId);
   const result = await pool.query(
     `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
             overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
             status, disabled_at, created_at, last_login_at
-     from users
-     where id = $1 and ($2::text = 'root' or role = 'user')`,
-    [userId, req.user!.role]
+     from users where id = $1`,
+    [userId]
   );
-  if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be exported by this admin");
   return result.rows[0];
 }
 
 async function assertCanImportUser(req: Request, userId: string) {
+  await assertCanManageUser(req, userId);
   const result = await pool.query(
-    `select id, public_id, username, email, display_name, role, admin_approved, can_edit_sessions,
-            overtime_enabled, overtime_mode, weekly_work_minutes, weekly_work_minutes_set_at,
-            status, disabled_at, created_at, last_login_at
-     from users
-     where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')`,
-    [userId, req.user!.role]
+    `select id from users where id = $1`,
+    [userId]
   );
-  if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be exported by this admin");
   return result.rows[0];
 }
 
@@ -263,15 +290,13 @@ router.patch("/users/:id/public-id", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const input = publicIdSchema.parse(req.body);
     const result = await pool.query(
-      `update users
-       set public_id = $3, updated_at = now()
-       where id = $1 and ($2::text = 'root' or role = 'user')
-       returning id, public_id`,
-      [userId, req.user!.role, input.publicId]
+      `update users set public_id = $2, updated_at = now() where id = $1 returning id, public_id`,
+      [userId, input.publicId]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     req.log?.info("user public id updated", { actorUserId: req.user!.id, userId, publicId: input.publicId });
     res.json({ publicId: result.rows[0].public_id });
   } catch (error) {
@@ -287,18 +312,16 @@ router.patch("/users/:id/profile", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const input = userProfileSchema.parse(req.body);
     const result = await pool.query(
       `update users
-       set display_name = $3,
-           name = $3,
-           email = $4,
-           updated_at = now()
-       where id = $1 and ($2::text = 'root' or role = 'user')
+       set display_name = $2, name = $2, email = $3, updated_at = now()
+       where id = $1
        returning id, email, display_name`,
-      [userId, req.user!.role, input.displayName, input.email ?? null]
+      [userId, input.displayName, input.email ?? null]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     req.log?.info("user profile updated by admin", { actorUserId: req.user!.id, userId });
     res.json({ user: { email: result.rows[0].email, displayName: result.rows[0].display_name } });
   } catch (error) {
@@ -314,14 +337,13 @@ router.patch("/users/:id/edit-permission", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const input = editPermissionSchema.parse(req.body);
     const result = await pool.query(
-      `update users set can_edit_sessions = $3, updated_at = now()
-       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')
-       returning id`,
-      [userId, req.user!.role, input.canEditSessions]
+      `update users set can_edit_sessions = $2, updated_at = now() where id = $1 returning id`,
+      [userId, input.canEditSessions]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -332,19 +354,20 @@ router.patch("/users/:id/overtime-permission", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const input = overtimePermissionSchema.parse(req.body);
     const result = await pool.query(
       `update users
-       set overtime_enabled = $3,
-           overtime_mode = $4,
-           weekly_work_minutes = case when $3::boolean then weekly_work_minutes else null end,
-           weekly_work_minutes_set_at = case when $3::boolean then weekly_work_minutes_set_at else null end,
+       set overtime_enabled = $2,
+           overtime_mode = $3,
+           weekly_work_minutes = case when $2::boolean then weekly_work_minutes else null end,
+           weekly_work_minutes_set_at = case when $2::boolean then weekly_work_minutes_set_at else null end,
            updated_at = now()
-       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')
+       where id = $1
        returning id`,
-      [userId, req.user!.role, input.enabled, input.mode]
+      [userId, input.enabled, input.mode]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     if (!input.enabled) {
       await pool.query("delete from overtime_payments where user_id = $1", [userId]);
     }
@@ -470,19 +493,13 @@ router.delete("/users/:id/overtime-payments/:weekStart", async (req, res, next) 
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const weekStart = z.string().date().parse(req.params.weekStart);
     const result = await pool.query(
-      `delete from overtime_payments op
-       using users u
-       where op.user_id = u.id
-         and op.user_id = $1
-         and op.week_start = $3::date
-         and u.role <> 'root'
-         and ($2::text = 'root' or u.role = 'user')
-       returning op.id`,
-      [userId, req.user!.role, weekStart]
+      `delete from overtime_payments where user_id = $1 and week_start = $2::date returning id`,
+      [userId, weekStart]
     );
-    if (!result.rows[0]) throw new HttpError(404, "Payment status not found or cannot be changed by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "Payment status not found");
     req.log?.info("overtime payment removed by admin", { actorUserId: req.user!.id, userId, weekStart });
     await logAudit({
       userId: req.user!.id,
@@ -502,16 +519,15 @@ router.post("/users/:id/reset-password", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const input = resetPasswordSchema.parse(req.body);
     const temporaryPassword = input.password ?? randomToken(12);
     const passwordHash = await hashPassword(temporaryPassword);
     const result = await pool.query(
-      `update users set password_hash = $3, password_changed_at = now(), updated_at = now()
-       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')
-       returning id`,
-      [userId, req.user!.role, passwordHash]
+      `update users set password_hash = $2, password_changed_at = now(), updated_at = now() where id = $1 returning id`,
+      [userId, passwordHash]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be changed by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     await pool.query("update app_sessions set revoked_at = now() where user_id = $1 and revoked_at is null", [userId]);
     res.json({ temporaryPassword });
   } catch (error) {
@@ -524,13 +540,12 @@ router.delete("/users/:id", async (req, res, next) => {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
     if (userId === req.user!.id) throw new HttpError(400, "You cannot delete your own account");
+    await assertCanManageUser(req, userId);
     const result = await pool.query(
-      `delete from users
-       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')
-       returning id`,
-      [userId, req.user!.role]
+      `delete from users where id = $1 returning id`,
+      [userId]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found or cannot be deleted by this admin");
+    if (!result.rows[0]) throw new HttpError(404, "User not found");
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -542,11 +557,7 @@ router.delete("/users/:id/data", async (req, res, next) => {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
     if (userId === req.user!.id) throw new HttpError(400, "You cannot wipe your own data");
-    const check = await pool.query(
-      `select id from users where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')`,
-      [userId, req.user!.role]
-    );
-    if (!check.rows[0]) throw new HttpError(404, "User not found or cannot be managed by this admin");
+    await assertCanManageUser(req, userId);
     await withTransaction(async (client) => {
       await client.query("delete from time_sessions where user_id = $1", [userId]);
       await client.query("delete from administrative_requests where user_id = $1", [userId]);
@@ -588,6 +599,7 @@ router.get("/users/:id/summary", async (req, res, next) => {
     requireAdmin(req);
     const query = paginationSchema.parse(req.query);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const params: unknown[] = [userId, query.from ?? null, query.to ?? null, query.tagId ?? null];
     const summary = await pool.query(
       `with filtered as (
@@ -621,6 +633,7 @@ router.get("/users/:id/sessions", async (req, res, next) => {
       .extend({ limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0) })
       .parse(req.query);
     const userId = uuidSchema.parse(req.params.id);
+    await assertCanManageUser(req, userId);
     const result = await pool.query(
       `select s.id, s.started_at, s.ended_at, s.start_timezone, s.end_timezone, s.note, s.no_count_minutes,
               case when s.ended_at is null then null else greatest(extract(epoch from (s.ended_at - s.started_at)) - s.no_count_minutes * 60, 0)::bigint end as duration_seconds,
@@ -644,12 +657,7 @@ router.get("/users/:id/overtime", async (req, res, next) => {
   try {
     requireAdmin(req);
     const userId = uuidSchema.parse(req.params.id);
-    const userResult = await pool.query(
-      `select id from users
-       where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')`,
-      [userId, req.user!.role]
-    );
-    if (!userResult.rows[0]) throw new HttpError(404, "User not found or cannot be viewed by this admin");
+    await assertCanManageUser(req, userId);
     res.json(await getOvertimeReport(userId));
   } catch (error) {
     next(error);

@@ -14,7 +14,7 @@ class ApiError extends Error {
     readonly requestId: string | null,
     readonly details?: unknown
   ) {
-    super(requestId ? `${message} (request id: ${requestId})` : message);
+    super(message);
   }
 }
 
