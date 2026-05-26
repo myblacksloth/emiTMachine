@@ -2371,8 +2371,16 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     [managerAssignments]
   );
 
-  // Returns true when the current admin/root is allowed to manage (view/edit/delete) a user.
+  // Returns true when the current admin/root is allowed to manage (view/edit/reset) a user.
+  // Includes subordinate admins — admin1 can edit/reset-password for admin2 in their subtree.
   const canManage = (user: AdminUser): boolean => {
+    if (currentRole === "root") return user.role !== "root";
+    return user.role !== "root" && managedUserIds.has(user.id);
+  };
+
+  // Narrower check: only true for operations that are too destructive to allow admin→admin.
+  // Admins can delete/wipe only role='user' accounts; root can delete/wipe any non-root.
+  const canDelete = (user: AdminUser): boolean => {
     if (currentRole === "root") return user.role !== "root";
     return user.role === "user" && managedUserIds.has(user.id);
   };
@@ -2804,8 +2812,12 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 {canManage(user) ? (
                   <div className="admin-user-danger-actions" aria-label={`Dangerous actions for ${user.username}`}>
                     <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
-                    <button className="danger-action" type="button" onClick={() => wipeUserData(user)}>Wipe data</button>
-                    <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
+                    {canDelete(user) ? (
+                      <>
+                        <button className="danger-action" type="button" onClick={() => wipeUserData(user)}>Wipe data</button>
+                        <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
               </article>

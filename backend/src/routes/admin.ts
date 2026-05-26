@@ -86,7 +86,7 @@ async function assertCanManageUser(req: Request, userId: string): Promise<void> 
      )
      select 1 from users
      where id = $1
-       and role = 'user'
+       and role <> 'root'
        and id in (select user_id from managed_tree)`,
     [userId, req.user!.id]
   );
@@ -216,8 +216,8 @@ router.get("/users", async (req, res, next) => {
        select ${cols}
        from users
        where id in (select user_id from managed_tree)
-         and role = 'user'
-       order by created_at desc`,
+         and role <> 'root'
+       order by case role when 'admin' then 0 else 1 end, created_at desc`,
       [req.user!.id]
     );
     res.json({ users: result.rows });
@@ -564,11 +564,14 @@ router.delete("/users/:id", async (req, res, next) => {
     const userId = uuidSchema.parse(req.params.id);
     if (userId === req.user!.id) throw new HttpError(400, "You cannot delete your own account");
     await assertCanManageUser(req, userId);
+    // Admins cannot delete other admin accounts — only root can
     const result = await pool.query(
-      `delete from users where id = $1 returning id`,
+      req.user!.role === "root"
+        ? `delete from users where id = $1 returning id`
+        : `delete from users where id = $1 and role = 'user' returning id`,
       [userId]
     );
-    if (!result.rows[0]) throw new HttpError(404, "User not found");
+    if (!result.rows[0]) throw new HttpError(403, "Admin accounts can only be deleted by root");
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -581,6 +584,11 @@ router.delete("/users/:id/data", async (req, res, next) => {
     const userId = uuidSchema.parse(req.params.id);
     if (userId === req.user!.id) throw new HttpError(400, "You cannot wipe your own data");
     await assertCanManageUser(req, userId);
+    // Admins cannot wipe data of other admin accounts — only root can
+    if (req.user!.role !== "root") {
+      const roleCheck = await pool.query("select 1 from users where id = $1 and role = 'user'", [userId]);
+      if (!roleCheck.rows[0]) throw new HttpError(403, "Admin accounts can only be wiped by root");
+    }
     await withTransaction(async (client) => {
       await client.query("delete from time_sessions where user_id = $1", [userId]);
       await client.query("delete from administrative_requests where user_id = $1", [userId]);
