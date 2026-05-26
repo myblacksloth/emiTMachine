@@ -1953,7 +1953,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
     <section className="panel overtime-panel">
       <div className="panel-title">
         <div>
-          <p className="eyebrow">Banca ore straordinari</p>
+          <p className="eyebrow">Overtime</p>
           <h2>Overtime balance</h2>
         </div>
         <button type="button" onClick={loadOvertime} disabled={loading}>
@@ -1977,7 +1977,7 @@ function OvertimePanel({ onToast }: { onToast: (tone: Toast["tone"], message: st
       {settings?.enabled && settings.weeklyWorkMinutes !== null && report ? (
         <>
           <section className="summary-grid compact overtime-summary" aria-label="Overtime summary">
-            <Metric label="Mode" value={settings.mode === "time_bank" ? "Banca ore" : "Straordinari"} icon={<Hourglass size={18} />} />
+            <Metric label="Mode" value={settings.mode === "time_bank" ? "Time bank" : "Overtime"} icon={<Hourglass size={18} />} />
             <Metric label="Weekly target" value={minutesLabel(settings.weeklyWorkMinutes)} icon={<TimerReset size={18} />} />
             <Metric label="Residual bank" value={settings.mode === "time_bank" ? minutesLabel(report.residualMinutes) : "—"} icon={<BarChart3 size={18} />} />
             <Metric label="Weeks" value={String(report.weeks.length)} icon={<CalendarClock size={18} />} />
@@ -2775,8 +2775,8 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                       </button>
                       {user.overtimeEnabled ? (
                         <select value={user.overtimeMode} onChange={(event) => changeOvertimeMode(user, event.target.value as "overtime" | "time_bank")}>
-                          <option value="overtime">Straordinari</option>
-                          <option value="time_bank">Banca ore</option>
+                          <option value="overtime">Overtime</option>
+                          <option value="time_bank">Time bank</option>
                         </select>
                       ) : null}
                     </>
@@ -2900,8 +2900,8 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
           <section className="overtime-admin-box">
             <div className="panel-title compact-title">
               <div>
-                <p className="eyebrow">Banca ore straordinari</p>
-                <h2>{selectedOvertime.settings.mode === "time_bank" ? "Banca ore" : "Straordinari"}</h2>
+                <p className="eyebrow">Overtime</p>
+                <h2>{selectedOvertime.settings.mode === "time_bank" ? "Time bank" : "Overtime"}</h2>
               </div>
               <strong>{selectedOvertime.settings.weeklyWorkMinutes ? minutesLabel(selectedOvertime.settings.weeklyWorkMinutes) : "Target missing"}</strong>
             </div>
@@ -3933,7 +3933,7 @@ function TimeTools() {
     const m = Math.floor((diff % 3600) / 60);
     const s = diff % 60;
     liveResult =
-      diff === 0 ? "Adesso!"
+      diff === 0 ? "Now!"
       : h > 0 ? `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
       : m > 0 ? `${m}m ${String(s).padStart(2, "0")}s`
       : `${s}s`;
@@ -4012,7 +4012,7 @@ function TimeTools() {
                 {shiftEndTime}
                 {shiftRemaining !== null && (
                   <small className="tool-remaining">
-                    {shiftRemaining === 0 ? " — finito!" : ` — ${fmtDiff(shiftRemaining)} rimasti`}
+                    {shiftRemaining === 0 ? " — done!" : ` — ${fmtDiff(shiftRemaining)} remaining`}
                   </small>
                 )}
               </>
