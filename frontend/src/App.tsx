@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlarmClock,
   BarChart3,
+  Calculator,
   CalendarClock,
   ChevronDown,
   ChevronLeft,
@@ -3798,6 +3799,12 @@ function TimeTools() {
   const [shiftWorkH, setShiftWorkH] = useState("8");
   const [shiftBreakM, setShiftBreakM] = useState("30");
 
+  const [sumEntries, setSumEntries] = useState<{ h: string; m: string; sign: "+" | "-" }[]>([
+    { h: "", m: "", sign: "+" },
+    { h: "", m: "", sign: "+" },
+  ]);
+  const [sumResult, setSumResult] = useState<string | null>(null);
+
   const [liveTarget, setLiveTarget] = useState("");
   const [, tick] = useState(0);
 
@@ -3881,6 +3888,19 @@ function TimeTools() {
       : `${s}s`;
   }
 
+  function calcSum() {
+    let total = 0;
+    for (const e of sumEntries) {
+      const minutes = (parseInt(e.h) || 0) * 60 + (parseInt(e.m) || 0);
+      total += e.sign === "-" ? -minutes : minutes;
+    }
+    const neg = total < 0;
+    const abs = Math.abs(total);
+    const h = Math.floor(abs / 60);
+    const m = abs % 60;
+    setSumResult(`${neg ? "−" : ""}${h}h ${String(m).padStart(2, "0")}m`);
+  }
+
   return (
     <section className="panel stack wide">
       <h2><Clock size={18} /> Time Tools</h2>
@@ -3943,6 +3963,57 @@ function TimeTools() {
             <TimeField label="Target" value={liveTarget} onChange={setLiveTarget} />
           </div>
           <div className={`time-result${liveTarget ? " live" : ""}`}>{liveResult ?? "—"}</div>
+        </div>
+
+        <div className="time-tool-card">
+          <div className="tool-header"><Calculator size={15} /><strong>Time sum</strong></div>
+          <p className="muted small">Sum multiple durations to get the total</p>
+          {sumEntries.map((entry: { h: string; m: string; sign: "+" | "-" }, i: number) => (
+            <div key={i} className="tool-row sum-entry-row">
+              {i === 0
+                ? <span className="tool-label sum-sign-fixed">+</span>
+                : <button
+                    type="button"
+                    className={`sum-sign-btn${entry.sign === "-" ? " minus" : ""}`}
+                    aria-label={`Toggle sign for row ${i + 1}`}
+                    onClick={() => { const n = [...sumEntries]; n[i] = { ...n[i], sign: entry.sign === "+" ? "-" : "+" }; setSumEntries(n); setSumResult(null); }}
+                  >
+                    {entry.sign}
+                  </button>
+              }
+              <input
+                type="number" min="0" max="999" placeholder="0"
+                value={entry.h}
+                onChange={(e: { target: { value: string } }) => { const n = [...sumEntries]; n[i] = { ...n[i], h: e.target.value }; setSumEntries(n); setSumResult(null); }}
+                className="tool-num"
+              />
+              <span className="muted">h</span>
+              <input
+                type="number" min="0" max="59" placeholder="0"
+                value={entry.m}
+                onChange={(e: { target: { value: string } }) => { const n = [...sumEntries]; n[i] = { ...n[i], m: e.target.value }; setSumEntries(n); setSumResult(null); }}
+                className="tool-num"
+              />
+              <span className="muted">m</span>
+              {sumEntries.length > 2 ? (
+                <button
+                  type="button" className="sum-remove-btn" aria-label="Remove row"
+                  onClick={() => { setSumEntries(sumEntries.filter((_: { h: string; m: string; sign: "+" | "-" }, j: number) => j !== i)); setSumResult(null); }}
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+          ))}
+          <div className="sum-actions">
+            <button type="button" className="sum-add-btn" onClick={() => { setSumEntries([...sumEntries, { h: "", m: "", sign: "+" }]); setSumResult(null); }}>
+              <Plus size={14} /> Add
+            </button>
+            <button type="button" className="sum-calc-btn" onClick={calcSum}>
+              = Calculate
+            </button>
+          </div>
+          <div className="time-result">{sumResult ?? "—"}</div>
         </div>
 
       </div>
