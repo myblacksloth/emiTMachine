@@ -2598,6 +2598,21 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
     onToast("success", "User deleted.");
   };
 
+  const wipeUserData = async (user: AdminUser) => {
+    if (!(await confirmTyped(
+      `Delete all activities and administrative requests for ${user.username}? The account is kept but all session history and requests are permanently removed.`,
+      "confirm",
+      "Wipe user data"
+    ))) return;
+    try {
+      await api.wipeUserData(user.id);
+      await loadSelectedUserData(user.id);
+      onToast("success", "All activities and administrative requests deleted.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to wipe user data.");
+    }
+  };
+
   const toggleRegistration = async () => {
     if (!(await confirmCritical(`${registrationEnabled ? "Lock" : "Open"} user registration?`))) return;
     await api.setRegistrationSetting(!registrationEnabled);
@@ -2770,6 +2785,7 @@ function AdminPanel({ currentRole, onToast }: { currentRole: "admin" | "root"; o
                 {user.role !== "root" && (currentRole === "root" || user.role === "user") ? (
                   <div className="admin-user-danger-actions" aria-label={`Dangerous actions for ${user.username}`}>
                     <button type="button" onClick={() => resetPassword(user)}>Reset password</button>
+                    <button className="danger-action" type="button" onClick={() => wipeUserData(user)}>Wipe data</button>
                     <button className="danger-action" type="button" onClick={() => deleteUser(user)}>Delete</button>
                   </div>
                 ) : null}

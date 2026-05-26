@@ -47,6 +47,7 @@ Admins/root can:
 - review administrative requests for users they are responsible for;
 - inspect a selected user's session summary, session history, and overtime data;
 - reset credentials for users they are allowed to manage;
+- wipe all activities and administrative requests for users they are allowed to manage (account is kept);
 - delete users they are allowed to manage;
 - enable or disable session editing for individual users;
 - enable or disable overtime tracking for individual users and switch between `overtime` and `time_bank` (banca ore) mode.
@@ -185,6 +186,7 @@ GET    /api/admin/manager-assignments
 POST   /api/admin/users/:managerId/managed-users
 DELETE /api/admin/users/:managerId/managed-users/:userId
 POST   /api/admin/users/:id/reset-password
+DELETE /api/admin/users/:id/data
 DELETE /api/admin/users/:id
 GET    /api/admin/users/:id/summary
 GET    /api/admin/users/:id/sessions

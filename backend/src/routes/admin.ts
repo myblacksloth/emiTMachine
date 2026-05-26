@@ -537,6 +537,26 @@ router.delete("/users/:id", async (req, res, next) => {
   }
 });
 
+router.delete("/users/:id/data", async (req, res, next) => {
+  try {
+    requireAdmin(req);
+    const userId = uuidSchema.parse(req.params.id);
+    if (userId === req.user!.id) throw new HttpError(400, "You cannot wipe your own data");
+    const check = await pool.query(
+      `select id from users where id = $1 and role <> 'root' and ($2::text = 'root' or role = 'user')`,
+      [userId, req.user!.role]
+    );
+    if (!check.rows[0]) throw new HttpError(404, "User not found or cannot be managed by this admin");
+    await withTransaction(async (client) => {
+      await client.query("delete from time_sessions where user_id = $1", [userId]);
+      await client.query("delete from administrative_requests where user_id = $1", [userId]);
+    });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/settings/registration", async (req, res, next) => {
   try {
     requireRoot(req);

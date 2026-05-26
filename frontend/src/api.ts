@@ -684,6 +684,7 @@ export const api = {
   deleteUserOvertimePayment: (id: string, weekStart: string) =>
     request<void>(`/api/admin/users/${id}/overtime-payments/${weekStart}`, { method: "DELETE" }),
   resetUserPassword: (id: string) => request<{ temporaryPassword: string }>(`/api/admin/users/${id}/reset-password`, { method: "POST" }),
+  wipeUserData: (id: string) => request<void>(`/api/admin/users/${id}/data`, { method: "DELETE" }),
   deleteUser: (id: string) => request<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
   registrationSetting: () => request<{ enabled: boolean }>("/api/admin/settings/registration"),
   setRegistrationSetting: (enabled: boolean) =>
