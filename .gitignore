@@ -10,6 +10,7 @@ Caddyfile
 
 docker-compose-reverse.yml
 docker-compose-reverse.*.env
+docker-compose-npm-advanced.env
 
 
 *.pem
