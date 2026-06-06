@@ -35,3 +35,5 @@ backups/*
 !backups/postgres/
 backups/postgres/*
 !backups/postgres/.gitkeep
+
+nginx-proxy-manager

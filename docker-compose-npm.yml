@@ -1,0 +1,129 @@
+
+# Reverse-proxy deployment with Nginx Proxy Manager
+
+services:
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:2.9.3
+    restart: always
+    environment:
+      DB_SQLITE_FILE: /data/database.sqlite
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    volumes:
+      - ./nginx-proxy-manager/data:/data
+      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+    networks:
+      - gotproxed
+      - emitmachineint
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  # -----------------------------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    user: postgres
+    env_file:
+      - ./docker-compose-reverse.postgres.env
+    environment:
+      POSTGRES_DB: emitmachine
+      POSTGRES_USER: emitmachine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emitmachine -d emitmachine"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  # -----------------------------------------------------------------------------------------------
+  postgres-backup:
+    image: postgres:16-alpine
+    user: "${UID:-1000}:${GID:-1000}"
+    env_file:
+      - ./docker-compose-reverse.postgres.env
+    environment:
+      POSTGRES_DB: emitmachine
+      POSTGRES_USER: emitmachine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backups/postgres:/backups
+    networks:
+      - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          export PGPASSWORD="$${POSTGRES_PASSWORD}"
+          tmp="/backups/emitmachine-latest.sql.tmp"
+          out="/backups/emitmachine-latest.sql"
+          pg_dump --host=postgres --username="$${POSTGRES_USER}" --dbname="$${POSTGRES_DB}" --format=plain --clean --if-exists --no-owner --no-privileges > "$${tmp}" && mv "$${tmp}" "$${out}"
+          sleep 28800
+        done
+  # -----------------------------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+    user: node
+    env_file:
+      - ./docker-compose-reverse.backend.env
+    environment:
+      PORT: 4000
+      RP_NAME: emiTMachine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  # -----------------------------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+    user: node
+    env_file:
+      - ./docker-compose-reverse.frontend.env
+    environment:
+      VITE_BACKEND_PROXY_TARGET: http://backend:4000
+    depends_on:
+      - backend
+    networks:
+      - emitmachineint
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+
+
+
+volumes:
+  postgres_data:
+
+networks:
+  emitmachineint:
+    internal: true
+  gotproxed:
+    driver: bridge
+
+
