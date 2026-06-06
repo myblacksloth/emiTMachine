@@ -10,6 +10,43 @@ flowchart LR
     Postgres --> Init[backend/db/init.sql]
 ```
 
+## Reverse Proxy Views
+
+The project supports a Caddy reverse-proxy stack and two Nginx Proxy Manager
+stacks. All reverse-proxy variants keep the application database on PostgreSQL.
+
+### Caddy
+
+```mermaid
+flowchart LR
+    Browser[Browser] --> Caddy[Caddy reverse proxy]
+    Caddy --> Frontend[Vite React frontend]
+    Frontend --> Backend[Express API]
+    Backend --> Postgres[(emiTMachine PostgreSQL)]
+```
+
+### Nginx Proxy Manager With SQLite
+
+```mermaid
+flowchart LR
+    Browser[Browser] --> NPM[Nginx Proxy Manager]
+    NPM --> Frontend[Vite React frontend]
+    Frontend --> Backend[Express API]
+    Backend --> Postgres[(emiTMachine PostgreSQL)]
+    NPM --> NpmSqlite[(NPM SQLite file)]
+```
+
+### Nginx Proxy Manager With MariaDB
+
+```mermaid
+flowchart LR
+    Browser[Browser] --> NPM[Nginx Proxy Manager]
+    NPM --> Frontend[Vite React frontend]
+    Frontend --> Backend[Express API]
+    Backend --> Postgres[(emiTMachine PostgreSQL)]
+    NPM --> NpmMaria[(NPM MariaDB)]
+```
+
 ## Logging
 
 The Docker Compose stack writes service logs to stdout and stderr so Docker, a reverse proxy, or a host logging driver can collect them without extra files or sidecars.

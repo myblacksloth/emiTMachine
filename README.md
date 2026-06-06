@@ -34,6 +34,7 @@ Root/admin behavior is documented in `doc/admin-root.md`.
 - CSV export and restore import.
 - PostgreSQL database initialized from SQL, not backend startup code.
 - Docker Compose stack for frontend, backend, and PostgreSQL.
+- Reverse proxy deployment guides for Caddy and Nginx Proxy Manager.
 
 ## Run Locally
 
@@ -87,6 +88,20 @@ Logging defaults are intended for local development:
 - `LOG_FORMAT`: backend log format. Use `pretty` for readable local logs and `json` when logs are collected by Docker, a reverse proxy, or a central logging system.
 
 Change `TOTP_ENCRYPTION_KEY`, cookie settings, and database credentials for any non-local deployment. HTTPS and reverse proxy configuration are intentionally left for the deployment layer.
+
+## Reverse Proxy Deployment
+
+The repository includes two reverse proxy guides:
+
+- `docker-reverse.md`: Caddy-based deployment with manually provided TLS certificates.
+- `docker-reverse-npm.md`: Nginx Proxy Manager deployment.
+
+The Nginx Proxy Manager guide includes two Compose variants:
+
+- `docker-compose-npm.yml`: NPM with SQLite for NPM's own data.
+- `docker-compose-npm-advanced.yml`: NPM with a dedicated MariaDB database for NPM's own data.
+
+Both NPM variants keep emiTMachine on PostgreSQL. The NPM database is only for proxy hosts, certificates, NPM users, and NPM settings.
 
 ## Passkeys
 

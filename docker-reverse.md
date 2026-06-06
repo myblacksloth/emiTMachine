@@ -2,6 +2,9 @@
 
 This guide explains how to run emiTMachine behind the included Caddy reverse proxy.
 
+For an Nginx Proxy Manager deployment, including the advanced variant with a
+dedicated MariaDB database for NPM, see `docker-reverse-npm.md`.
+
 ## Files
 
 - `docker-compose-reverse.example.yml`: public placeholder compose file.

@@ -128,3 +128,27 @@ docker compose up -d --build backend
 Structured log collection is needed:
 
 Set `LOG_FORMAT=json` for the backend service and collect Docker stdout/stderr from the `backend` container.
+
+## Reverse Proxy Issues
+
+Nginx Proxy Manager logs `getaddrinfo ENOTFOUND db`:
+
+NPM is trying to use an old MySQL/MariaDB host named `db`. The current SQLite
+stack uses `/data/database.sqlite`, and the advanced stack uses the service name
+`npm-db`. Stop the stack and clear stale NPM data or use the advanced stack with
+`docker-compose-npm-advanced.env`.
+
+NPM advanced stack fails before starting:
+
+```bash
+docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env config
+```
+
+Check that `docker-compose-npm-advanced.env` exists and defines
+`MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, and `MYSQL_PASSWORD`.
+
+Ports `80`, `443`, or `81` are already allocated:
+
+Only one reverse proxy stack can bind those host ports at a time. Stop the Caddy
+stack, the SQLite NPM stack, or the advanced NPM stack before starting another
+one.
