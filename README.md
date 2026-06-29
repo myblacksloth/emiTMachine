@@ -14,6 +14,7 @@ emiTMachine is a multi-user time tracking web app for work sessions, tags, repor
 | ![](./stuff/i/SCR-20260515-offp.png) | ![](./stuff/i/SCR-20260515-oflv.png) |
 | ![](./stuff/i/SCR-20260515-ofrs.png) | ![](./stuff/i/SCR-20260520-otwy.png) |
 
+
 ## Deploy Fast
 
 Start here if you want the shortest path to a running deployment:
@@ -30,7 +31,7 @@ Use `domain.example.com` in the docs as a placeholder for your real HTTPS hostna
 | --- | --- | --- |
 | Local development | `docker-compose.yml` | `docker compose up --build` |
 | Production with included Caddy reverse proxy | `docker-compose-reverse.yml` | `docker compose -f docker-compose-reverse.yml up -d --build` |
-| Production with Nginx Proxy Manager and SQLite NPM storage | `docker-compose-npm.yml` | `docker compose -f docker-compose-npm.yml up -d --build` |
+| Production with Nginx Proxy Manager and SQLite NPM storage (*) | `docker-compose-npm.yml` | `docker compose -f docker-compose-npm.yml up -d --build` |
 | Production with Nginx Proxy Manager and MariaDB NPM storage | `docker-compose-npm-advanced.yml` | `docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up -d --build` |
 
 Only `.example` env files are committed. Real env files contain secrets and deployment-specific domains, are ignored by Git, and must not be pushed.
@@ -69,20 +70,15 @@ The database is persisted in the `postgres_data` Docker volume and initialized f
 
 ## Backups
 
-The Compose stacks include a `postgres-backup` sidecar. It writes the latest PostgreSQL dump every 8 hours to:
-
-```text
-backups/postgres/emitmachine-latest.sql
-```
-
-Restore commands and Nginx Proxy Manager backup notes are in [doc/operations.md](doc/operations.md).
+Backups are intentionally handled by the host or infrastructure layer, not by a long-running backup container. Use [doc/backups.md](doc/backups.md) for the recommended PostgreSQL backup, retention, off-site copy, cron, and restore procedure.
 
 ## Documentation
 
 - [Deployment quickstart](doc/deployment-quickstart.md): shortest deployment path with copy/paste commands.
 - [Deployment guide](doc/deployment.md): full Compose selection, env files, diagrams, and deployment recipes.
 - [Local development](doc/local-development.md): default local stack and local commands.
-- [Operations](doc/operations.md): backups, restore, logs, validation, and post-deploy checks.
+- [Backups and restore](doc/backups.md): production backup policy, cron setup, off-site copy, and restore procedure.
+- [Operations](doc/operations.md): logs, validation, and post-deploy checks.
 - [Caddy reverse proxy guide](docker-reverse.md): detailed Caddy setup.
 - [Nginx Proxy Manager guide](docker-reverse-npm.md): detailed NPM setup.
 - [Architecture](doc/architecture.md): container and application architecture.

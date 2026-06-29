@@ -181,14 +181,9 @@ RP_ORIGIN=https://domain.example.com
 
 ## Backups
 
-emiTMachine PostgreSQL backups are handled by the `postgres-backup` sidecar in
-both NPM stacks. The latest dump is written to:
+emiTMachine PostgreSQL backups should be scheduled on the Docker host or by infrastructure tooling, not by a long-running backup container. Use `doc/backups.md` for the recommended PostgreSQL backup and restore procedure.
 
-```text
-backups/postgres/emitmachine-latest.sql
-```
-
-For the SQLite NPM stack, back up:
+For the SQLite NPM stack, also back up:
 
 ```text
 nginx-proxy-manager/data
@@ -198,7 +193,8 @@ nginx-proxy-manager/letsencrypt
 For the advanced MariaDB NPM stack, back up:
 
 ```bash
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env exec -T npm-db sh -c 'mariadb-dump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > backups/npm-mariadb.sql
+sudo install -d -m 0750 -o root -g root /srv/backups/emitmachine/npm-mariadb
+docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env exec -T npm-db sh -c 'mariadb-dump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > /srv/backups/emitmachine/npm-mariadb/npm-$(date -u +%Y%m%dT%H%M%SZ).sql
 ```
 
 The `nginx-proxy-manager/letsencrypt` directory still needs a filesystem backup

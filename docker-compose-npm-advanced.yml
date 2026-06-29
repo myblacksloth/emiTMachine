@@ -75,37 +75,6 @@ services:
     cap_drop:
       - ALL
   # -----------------------------------------------------------------------------------------------
-  postgres-backup:
-    image: postgres:16-alpine
-    user: "${UID:-1000}:${GID:-1000}"
-    env_file:
-      - ./docker-compose-reverse.postgres.env
-    environment:
-      POSTGRES_DB: emitmachine
-      POSTGRES_USER: emitmachine
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./backups/postgres:/backups
-    networks:
-      - emitmachineint
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    command:
-      - sh
-      - -c
-      - |
-        while true; do
-          export PGPASSWORD="$${POSTGRES_PASSWORD}"
-          tmp="/backups/emitmachine-latest.sql.tmp"
-          out="/backups/emitmachine-latest.sql"
-          pg_dump --host=postgres --username="$${POSTGRES_USER}" --dbname="$${POSTGRES_DB}" --format=plain --clean --if-exists --no-owner --no-privileges > "$${tmp}" && mv "$${tmp}" "$${out}"
-          sleep 28800
-        done
-  # -----------------------------------------------------------------------------------------------
   backend:
     build:
       context: ./backend

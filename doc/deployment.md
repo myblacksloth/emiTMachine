@@ -18,8 +18,8 @@ flowchart LR
   ReverseProxy --> Frontend[Frontend container]
   Frontend --> Backend[Backend container]
   Backend --> Postgres[(PostgreSQL)]
-  Backup[postgres-backup] --> Postgres
-  Backup --> Dump[backups/postgres/emitmachine-latest.sql]
+  HostCron[Host cron backup job] --> Postgres
+  HostCron --> BackupStore[Local and off-site backup storage]
 ```
 
 Nginx Proxy Manager deployments add NPM storage:
@@ -210,16 +210,21 @@ Do not commit private deployment files:
 - `caddy/config/Caddyfile`
 - `caddy/certs/*.pem`
 - `nginx-proxy-manager/`
-- `backups/postgres/*.sql`
+- backup dumps or archives
 
 These are already covered by `.gitignore`; keep them private.
 
 ## Backups, Logs, And Checks
 
-Operational commands are in [operations.md](operations.md):
+Backup and restore procedures are in [backups.md](backups.md):
 
 - PostgreSQL backup and restore.
+- Host cron setup.
+- Retention and off-site copy.
 - Nginx Proxy Manager backup notes.
+
+Operational commands are in [operations.md](operations.md):
+
 - Compose validation commands.
 - Logs for each stack.
 - Post-deploy checklist.

@@ -156,7 +156,7 @@ Then verify:
 - Login or registration works.
 - Passkey setup works over HTTPS.
 - Backend logs do not show CORS, cookie, or database connection errors.
-- `backups/postgres/emitmachine-latest.sql` is created after PostgreSQL becomes healthy.
+- A host-level PostgreSQL backup job is configured from [backups.md](backups.md).
 
 ## Do Not Commit
 
@@ -168,6 +168,6 @@ Do not commit private deployment files:
 - `caddy/config/Caddyfile`
 - `caddy/certs/*.pem`
 - `nginx-proxy-manager/`
-- `backups/postgres/*.sql`
+- backup dumps or archives
 
 Full details are in [deployment.md](deployment.md).

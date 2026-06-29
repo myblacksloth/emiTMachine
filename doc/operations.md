@@ -1,61 +1,6 @@
 # Operations
 
-This page covers backups, restore, logs, and production checks.
-
-## Backups
-
-All Compose stacks include `postgres-backup`, which writes the latest PostgreSQL dump every 8 hours:
-
-```text
-backups/postgres/emitmachine-latest.sql
-```
-
-The first dump is created as soon as PostgreSQL becomes healthy. Each run writes through a temporary file and then replaces the previous dump.
-
-Backup files are ignored by Git.
-
-## Restore
-
-Restore into the local stack:
-
-```bash
-docker compose exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-Restore into the Caddy stack:
-
-```bash
-docker compose -f docker-compose-reverse.yml exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-Restore into the NPM SQLite stack:
-
-```bash
-docker compose -f docker-compose-npm.yml exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-Restore into the advanced NPM stack:
-
-```bash
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-## Nginx Proxy Manager Backups
-
-For NPM with SQLite, back up:
-
-```text
-nginx-proxy-manager/data
-nginx-proxy-manager/letsencrypt
-```
-
-For NPM with MariaDB, back up MariaDB separately:
-
-```bash
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env exec -T npm-db sh -c 'mariadb-dump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > backups/npm-mariadb.sql
-```
-
-The `nginx-proxy-manager/letsencrypt` directory still needs a filesystem backup because certificate files are stored there.
+This page covers logs, validation, and production checks. Backup and restore procedures are documented separately in [backups.md](backups.md).
 
 ## Logs
 
@@ -102,7 +47,8 @@ docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-
 - Passkey setup works over HTTPS.
 - Backend logs do not show CORS, cookie, or database connection errors.
 - PostgreSQL logs show a healthy database.
-- `backups/postgres/emitmachine-latest.sql` exists after PostgreSQL becomes healthy.
+- A host-level PostgreSQL backup job is configured and has produced at least one verified backup.
+- Off-site copy is configured for backup files.
 
 ## Common Problems
 

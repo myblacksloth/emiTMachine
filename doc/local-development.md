@@ -27,7 +27,6 @@ Services:
 `docker-compose.yml` starts:
 
 - `postgres`: PostgreSQL 16 with schema initialization from `backend/db/init.sql`.
-- `postgres-backup`: periodic PostgreSQL dump sidecar.
 - `backend`: Node backend API.
 - `frontend`: Vite frontend.
 
@@ -80,3 +79,5 @@ VITE_BACKEND_PROXY_TARGET=http://backend:4000
 ```
 
 For deployment, do not reuse these defaults. Use private env files as described in [deployment-quickstart.md](deployment-quickstart.md).
+
+Backups are not run by the local Compose stack. See [backups.md](backups.md) for the production backup and restore procedure.

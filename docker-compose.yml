@@ -16,30 +16,6 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
 
-  postgres-backup:
-    image: postgres:16-alpine
-    user: "${UID:-1000}:${GID:-1000}"
-    environment:
-      POSTGRES_DB: emitmachine
-      POSTGRES_USER: emitmachine
-      POSTGRES_PASSWORD: emitmachine
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./backups/postgres:/backups
-    command:
-      - sh
-      - -c
-      - |
-        while true; do
-          export PGPASSWORD="$${POSTGRES_PASSWORD}"
-          tmp="/backups/emitmachine-latest.sql.tmp"
-          out="/backups/emitmachine-latest.sql"
-          pg_dump --host=postgres --username="$${POSTGRES_USER}" --dbname="$${POSTGRES_DB}" --format=plain --clean --if-exists --no-owner --no-privileges > "$${tmp}" && mv "$${tmp}" "$${out}"
-          sleep 28800
-        done
-
   backend:
     build:
       context: ./backend

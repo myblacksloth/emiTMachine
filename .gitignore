@@ -32,9 +32,6 @@ dist/
 coverage/
 *.log
 
-backups/*
-!backups/postgres/
-backups/postgres/*
-!backups/postgres/.gitkeep
+backups/
 
 nginx-proxy-manager
