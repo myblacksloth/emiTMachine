@@ -2,9 +2,29 @@
 
 emiTMachine is a multi-user time tracking web app for work sessions, tags, reports, TOTP, passkeys, recovery codes, CSV history, admin workflows, and overtime/time-bank tracking.
 
+## Screenshots
+
+![](./stuff/i/SCR-20260515-ogph.png)
+
+![](./stuff/i/SCR-20260515-nyjq.png)
+
+|   |   |
+| ------------ | ------------ |
+| ![](./stuff/i/SCR-20260515-oemn.png) | ![](./stuff/i/SCR-20260515-oeyo.png) |
+| ![](./stuff/i/SCR-20260515-offp.png) | ![](./stuff/i/SCR-20260515-oflv.png) |
+| ![](./stuff/i/SCR-20260515-ofrs.png) | ![](./stuff/i/SCR-20260520-otwy.png) |
+
 ## Deploy Fast
 
-Use this section when you already know which deployment style you want. Full deployment details are in [doc/deployment.md](doc/deployment.md).
+Start here if you want the shortest path to a running deployment:
+
+1. Open [doc/deployment-quickstart.md](doc/deployment-quickstart.md).
+2. Pick Caddy, Nginx Proxy Manager with SQLite, or Nginx Proxy Manager with MariaDB.
+3. Copy the listed `.example` files.
+4. Replace the placeholder domain, passwords, and encryption key.
+5. Start the selected Compose stack.
+
+Use `domain.example.com` in the docs as a placeholder for your real HTTPS hostname.
 
 | Goal | Use | Command |
 | --- | --- | --- |
@@ -13,7 +33,11 @@ Use this section when you already know which deployment style you want. Full dep
 | Production with Nginx Proxy Manager and SQLite NPM storage | `docker-compose-npm.yml` | `docker compose -f docker-compose-npm.yml up -d --build` |
 | Production with Nginx Proxy Manager and MariaDB NPM storage | `docker-compose-npm-advanced.yml` | `docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up -d --build` |
 
-For a real deployment, create the private env files before starting the stack:
+Only `.example` env files are committed. Real env files contain secrets and deployment-specific domains, are ignored by Git, and must not be pushed.
+
+## Required Deployment Env Files
+
+Most deployment stacks need these private files:
 
 ```bash
 cp docker-compose-reverse.postgres.env.example docker-compose-reverse.postgres.env
@@ -27,30 +51,7 @@ If you use `docker-compose-npm-advanced.yml`, also run:
 cp docker-compose-npm-advanced.env.example docker-compose-npm-advanced.env
 ```
 
-Only `.example` env files are committed. Real env files contain secrets and deployment-specific domains, are ignored by Git, and must not be pushed.
-
-## Minimal Deployment Checklist
-
-1. Pick one stack from the table above.
-2. Copy the required `.example` env files.
-3. Replace every placeholder domain, password, and encryption key.
-4. Keep `POSTGRES_PASSWORD` aligned with the password inside `DATABASE_URL`.
-5. For passkeys, set `RP_ID`, `RP_ORIGIN`, and `CORS_ORIGIN` to the same public HTTPS hostname users open in the browser.
-6. Start the selected Compose stack.
-
-For Caddy, also copy the Caddyfile example and provide TLS certificates:
-
-```bash
-cp docker-compose-reverse.example.yml docker-compose-reverse.yml
-cp caddy/config/Caddyfile.example caddy/config/Caddyfile
-```
-
-Then edit `caddy/config/Caddyfile` and place certificates at:
-
-```text
-caddy/certs/cert.pem
-caddy/certs/key.pem
-```
+For Caddy, also copy `docker-compose-reverse.example.yml` to `docker-compose-reverse.yml` and `caddy/config/Caddyfile.example` to `caddy/config/Caddyfile`.
 
 ## Local Development
 
@@ -74,17 +75,14 @@ The Compose stacks include a `postgres-backup` sidecar. It writes the latest Pos
 backups/postgres/emitmachine-latest.sql
 ```
 
-Manual restore into the default local stack:
-
-```bash
-docker compose exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-Deployment restore commands and Nginx Proxy Manager backup notes are in [doc/deployment.md](doc/deployment.md).
+Restore commands and Nginx Proxy Manager backup notes are in [doc/operations.md](doc/operations.md).
 
 ## Documentation
 
-- [Deployment guide](doc/deployment.md): Compose selection, env files, Caddy, Nginx Proxy Manager, backups, and troubleshooting.
+- [Deployment quickstart](doc/deployment-quickstart.md): shortest deployment path with copy/paste commands.
+- [Deployment guide](doc/deployment.md): full Compose selection, env files, diagrams, and deployment recipes.
+- [Local development](doc/local-development.md): default local stack and local commands.
+- [Operations](doc/operations.md): backups, restore, logs, validation, and post-deploy checks.
 - [Caddy reverse proxy guide](docker-reverse.md): detailed Caddy setup.
 - [Nginx Proxy Manager guide](docker-reverse-npm.md): detailed NPM setup.
 - [Architecture](doc/architecture.md): container and application architecture.
@@ -107,18 +105,6 @@ Deployment restore commands and Nginx Proxy Manager backup notes are in [doc/dep
 - Admin/root user management workflows.
 - PostgreSQL database initialized from SQL, not backend startup code.
 - Docker Compose support for local development and reverse-proxy deployment.
-
-## Screenshots
-
-![](./stuff/i/SCR-20260515-ogph.png)
-
-![](./stuff/i/SCR-20260515-nyjq.png)
-
-|   |   |
-| ------------ | ------------ |
-| ![](./stuff/i/SCR-20260515-oemn.png) | ![](./stuff/i/SCR-20260515-oeyo.png) |
-| ![](./stuff/i/SCR-20260515-offp.png) | ![](./stuff/i/SCR-20260515-oflv.png) |
-| ![](./stuff/i/SCR-20260515-ofrs.png) | ![](./stuff/i/SCR-20260520-otwy.png) |
 
 ## Agentic Workflow
 

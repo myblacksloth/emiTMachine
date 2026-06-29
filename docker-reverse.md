@@ -34,7 +34,7 @@ cp caddy/config/Caddyfile.example caddy/config/Caddyfile
 Edit `caddy/config/Caddyfile` and replace:
 
 ```caddyfile
-your.domain.com
+domain.example.com
 ```
 
 with your real public domain.
@@ -42,7 +42,7 @@ with your real public domain.
 Example:
 
 ```caddyfile
-example.yourdomain.com {
+domain.example.com {
     tls /certs/cert.pem /certs/key.pem
     reverse_proxy frontend:5173
 }
@@ -78,11 +78,11 @@ NODE_ENV=production
 
 DATABASE_URL=postgres://emitmachine:change-this-password@postgres:5432/emitmachine
 
-CORS_ORIGIN=https://your.domain.com
+CORS_ORIGIN=https://domain.example.com
 COOKIE_SECURE=true
 
-RP_ID=your.domain.com
-RP_ORIGIN=https://your.domain.com
+RP_ID=domain.example.com
+RP_ORIGIN=https://domain.example.com
 
 TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
 ```
@@ -94,13 +94,13 @@ LOG_LEVEL=info
 LOG_FORMAT=json
 ```
 
-For passkeys, `RP_ID`, `RP_ORIGIN`, and the browser URL must use the same HTTPS domain.
+For passkeys, `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN`, and the browser URL must use the same HTTPS domain.
 Keep the password in `DATABASE_URL` aligned with `POSTGRES_PASSWORD`.
 
 Edit `docker-compose-reverse.frontend.env`:
 
 ```dotenv
-VITE_ALLOWED_HOSTS=your.domain.com
+VITE_ALLOWED_HOSTS=domain.example.com
 ```
 
 This allows the Vite dev server inside the frontend container to accept requests proxied from your public domain.
@@ -116,7 +116,7 @@ docker compose -f docker-compose-reverse.yml up -d --build
 The app should be reachable at:
 
 ```text
-https://your.domain.com
+https://domain.example.com
 ```
 
 ## 5. Stop The Stack
@@ -203,7 +203,7 @@ Common issues:
 - Passkeys fail: verify that `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN`, and the browser URL use the same HTTPS domain.
 - `Blocked request. This host is not allowed`: set `VITE_ALLOWED_HOSTS` in `docker-compose-reverse.frontend.env` to the public domain used in the browser.
 - Browser cannot reach the app: verify DNS, router port forwarding, firewall rules, and that Caddy is listening on ports `80` and `443`.
-- Backend CORS/session errors: verify `CORS_ORIGIN=https://your.domain.com` and `COOKIE_SECURE=true`.
+- Backend CORS/session errors: verify `CORS_ORIGIN=https://domain.example.com` and `COOKIE_SECURE=true`.
 
 <!-- 
 sudo systemctl stop docker

@@ -1,41 +1,56 @@
 # Deployment Guide
 
-This guide is the operational entry point for deploying emiTMachine with Docker Compose.
+This is the full deployment guide for emiTMachine. If you only need copy/paste commands, start with [deployment-quickstart.md](deployment-quickstart.md).
+
+The examples use this public hostname:
+
+```text
+domain.example.com
+```
+
+Replace it with your real HTTPS hostname everywhere.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser[Browser] --> ReverseProxy[Reverse proxy]
+  ReverseProxy --> Frontend[Frontend container]
+  Frontend --> Backend[Backend container]
+  Backend --> Postgres[(PostgreSQL)]
+  Backup[postgres-backup] --> Postgres
+  Backup --> Dump[backups/postgres/emitmachine-latest.sql]
+```
+
+Nginx Proxy Manager deployments add NPM storage:
+
+```mermaid
+flowchart LR
+  NPM[Nginx Proxy Manager] --> Frontend[Frontend container]
+  NPM --> NPMStore[(SQLite or MariaDB for NPM only)]
+  Backend[Backend container] --> Postgres[(PostgreSQL for emiTMachine)]
+```
+
+emiTMachine always uses PostgreSQL for application data. SQLite or MariaDB in Nginx Proxy Manager stacks stores only NPM configuration.
 
 ## Pick One Stack
 
 Do not run multiple production stacks at the same time unless you intentionally isolate ports, volumes, and networks.
 
-| File | When to use it | Exposed ports |
+| File | Use case | Exposed ports |
 | --- | --- | --- |
-| `docker-compose.yml` | Local development and quick testing. Uses development defaults directly in the Compose file. | `5173`, `4000`, `5432` |
+| `docker-compose.yml` | Local development and quick testing. | `5173`, `4000`, `5432` |
 | `docker-compose-reverse.yml` | Production-style deployment with the included Caddy reverse proxy. | `80`, `443` |
-| `docker-compose-npm.yml` | Production-style deployment with Nginx Proxy Manager using SQLite for NPM's own data. | `80`, `443`, `81` |
-| `docker-compose-npm-advanced.yml` | Production-style deployment with Nginx Proxy Manager using a dedicated MariaDB database for NPM's own data. | `80`, `443`, `81` |
+| `docker-compose-npm.yml` | Production-style deployment with Nginx Proxy Manager and SQLite NPM storage. | `80`, `443`, `81` |
+| `docker-compose-npm-advanced.yml` | Production-style deployment with Nginx Proxy Manager and MariaDB NPM storage. | `80`, `443`, `81` |
 
-emiTMachine always uses PostgreSQL for application data. The SQLite or MariaDB database in the Nginx Proxy Manager stacks stores only NPM data: proxy hosts, certificates, NPM users, and NPM settings.
+## Deployment Recipes
 
-## Quick Start: Local Development
+### Included Caddy Reverse Proxy
 
-```bash
-docker compose up --build
-```
+Use this when you want the repository to run the reverse proxy too and you already have TLS certificate files.
 
-Open:
-
-```text
-http://localhost:5173
-```
-
-The backend API is available at:
-
-```text
-http://localhost:4000/api
-```
-
-## Quick Start: Caddy Deployment
-
-Create private files:
+Create files:
 
 ```bash
 cp docker-compose-reverse.example.yml docker-compose-reverse.yml
@@ -45,7 +60,7 @@ cp docker-compose-reverse.frontend.env.example docker-compose-reverse.frontend.e
 cp caddy/config/Caddyfile.example caddy/config/Caddyfile
 ```
 
-Edit:
+Configure:
 
 - `docker-compose-reverse.postgres.env`
 - `docker-compose-reverse.backend.env`
@@ -65,17 +80,13 @@ Start:
 docker compose -f docker-compose-reverse.yml up -d --build
 ```
 
-Stop:
-
-```bash
-docker compose -f docker-compose-reverse.yml down
-```
-
 Detailed Caddy notes are in [../docker-reverse.md](../docker-reverse.md).
 
-## Quick Start: Nginx Proxy Manager With SQLite
+### Nginx Proxy Manager With SQLite
 
-Create shared emiTMachine env files:
+Use this for the simplest NPM deployment.
+
+Create files:
 
 ```bash
 cp docker-compose-reverse.postgres.env.example docker-compose-reverse.postgres.env
@@ -83,19 +94,13 @@ cp docker-compose-reverse.backend.env.example docker-compose-reverse.backend.env
 cp docker-compose-reverse.frontend.env.example docker-compose-reverse.frontend.env
 ```
 
-Edit:
-
-- `docker-compose-reverse.postgres.env`
-- `docker-compose-reverse.backend.env`
-- `docker-compose-reverse.frontend.env`
-
-Start:
+Configure the copied env files, then start:
 
 ```bash
 docker compose -f docker-compose-npm.yml up -d --build
 ```
 
-Open the NPM admin UI:
+Open:
 
 ```text
 http://your-server:81
@@ -108,60 +113,43 @@ admin@example.com
 changeme
 ```
 
-Change the default NPM credentials immediately after first login.
+Change them immediately after first login.
 
-In NPM, create a proxy host:
+Create an NPM proxy host:
 
+- Domain name: `domain.example.com`
 - Forward hostname: `frontend`
 - Forward port: `5173`
 - Scheme: `http`
 - Websockets support: enabled
-- SSL: request or upload a certificate for your domain
+- SSL: request or upload a certificate for `domain.example.com`
 
 Detailed NPM notes are in [../docker-reverse-npm.md](../docker-reverse-npm.md).
 
-## Quick Start: Nginx Proxy Manager With MariaDB
+### Nginx Proxy Manager With MariaDB
 
-Create shared emiTMachine env files:
+Use this when you want NPM data in a dedicated MariaDB database.
+
+Create files:
 
 ```bash
 cp docker-compose-reverse.postgres.env.example docker-compose-reverse.postgres.env
 cp docker-compose-reverse.backend.env.example docker-compose-reverse.backend.env
 cp docker-compose-reverse.frontend.env.example docker-compose-reverse.frontend.env
-```
-
-Create the private NPM MariaDB env file:
-
-```bash
 cp docker-compose-npm-advanced.env.example docker-compose-npm-advanced.env
 ```
 
-Edit:
-
-- `docker-compose-reverse.postgres.env`
-- `docker-compose-reverse.backend.env`
-- `docker-compose-reverse.frontend.env`
-- `docker-compose-npm-advanced.env`
-
-Start:
+Configure all copied env files, then start:
 
 ```bash
 docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up -d --build
 ```
 
-Open the NPM admin UI:
-
-```text
-http://your-server:81
-```
-
-Detailed NPM notes are in [../docker-reverse-npm.md](../docker-reverse-npm.md).
+Configure NPM as described in the SQLite recipe.
 
 ## Env Files
 
-Only example env files are committed to the repository. Real env files contain secrets and deployment-specific values, are ignored by Git, and must not be pushed.
-
-Tracked examples:
+Only example env files are committed. Real env files contain secrets and deployment-specific values, are ignored by Git, and must not be pushed.
 
 | Example file | Copy to | Used by |
 | --- | --- | --- |
@@ -169,107 +157,74 @@ Tracked examples:
 | `docker-compose-reverse.backend.env.example` | `docker-compose-reverse.backend.env` | Caddy and NPM stacks |
 | `docker-compose-reverse.frontend.env.example` | `docker-compose-reverse.frontend.env` | Caddy and NPM stacks |
 | `docker-compose-npm-advanced.env.example` | `docker-compose-npm-advanced.env` | Advanced NPM stack only |
-| `backend/.env.example` | optional local backend env | backend outside Compose |
+| `backend/.env.example` | optional local backend env | Backend outside Compose |
 
-Critical values:
+## What To Edit
 
-- `POSTGRES_PASSWORD`: PostgreSQL password for the `emitmachine` database user.
-- `DATABASE_URL`: backend PostgreSQL connection string. The password must match `POSTGRES_PASSWORD`.
-- `CORS_ORIGIN`: exact public browser origin, for example `https://time.example.com`.
-- `COOKIE_SECURE`: use `true` for HTTPS deployment.
-- `RP_ID`: passkey relying party id, usually the public hostname without protocol.
-- `RP_ORIGIN`: exact public HTTPS origin used for passkeys.
-- `TOTP_ENCRYPTION_KEY`: 32-byte base64 key. Generate with `openssl rand -base64 32`.
-- `VITE_ALLOWED_HOSTS`: comma-separated hostnames allowed by the frontend dev server, without protocol or path.
+| Goal | File or setting |
+| --- | --- |
+| Set the public domain | `docker-compose-reverse.backend.env`, `docker-compose-reverse.frontend.env`, Caddyfile or NPM proxy host |
+| Set PostgreSQL password | `docker-compose-reverse.postgres.env` and the password part of `DATABASE_URL` in `docker-compose-reverse.backend.env` |
+| Configure passkeys | `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN` |
+| Configure frontend allowed host | `VITE_ALLOWED_HOSTS` |
+| Configure Caddy TLS | `caddy/config/Caddyfile`, `caddy/certs/cert.pem`, `caddy/certs/key.pem` |
+| Configure advanced NPM MariaDB | `docker-compose-npm-advanced.env` |
+| Change backend log format | `LOG_FORMAT` in `docker-compose-reverse.backend.env` |
+| Change backend log level | `LOG_LEVEL` in `docker-compose-reverse.backend.env` |
+
+## Required Values
+
+Set these values for deployment:
+
+```dotenv
+POSTGRES_PASSWORD=replace-with-a-real-password
+DATABASE_URL=postgres://emitmachine:replace-with-a-real-password@postgres:5432/emitmachine
+CORS_ORIGIN=https://domain.example.com
+COOKIE_SECURE=true
+RP_ID=domain.example.com
+RP_ORIGIN=https://domain.example.com
+VITE_ALLOWED_HOSTS=domain.example.com
+```
+
+Generate a real TOTP encryption key:
+
+```bash
+openssl rand -base64 32
+```
+
+Then set:
+
+```dotenv
+TOTP_ENCRYPTION_KEY=<generated-value>
+```
 
 For passkeys, `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN`, and the URL opened in the browser must describe the same HTTPS site.
 
-## Compose File Reference
+## Do Not Commit
 
-| File | Purpose |
-| --- | --- |
-| `docker-compose.yml` | Local development stack with PostgreSQL, `postgres-backup`, backend, and frontend. |
-| `docker-compose-reverse.example.yml` | Tracked Caddy deployment template. Copy it to `docker-compose-reverse.yml`. |
-| `docker-compose-reverse.yml` | Private active Caddy deployment file, ignored by Git. |
-| `docker-compose-npm.yml` | Nginx Proxy Manager stack with SQLite NPM storage. |
-| `docker-compose-npm-advanced.yml` | Nginx Proxy Manager stack with MariaDB NPM storage. |
+Do not commit private deployment files:
 
-## Backups And Restore
+- `docker-compose-reverse.yml`
+- `docker-compose-reverse.*.env`
+- `docker-compose-npm-advanced.env`
+- `caddy/config/Caddyfile`
+- `caddy/certs/*.pem`
+- `nginx-proxy-manager/`
+- `backups/postgres/*.sql`
 
-All Compose stacks include `postgres-backup`, which writes a PostgreSQL dump every 8 hours:
+These are already covered by `.gitignore`; keep them private.
 
-```text
-backups/postgres/emitmachine-latest.sql
-```
+## Backups, Logs, And Checks
 
-The first dump is created as soon as PostgreSQL becomes healthy. Each run overwrites the previous dump atomically. Backup files are ignored by Git.
+Operational commands are in [operations.md](operations.md):
 
-Restore into the local stack:
+- PostgreSQL backup and restore.
+- Nginx Proxy Manager backup notes.
+- Compose validation commands.
+- Logs for each stack.
+- Post-deploy checklist.
+- Common production problems.
 
-```bash
-docker compose exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
+## Local Development
 
-Restore into the Caddy stack:
-
-```bash
-docker compose -f docker-compose-reverse.yml exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-Restore into the NPM SQLite stack:
-
-```bash
-docker compose -f docker-compose-npm.yml exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-Restore into the advanced NPM stack:
-
-```bash
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
-```
-
-For NPM SQLite, also back up:
-
-```text
-nginx-proxy-manager/data
-nginx-proxy-manager/letsencrypt
-```
-
-For advanced NPM, back up MariaDB separately:
-
-```bash
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env exec -T npm-db sh -c 'mariadb-dump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > backups/npm-mariadb.sql
-```
-
-The `nginx-proxy-manager/letsencrypt` directory still needs a filesystem backup because certificate files are stored there.
-
-## Validation And Logs
-
-Validate a stack before starting it:
-
-```bash
-docker compose config
-docker compose -f docker-compose-reverse.yml config
-docker compose -f docker-compose-npm.yml config
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env config
-```
-
-Follow logs:
-
-```bash
-docker compose logs -f
-docker compose -f docker-compose-reverse.yml logs -f caddy backend frontend postgres
-docker compose -f docker-compose-npm.yml logs -f nginx-proxy-manager backend frontend postgres
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env logs -f nginx-proxy-manager npm-db backend frontend postgres
-```
-
-## Common Problems
-
-- `port is already allocated`: another service is already using `80`, `443`, `81`, `5173`, `4000`, or `5432`, or multiple stacks are running at once.
-- `Blocked request. This host is not allowed`: set `VITE_ALLOWED_HOSTS` to the public hostname used in the browser.
-- Passkeys fail: verify HTTPS and make `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN`, and the browser URL consistent.
-- Backend CORS or session errors: verify `CORS_ORIGIN=https://your.domain.com` and `COOKIE_SECURE=true`.
-- Backend cannot connect to PostgreSQL: check that `POSTGRES_PASSWORD` matches the password in `DATABASE_URL`.
-- NPM advanced stack reports missing MySQL variables: verify `docker-compose-npm-advanced.env` exists and is passed with `--env-file`.
-
-More logging notes are in [troubleshooting.md](troubleshooting.md).
+Local development commands are in [local-development.md](local-development.md).

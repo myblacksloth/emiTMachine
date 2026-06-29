@@ -48,11 +48,11 @@ NODE_ENV=production
 
 DATABASE_URL=postgres://emitmachine:change-this-password@postgres:5432/emitmachine
 
-CORS_ORIGIN=https://your.domain.com
+CORS_ORIGIN=https://domain.example.com
 COOKIE_SECURE=true
 
-RP_ID=your.domain.com
-RP_ORIGIN=https://your.domain.com
+RP_ID=domain.example.com
+RP_ORIGIN=https://domain.example.com
 
 TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
 ```
@@ -60,11 +60,11 @@ TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
 Edit `docker-compose-reverse.frontend.env`:
 
 ```dotenv
-VITE_ALLOWED_HOSTS=your.domain.com
+VITE_ALLOWED_HOSTS=domain.example.com
 ```
 
-For passkeys, `RP_ID`, `RP_ORIGIN`, and the browser URL must use the same HTTPS
-domain.
+For passkeys, `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN`, and the browser URL must use
+the same HTTPS domain.
 
 ## Option 1: NPM With SQLite
 
@@ -73,7 +73,7 @@ Use this option for a single NPM instance with simple operational needs.
 Start the stack:
 
 ```bash
-docker compose -f docker-compose-npm.yml up --build
+docker compose -f docker-compose-npm.yml up -d --build
 ```
 
 Stop the stack:
@@ -117,7 +117,7 @@ MYSQL_PASSWORD=replace-with-npm-mariadb-user-password
 Start the advanced stack:
 
 ```bash
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up --build
+docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up -d --build
 ```
 
 Stop the advanced stack:
@@ -173,10 +173,10 @@ In NPM, create a proxy host for your public domain:
 Then make sure the backend environment uses the same public origin:
 
 ```dotenv
-CORS_ORIGIN=https://your.domain.com
+CORS_ORIGIN=https://domain.example.com
 COOKIE_SECURE=true
-RP_ID=your.domain.com
-RP_ORIGIN=https://your.domain.com
+RP_ID=domain.example.com
+RP_ORIGIN=https://domain.example.com
 ```
 
 ## Backups
@@ -232,14 +232,14 @@ Common issues:
 - `port is already allocated`: another service is already binding `80`, `443`, or `81`, or both NPM variants are running.
 - `Blocked request. This host is not allowed`: set `VITE_ALLOWED_HOSTS` in `docker-compose-reverse.frontend.env` to the public domain used in the browser.
 - Passkeys fail: verify that `RP_ID`, `RP_ORIGIN`, and the browser URL use the same HTTPS domain.
-- Backend CORS/session errors: verify `CORS_ORIGIN=https://your.domain.com` and `COOKIE_SECURE=true`.
+- Backend CORS/session errors: verify `CORS_ORIGIN=https://domain.example.com` and `COOKIE_SECURE=true`.
 
 To reset only NPM SQLite data:
 
 ```bash
 docker compose -f docker-compose-npm.yml down
 rm -rf nginx-proxy-manager/data
-docker compose -f docker-compose-npm.yml up --build
+docker compose -f docker-compose-npm.yml up -d --build
 ```
 
 To reset only the advanced NPM MariaDB volume:
@@ -248,5 +248,5 @@ To reset only the advanced NPM MariaDB volume:
 docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env down
 docker volume ls --format '{{.Name}}' | grep npm_mariadb_data
 docker volume rm <npm_mariadb_data_volume_name>
-docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up --build
+docker compose -f docker-compose-npm-advanced.yml --env-file docker-compose-npm-advanced.env up -d --build
 ```
