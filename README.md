@@ -88,7 +88,7 @@ Recommended choice:
 
 ## Environment
 
-The Compose file provides development defaults:
+The default `docker-compose.yml` file provides development defaults directly in the Compose services:
 
 ```text
 DATABASE_URL=postgres://emitmachine:emitmachine@postgres:5432/emitmachine
@@ -101,6 +101,27 @@ RP_NAME=emiTMachine
 TOTP_ENCRYPTION_KEY=replace-with-32-byte-base64-key
 VITE_BACKEND_PROXY_TARGET=http://backend:4000
 ```
+
+For deployment Compose files, only example env files are committed to the repository. The real env files contain deployment-specific domains, credentials, and encryption keys, so they are intentionally ignored by Git and must not be pushed.
+
+Tracked example files:
+
+- `docker-compose-reverse.postgres.env.example`: PostgreSQL password for the reverse-proxy stacks.
+- `docker-compose-reverse.backend.env.example`: backend database URL, CORS origin, cookie security, WebAuthn/passkey origin, TOTP encryption key, and logging settings.
+- `docker-compose-reverse.frontend.env.example`: frontend allowed public hostnames.
+- `docker-compose-npm-advanced.env.example`: MariaDB credentials used only by Nginx Proxy Manager in the advanced NPM stack.
+- `backend/.env.example`: backend environment reference for running the backend outside Docker Compose.
+
+Private local files to create when needed:
+
+```bash
+cp docker-compose-reverse.postgres.env.example docker-compose-reverse.postgres.env
+cp docker-compose-reverse.backend.env.example docker-compose-reverse.backend.env
+cp docker-compose-reverse.frontend.env.example docker-compose-reverse.frontend.env
+cp docker-compose-npm-advanced.env.example docker-compose-npm-advanced.env
+```
+
+After copying, replace all placeholder values before starting a deployment stack. Keep `POSTGRES_PASSWORD` aligned with the password inside `DATABASE_URL`. For passkeys, `RP_ID`, `RP_ORIGIN`, and `CORS_ORIGIN` must match the public HTTPS hostname users open in the browser.
 
 Logging defaults are intended for local development:
 
