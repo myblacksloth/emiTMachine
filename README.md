@@ -66,6 +66,26 @@ For a manual restore into a running local stack, use `psql` from the Postgres co
 docker compose exec -T postgres psql -U emitmachine -d emitmachine < backups/postgres/emitmachine-latest.sql
 ```
 
+## Docker Compose Files
+
+The repository contains several Compose files for different runtime scenarios. Use only one of these stacks at a time unless you intentionally know how to isolate ports, volumes, and networks.
+
+| File | Purpose | Main command |
+| --- | --- | --- |
+| `docker-compose.yml` | Default local development stack. It starts PostgreSQL, the PostgreSQL backup helper, the backend, and the frontend. The frontend is available on `http://localhost:5173`, the backend on `http://localhost:4000`, and PostgreSQL on `localhost:5432`. | `docker compose up --build` |
+| `docker-compose-reverse.example.yml` | Template for a Caddy reverse-proxy deployment. Copy it to `docker-compose-reverse.yml`, then create the private env files and Caddy config described in `docker-reverse.md`. This file is meant as a tracked example, not as the active deployment file. | Copy first, then use the copied file |
+| `docker-compose-reverse.yml` | Active Caddy reverse-proxy deployment file. It starts Caddy, PostgreSQL, the backup helper, backend, and frontend on internal Docker networks. Backend, frontend, and PostgreSQL are not directly published to the host; Caddy exposes ports `80` and `443`. This file depends on private env files such as `docker-compose-reverse.postgres.env`, `docker-compose-reverse.backend.env`, and `docker-compose-reverse.frontend.env`. | `docker compose -f docker-compose-reverse.yml up -d --build` |
+| `docker-compose-npm.yml` | Nginx Proxy Manager deployment using SQLite for NPM's own data. It also starts the emiTMachine PostgreSQL, backup helper, backend, and frontend. NPM exposes ports `80`, `443`, and the admin UI on `81`. emiTMachine still uses PostgreSQL; SQLite is only for Nginx Proxy Manager settings. | `docker compose -f docker-compose-npm.yml up -d --build` |
+| `docker-compose-npm-advanced.yml` | Nginx Proxy Manager deployment using a dedicated MariaDB container for NPM's own data. Use this instead of `docker-compose-npm.yml` when you want NPM's configuration stored in MariaDB rather than SQLite. emiTMachine still uses PostgreSQL. This file also requires `docker-compose-npm-advanced.env`. | `docker compose -f docker-compose-npm-advanced.yml up -d --build` |
+
+Recommended choice:
+
+- Use `docker-compose.yml` for local development and testing.
+- Use `docker-compose-reverse.yml` when deploying behind the included Caddy reverse proxy.
+- Use `docker-compose-npm.yml` when deploying with Nginx Proxy Manager and you want the simplest NPM setup.
+- Use `docker-compose-npm-advanced.yml` when deploying with Nginx Proxy Manager and you want NPM backed by MariaDB.
+- Do not edit `docker-compose-reverse.example.yml` for real secrets or domains; copy it and edit the private deployment files instead.
+
 ## Environment
 
 The Compose file provides development defaults:
