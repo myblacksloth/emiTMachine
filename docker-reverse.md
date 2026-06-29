@@ -200,7 +200,7 @@ docker compose -f docker-compose-reverse.yml logs -f frontend
 Common issues:
 
 - `network gotproxed declared as external, but could not be found`: create the external network or remove `external: true`.
-- Passkeys fail: verify that `PUBLIC_DOMAIN`, `RP_ID`, `RP_ORIGIN`, and the browser URL use the same HTTPS domain.
+- Passkeys fail: verify that `RP_ID`, `RP_ORIGIN`, `CORS_ORIGIN`, and the browser URL use the same HTTPS domain.
 - `Blocked request. This host is not allowed`: set `VITE_ALLOWED_HOSTS` in `docker-compose-reverse.frontend.env` to the public domain used in the browser.
 - Browser cannot reach the app: verify DNS, router port forwarding, firewall rules, and that Caddy is listening on ports `80` and `443`.
 - Backend CORS/session errors: verify `CORS_ORIGIN=https://your.domain.com` and `COOKIE_SECURE=true`.
