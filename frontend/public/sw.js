@@ -1,4 +1,4 @@
-const CACHE_NAME = "emitmachine-pwa-v1";
+const CACHE_NAME = "emitmachine-pwa-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon-placeholder.svg", "/icons/icon-maskable-placeholder.svg"];
 
 self.addEventListener("install", (event) => {
@@ -54,6 +54,30 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache));
         return networkResponse;
       });
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = new URL(event.notification.data?.url ?? "/", self.location.origin);
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === targetUrl.origin && "focus" in client) {
+          client.postMessage({ type: "open-view", view: "countdowns" });
+          return client.focus();
+        }
+      }
+
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl.href);
+      }
+
+      return undefined;
     })
   );
 });

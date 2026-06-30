@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlarmClock,
   BarChart3,
+  BellRing,
   Calculator,
   CalendarClock,
   ChevronDown,
@@ -35,6 +36,7 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
+import { getCountdownNotificationPermission, notifyCountdownExpired, requestCountdownNotificationPermission } from "./pwa";
 import type {
   ActivitySession,
   AdminUser,
@@ -51,6 +53,10 @@ import type {
   Tag,
   Toast
 } from "./types";
+
+type WorkspaceView = "dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin" | "audit";
+
+const workspaceViews = new Set<WorkspaceView>(["dashboard", "activities", "calendar", "requests", "overtime", "tags", "tools", "countdowns", "profile", "admin", "audit"]);
 
 const emptyDashboard: DashboardData = {
   user: { name: "User", username: "", email: null, publicId: "", role: "user", adminApproved: true, canEditSessions: true, totpEnabled: false, passkeyCount: 0, recoveryCodeCount: 0 },
@@ -70,6 +76,11 @@ const emptyDashboard: DashboardData = {
 };
 
 const palette = ["#27b3a8", "#ff8a4c", "#7c6ee6", "#e14f77", "#3f8cff", "#8abf45"];
+
+function initialWorkspaceView(): WorkspaceView {
+  const view = new URLSearchParams(window.location.search).get("view");
+  return workspaceViews.has(view as WorkspaceView) ? (view as WorkspaceView) : "dashboard";
+}
 
 function normalizedTagName(tag?: Tag) {
   return tag?.name.trim().toLowerCase() ?? "";
@@ -667,9 +678,10 @@ function Dashboard({
   onToast: (tone: Toast["tone"], message: string) => void;
 }) {
   const [confirming, setConfirming] = useState<"in" | "out" | null>(null);
-  const [view, setView] = useState<"dashboard" | "activities" | "calendar" | "requests" | "overtime" | "tags" | "tools" | "countdowns" | "profile" | "admin" | "audit">("dashboard");
+  const [view, setView] = useState<WorkspaceView>(initialWorkspaceView);
   const [showMore, setShowMore] = useState(false);
   const [chartsExpanded, setChartsExpanded] = useState(false);
+  const countdownNotificationsRef = useRef<Set<string> | null>(null);
 
   const moreViews = ["overtime", "tags", "tools", "countdowns", "admin", "audit"] as const;
   const isMoreActive = (moreViews as readonly string[]).includes(view);
@@ -677,7 +689,54 @@ function Dashboard({
   function navTo(v: typeof view) {
     setView(v);
     setShowMore(false);
+    const nextUrl = new URL(window.location.href);
+    if (v === "dashboard") {
+      nextUrl.searchParams.delete("view");
+    } else {
+      nextUrl.searchParams.set("view", v);
+    }
+    window.history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
   }
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "open-view" && workspaceViews.has(event.data.view)) {
+        navTo(event.data.view);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    // Seed expired ids once so existing overdue countdowns do not notify on page load.
+    if (countdownNotificationsRef.current === null) {
+      const now = Date.now();
+      countdownNotificationsRef.current = new Set(
+        data.countdowns.filter((countdown) => new Date(countdown.targetAt).getTime() <= now).map((countdown) => countdown.id)
+      );
+    }
+
+    const timer = window.setInterval(() => {
+      const notified = countdownNotificationsRef.current;
+      if (!notified) return;
+
+      for (const countdown of data.countdowns) {
+        if (countdown.status !== "active" || notified.has(countdown.id)) continue;
+        if (new Date(countdown.targetAt).getTime() > Date.now()) continue;
+
+        notified.add(countdown.id);
+        void notifyCountdownExpired(countdown).catch((error: unknown) => {
+          console.error("Countdown notification failed", error);
+        });
+      }
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [data.countdowns]);
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -701,40 +760,40 @@ function Dashboard({
       </header>
 
       <nav className="section-nav" aria-label="Workspace sections">
-        <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")} type="button">
+        <button className={view === "dashboard" ? "active" : ""} onClick={() => navTo("dashboard")} type="button">
           <LayoutDashboard size={16} /> <span>Dashboard</span>
         </button>
-        <button className={view === "activities" ? "active" : ""} onClick={() => setView("activities")} type="button">
+        <button className={view === "activities" ? "active" : ""} onClick={() => navTo("activities")} type="button">
           <CalendarClock size={16} /> <span>Activities</span>
         </button>
-        <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">
+        <button className={view === "calendar" ? "active" : ""} onClick={() => navTo("calendar")} type="button">
           <CalendarClock size={16} /> <span>Calendar</span>
         </button>
-        <button className={view === "requests" ? "active" : ""} onClick={() => setView("requests")} type="button">
+        <button className={view === "requests" ? "active" : ""} onClick={() => navTo("requests")} type="button">
           <ShieldCheck size={16} /> <span>Requests</span>
         </button>
-        <button className={view === "overtime" ? "active" : ""} onClick={() => setView("overtime")} type="button">
+        <button className={view === "overtime" ? "active" : ""} onClick={() => navTo("overtime")} type="button">
           <Hourglass size={16} /> <span>Overtime</span>
         </button>
-        <button className={view === "tags" ? "active" : ""} onClick={() => setView("tags")} type="button">
+        <button className={view === "tags" ? "active" : ""} onClick={() => navTo("tags")} type="button">
           <Tags size={16} /> <span>Tags</span>
         </button>
-        <button className={view === "tools" ? "active" : ""} onClick={() => setView("tools")} type="button">
+        <button className={view === "tools" ? "active" : ""} onClick={() => navTo("tools")} type="button">
           <Clock size={16} /> <span>Tools</span>
         </button>
-        <button className={view === "countdowns" ? "active" : ""} onClick={() => setView("countdowns")} type="button">
+        <button className={view === "countdowns" ? "active" : ""} onClick={() => navTo("countdowns")} type="button">
           <AlarmClock size={16} /> <span>Countdowns</span>
         </button>
-        <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")} type="button">
+        <button className={view === "profile" ? "active" : ""} onClick={() => navTo("profile")} type="button">
           <UserRound size={16} /> <span>Profile</span>
         </button>
         {data.user.role !== "user" ? (
-          <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")} type="button">
+          <button className={view === "admin" ? "active" : ""} onClick={() => navTo("admin")} type="button">
             <ShieldCheck size={16} /> <span>Admin</span>
           </button>
         ) : null}
         {data.user.role === "root" ? (
-          <button className={view === "audit" ? "active" : ""} onClick={() => setView("audit")} type="button">
+          <button className={view === "audit" ? "active" : ""} onClick={() => navTo("audit")} type="button">
             <ScrollText size={16} /> <span>Audit log</span>
           </button>
         ) : null}
@@ -4445,6 +4504,7 @@ function Countdowns({
   const [linkToCurrentSession, setLinkToCurrentSession] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [notificationPermission, setNotificationPermission] = useState(getCountdownNotificationPermission());
 
   useEffect(() => {
     const timer = window.setInterval(() => tick((value) => value + 1), 1000);
@@ -4484,10 +4544,40 @@ function Countdowns({
     onToast("success", "Countdown removed.");
   };
 
+  const enableNotifications = async () => {
+    const permission = await requestCountdownNotificationPermission();
+    setNotificationPermission(permission);
+    if (permission === "granted") {
+      onToast("success", "Countdown notifications enabled.");
+    } else if (permission === "denied") {
+      onToast("error", "Notifications are blocked by the browser.");
+    } else {
+      onToast("error", "Notifications were not enabled.");
+    }
+  };
+
+  const notificationLabel = {
+    default: "Notifications are off. Enable them to receive an alert when a countdown expires.",
+    denied: "Notifications are blocked. Re-enable them from the browser or Android app settings.",
+    granted: "Notifications are enabled for countdown expiry alerts.",
+    unsupported: "This browser does not support web notifications."
+  }[notificationPermission];
+
   return (
     <section className="panel countdown-panel">
       <div className="panel-title">
         <h2>Countdowns</h2>
+      </div>
+      <div className={`countdown-notifications ${notificationPermission === "granted" ? "enabled" : ""}`}>
+        <div>
+          <strong><BellRing size={16} /> Expiry notifications</strong>
+          <span>{notificationLabel}</span>
+        </div>
+        {notificationPermission === "default" ? (
+          <button type="button" onClick={enableNotifications}>
+            Enable notifications
+          </button>
+        ) : null}
       </div>
       <form className="countdown-form" onSubmit={create}>
         <TextField label="Title" value={title} onChange={setTitle} placeholder="End focus block" />
