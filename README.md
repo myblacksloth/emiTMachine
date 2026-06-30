@@ -82,6 +82,7 @@ Backups are intentionally handled by the host or infrastructure layer, not by a 
 - [Caddy reverse proxy guide](docker-reverse.md): detailed Caddy setup.
 - [Nginx Proxy Manager guide](docker-reverse-npm.md): detailed NPM setup.
 - [Architecture](doc/architecture.md): container and application architecture.
+- [Progressive Web App](doc/pwa.md): install behavior, offline shell caching, and icon replacement.
 - [Troubleshooting](doc/troubleshooting.md): logs, request ids, and operational checks.
 - [Root/admin behavior](doc/admin-root.md): admin and root user workflows.
 - [Activity management](doc/activity-management.md): activity editing and deletion behavior.
@@ -97,6 +98,7 @@ Backups are intentionally handled by the host or infrastructure layer, not by a 
 - Clock in/out workflow with editable client time confirmation.
 - Tags with colors, including default tags.
 - Daily, weekly, and monthly hour charts.
+- Progressive Web App installation with app-shell caching.
 - CSV export and restore import.
 - Admin/root user management workflows.
 - PostgreSQL database initialized from SQL, not backend startup code.
