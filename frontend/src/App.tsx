@@ -3804,6 +3804,12 @@ function PunchDialog({
   const [reminderMinutes, setReminderMinutes] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const currentReminderMinutes = (Number.parseInt(reminderHours, 10) || 0) * 60 + (Number.parseInt(reminderMinutes, 10) || 0);
+
+  const setReminderPreset = (minutes: number) => {
+    setReminderHours(String(Math.floor(minutes / 60)));
+    setReminderMinutes(String(minutes % 60));
+  };
 
   const submit = async () => {
     setBusy(true);
@@ -3849,39 +3855,7 @@ function PunchDialog({
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="punch-title">
         <ModalCloseButton onClick={onClose} disabled={busy} />
         <h2 id="punch-title">Confirm {mode === "in" ? "clock in" : "clock out"}</h2>
-        <p className="muted">Review the client time before recording this event.</p>
-        <DateTimeField label="Event time" value={occurredAt} onChange={setOccurredAt} />
-        {mode === "in" ? (
-          <div className="live-reminder-fields">
-            <p className="muted small">Set when this live activity should notify you. Leave both values at 0 to skip the reminder.</p>
-            <div className="duration-fields">
-              <label className="field">
-                <span>Notify after hours</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="24"
-                  step="1"
-                  inputMode="numeric"
-                  value={reminderHours}
-                  onChange={(event) => setReminderHours(event.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>Notify after minutes</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  step="1"
-                  inputMode="numeric"
-                  value={reminderMinutes}
-                  onChange={(event) => setReminderMinutes(event.target.value)}
-                />
-              </label>
-            </div>
-          </div>
-        ) : null}
+        <p className="muted">Pick the activity tags, then slide to confirm. Time, reminder, and note are in Options.</p>
         <fieldset className="tag-picker">
           <legend>Tags</legend>
           {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}
@@ -3899,10 +3873,61 @@ function PunchDialog({
             </label>
           ))}
         </fieldset>
-        <label className="field">
-          <span>Note</span>
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for this session" />
-        </label>
+        <details className="punch-options">
+          <summary><span>Options</span><ChevronDown size={14} aria-hidden="true" /></summary>
+          <div className="punch-options-body">
+            <DateTimeField label="Event time" value={occurredAt} onChange={setOccurredAt} />
+            {mode === "in" ? (
+              <div className="live-reminder-fields">
+                <p className="muted small">Notify after a duration from the confirmed event time.</p>
+                <div className="reminder-presets" aria-label="Reminder presets">
+                  <button className={currentReminderMinutes === 0 ? "active" : ""} type="button" onClick={() => setReminderPreset(0)}>
+                    No reminder
+                  </button>
+                  <button className={currentReminderMinutes === 240 ? "active" : ""} type="button" onClick={() => setReminderPreset(240)}>
+                    4h
+                  </button>
+                  <button className={currentReminderMinutes === 475 ? "active" : ""} type="button" onClick={() => setReminderPreset(475)}>
+                    7h 55m
+                  </button>
+                  <button className={currentReminderMinutes === 480 ? "active" : ""} type="button" onClick={() => setReminderPreset(480)}>
+                    8h
+                  </button>
+                </div>
+                <div className="duration-fields">
+                  <label className="field">
+                    <span>Notify after hours</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="24"
+                      step="1"
+                      inputMode="numeric"
+                      value={reminderHours}
+                      onChange={(event) => setReminderHours(event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Notify after minutes</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      step="1"
+                      inputMode="numeric"
+                      value={reminderMinutes}
+                      onChange={(event) => setReminderMinutes(event.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : null}
+            <label className="field">
+              <span>Note</span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for this session" />
+            </label>
+          </div>
+        </details>
         {error ? <p className="form-message error">{error}</p> : null}
         <SlideToConfirm
           label={busy ? "Saving..." : `Slide to ${mode === "in" ? "clock in" : "clock out"}`}

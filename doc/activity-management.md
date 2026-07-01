@@ -17,7 +17,9 @@ Users can:
 
 Critical actions are intentionally guarded in the UI. Clock-in and clock-out require a slide-to-confirm gesture after the user opens the confirmation dialog. Manual inserts, edits, deletes, administrative decisions, profile/security changes, imports, and other state-changing dashboard actions ask for explicit confirmation before the API call is sent.
 
-When clocking in, users can set a live activity reminder by entering a delay in hours and minutes. The reminder is calculated from the confirmed event time. For example, clocking in at `08:00` with `7h 55m` creates a local notification target at `15:55`.
+The clock-in dialog keeps the primary path short: users pick tags and slide to confirm. Advanced fields are grouped under `Options`, including the editable event time, note, and live activity reminder.
+
+When clocking in, users can set a live activity reminder from quick presets (`No reminder`, `4h`, `7h 55m`, `8h`) or by entering a custom delay in hours and minutes. The reminder is calculated from the confirmed event time. For example, clocking in at `08:00` with `7h 55m` creates a local notification target at `15:55`.
 
 Live activity reminders are stored in browser `localStorage` and are tied to the active session id returned by the backend. If the page is refreshed while the same session is still open, the frontend rebuilds the timer from the stored target time. Clocking out clears the stored reminder. This is intentionally frontend-only state; the backend stores the work session, not the local notification preference.
 

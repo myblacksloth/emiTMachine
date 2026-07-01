@@ -486,6 +486,70 @@ legend {
   background: var(--bg-soft);
 }
 
+.punch-options {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: rgba(120, 120, 128, 0.06);
+  overflow: hidden;
+}
+
+.punch-options summary {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.punch-options summary::-webkit-details-marker {
+  display: none;
+}
+
+.punch-options summary span {
+  font-weight: 700;
+}
+
+.punch-options summary svg {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  transition: transform var(--duration) var(--ease);
+}
+
+.punch-options[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.punch-options-body {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0 0.85rem 0.85rem;
+}
+
+.reminder-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.reminder-presets button {
+  min-height: 40px;
+  padding-inline: 0.55rem;
+  border-radius: var(--r-pill);
+  font-size: 0.86rem;
+}
+
+.reminder-presets button.active {
+  border-color: var(--blue);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .duration-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1903,6 +1967,10 @@ input[type="datetime-local"] {
   .countdown-form {
     grid-template-columns: 1fr;
     gap: 0.85rem;
+  }
+
+  .reminder-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .duration-fields {
