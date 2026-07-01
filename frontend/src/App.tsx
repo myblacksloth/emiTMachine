@@ -153,6 +153,11 @@ function presenceTag(tags: Tag[]) {
   return tags.find((tag) => normalizedTagName(tag) === "presence") ?? tags[0] ?? null;
 }
 
+function isExclusiveWorkModeTag(tag?: Tag) {
+  const name = normalizedTagName(tag);
+  return name === "presence" || name === "smart working";
+}
+
 function withExclusiveWorkMode(tags: Tag[], selectedIds: string[], changedTagId: string, checked: boolean) {
   const changedTag = tags.find((tag) => tag.id === changedTagId);
   const changedName = normalizedTagName(changedTag);
@@ -3749,7 +3754,7 @@ function ActivityEditor({
         <legend>Tags</legend>
         {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}
         {tags.map((tag) => (
-          <label key={tag.id}>
+          <label className={isExclusiveWorkModeTag(tag) ? "exclusive-work-mode-tag" : ""} key={tag.id}>
             <input
               type="checkbox"
               checked={draft.tagIds.includes(tag.id)}
@@ -3860,7 +3865,7 @@ function PunchDialog({
           <legend>Tags</legend>
           {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}
           {tags.map((tag) => (
-            <label key={tag.id}>
+            <label className={isExclusiveWorkModeTag(tag) ? "exclusive-work-mode-tag" : ""} key={tag.id}>
               <input
                 type="checkbox"
                 checked={selectedTags.includes(tag.id)}

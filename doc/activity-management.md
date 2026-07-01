@@ -32,6 +32,8 @@ Default tags:
 - `Not billable` is a protected default tag and can be combined with either work mode.
 - User-created tags can be deleted from the Tags panel. Protected default tags cannot be deleted. When deleting a custom tag, the user can either keep associated activities by removing only the tag link, or explicitly confirm deletion of all activities associated with that tag.
 
+`Presence` and `Smart working` are shown with the same light orange treatment in tag pickers to make their mutual exclusivity visible before selection.
+
 The backend rejects sessions that contain both `Presence` and `Smart working`, including manual activities, punch-in requests, and CSV imports.
 
 Backend endpoints:
