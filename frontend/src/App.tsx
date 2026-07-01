@@ -113,6 +113,22 @@ function notificationStatusLabel(status: CountdownNotificationPermission, servic
   }[status];
 }
 
+function notificationStatusDescription(status: CountdownNotificationPermission, serviceWorkerReady: boolean) {
+  if (status === "granted" && serviceWorkerReady) {
+    return "Countdown and live activity reminders can show browser notifications while the app is active.";
+  }
+  if (status === "granted") {
+    return "The browser permission is enabled, but the service worker is not ready yet. Keep the app open or refresh after it finishes installing.";
+  }
+  if (status === "denied") {
+    return "The browser is blocking notifications for this app. Re-enable them from site settings or Android app notification settings.";
+  }
+  if (status === "unsupported") {
+    return "This browser does not expose the notification APIs required by the PWA.";
+  }
+  return "Notifications are not enabled yet. Use the button below to ask the browser for permission.";
+}
+
 function readLiveActivityReminder() {
   try {
     const raw = window.localStorage.getItem(liveActivityReminderStorageKey);
@@ -751,6 +767,7 @@ function Dashboard({
   const [chartsExpanded, setChartsExpanded] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<CountdownNotificationPermission>(getNotificationPermissionStatus);
   const [notificationServiceWorkerReady, setNotificationServiceWorkerReady] = useState(false);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const countdownNotificationsRef = useRef<Set<string> | null>(null);
   const liveActivityReminderTimeoutRef = useRef<number | null>(null);
 
@@ -768,6 +785,34 @@ function Dashboard({
     }
     window.history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
   }
+
+  const refreshNotificationStatus = () => {
+    setNotificationStatus(getNotificationPermissionStatus());
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        setNotificationServiceWorkerReady(Boolean(registration));
+      });
+    } else {
+      setNotificationServiceWorkerReady(false);
+    }
+  };
+
+  const requestBrowserNotifications = async () => {
+    const permission = await requestCountdownNotificationPermission();
+    setNotificationStatus(getNotificationPermissionStatus());
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then(() => setNotificationServiceWorkerReady(true));
+    }
+
+    if (permission === "granted") {
+      onToast("success", "Notifications enabled.");
+    } else if (permission === "denied") {
+      onToast("error", "Notifications are blocked by the browser.");
+    } else if (permission === "unsupported") {
+      onToast("error", "This browser does not support notifications.");
+    }
+  };
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -790,14 +835,7 @@ function Dashboard({
   }, []);
 
   useEffect(() => {
-    const updateNotificationStatus = () => {
-      setNotificationStatus(getNotificationPermissionStatus());
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.getRegistration().then((registration) => {
-          setNotificationServiceWorkerReady(Boolean(registration));
-        });
-      }
-    };
+    const updateNotificationStatus = () => refreshNotificationStatus();
 
     window.addEventListener("focus", updateNotificationStatus);
     document.addEventListener("visibilitychange", updateNotificationStatus);
@@ -918,14 +956,47 @@ function Dashboard({
           <button type="button" className="topbar-refresh" aria-label="Refresh" onClick={onRefresh} disabled={loading}>
             <RefreshCw size={16} /><span>Refresh</span>
           </button>
-          <span
-            className={`notification-indicator ${notificationStatus === "granted" && notificationServiceWorkerReady ? "ok" : "error"}`}
-            aria-label={notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}
-            title={notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}
-            role="img"
-          >
-            <Bell size={16} />
-          </span>
+          <div className="notification-control">
+            <button
+              type="button"
+              className={`notification-indicator ${notificationStatus === "granted" && notificationServiceWorkerReady ? "ok" : "error"}`}
+              aria-label={notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}
+              aria-expanded={notificationPanelOpen}
+              title={notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}
+              onClick={() => setNotificationPanelOpen((open) => !open)}
+            >
+              <Bell size={16} />
+            </button>
+            {notificationPanelOpen ? (
+              <div className="notification-panel" role="dialog" aria-label="Notification settings">
+                <div className="notification-panel-header">
+                  <div>
+                    <p className="eyebrow">PWA notifications</p>
+                    <h2>{notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}</h2>
+                  </div>
+                  <button type="button" aria-label="Close notification panel" onClick={() => setNotificationPanelOpen(false)}>
+                    <X size={16} />
+                  </button>
+                </div>
+                <p className="muted">{notificationStatusDescription(notificationStatus, notificationServiceWorkerReady)}</p>
+                <div className="notification-panel-actions">
+                  {notificationStatus === "default" ? (
+                    <button className="primary-action" type="button" onClick={() => void requestBrowserNotifications()}>
+                      Enable notifications
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={refreshNotificationStatus}>
+                    Check status
+                  </button>
+                </div>
+                <div className="notification-help">
+                  <strong>Android/browser recovery</strong>
+                  <p>Chrome Android: open site settings for this app and allow Notifications. Installed PWA: Android Settings, Apps, emiTMachine, Notifications.</p>
+                  <p>If notifications were blocked, browsers usually do not show the permission prompt again until the setting is changed manually.</p>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button type="button" className="topbar-signout" onClick={onLogout}>
             <LogOut size={16} /> Sign out
           </button>

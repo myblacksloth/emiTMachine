@@ -32,9 +32,11 @@ Countdown expiry and live activity reminder notifications are available inside t
 
 1. Open the web app and sign in.
 2. Accept the browser notification permission prompt when it appears.
-3. Create a countdown.
-4. Keep the PWA open or recently active so the frontend can watch the countdown.
-5. When the target time is reached, the service worker shows a `Countdown expired` notification.
+3. If the prompt is missed or blocked, tap the notification bell next to `Refresh` to open the notification status panel.
+4. Use `Enable notifications` when the browser can still show the permission request, or follow the Android/browser recovery instructions in the panel.
+5. Create a countdown.
+6. Keep the PWA open or recently active so the frontend can watch the countdown.
+7. When the target time is reached, the service worker shows a `Countdown expired` notification.
 
 Live activity reminders are configured during clock-in. Enter the number of hours and minutes after the confirmed event time when the notification should be shown. For example, a clock-in event at `08:00` with `7h 55m` notifies at `15:55`.
 
@@ -42,7 +44,7 @@ Tapping the notification focuses emiTMachine and opens the Countdowns view when 
 
 These are local browser notifications. They are not server push notifications, so the backend does not store push subscriptions and the app does not send alerts after the browser has fully stopped the PWA.
 
-If notifications are blocked, re-enable them from the browser site settings or from the Android app notification settings for the installed PWA.
+If notifications are blocked, re-enable them from the browser site settings or from the Android app notification settings for the installed PWA. Browsers usually do not show the permission prompt again after a hard block until that setting is changed manually.
 
 ## Icon Placeholders
 
