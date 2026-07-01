@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlarmClock,
   BarChart3,
-  BellRing,
+  Bell,
   Calculator,
   CalendarClock,
   ChevronDown,
@@ -36,7 +36,7 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
-import { getCountdownNotificationPermission, notifyCountdownExpired, requestCountdownNotificationPermission } from "./pwa";
+import { getCountdownNotificationPermission, notifyCountdownExpired, requestCountdownNotificationPermission, type CountdownNotificationPermission } from "./pwa";
 import type {
   ActivitySession,
   AdminUser,
@@ -76,10 +76,32 @@ const emptyDashboard: DashboardData = {
 };
 
 const palette = ["#27b3a8", "#ff8a4c", "#7c6ee6", "#e14f77", "#3f8cff", "#8abf45"];
+let countdownNotificationPermissionPrompted = false;
 
 function initialWorkspaceView(): WorkspaceView {
   const view = new URLSearchParams(window.location.search).get("view");
   return workspaceViews.has(view as WorkspaceView) ? (view as WorkspaceView) : "dashboard";
+}
+
+function getNotificationPermissionStatus(): CountdownNotificationPermission {
+  if (!("serviceWorker" in navigator)) {
+    return "unsupported";
+  }
+
+  return getCountdownNotificationPermission();
+}
+
+function notificationStatusLabel(status: CountdownNotificationPermission, serviceWorkerReady: boolean) {
+  if (status === "granted" && !serviceWorkerReady) {
+    return "Notifications need the service worker";
+  }
+
+  return {
+    granted: "Notifications enabled",
+    denied: "Notifications blocked",
+    default: "Notifications not enabled",
+    unsupported: "Notifications unavailable"
+  }[status];
 }
 
 function normalizedTagName(tag?: Tag) {
@@ -681,6 +703,8 @@ function Dashboard({
   const [view, setView] = useState<WorkspaceView>(initialWorkspaceView);
   const [showMore, setShowMore] = useState(false);
   const [chartsExpanded, setChartsExpanded] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<CountdownNotificationPermission>(getNotificationPermissionStatus);
+  const [notificationServiceWorkerReady, setNotificationServiceWorkerReady] = useState(false);
   const countdownNotificationsRef = useRef<Set<string> | null>(null);
 
   const moreViews = ["overtime", "tags", "tools", "countdowns", "admin", "audit"] as const;
@@ -701,6 +725,13 @@ function Dashboard({
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      setNotificationServiceWorkerReady(Boolean(registration));
+    });
+    navigator.serviceWorker.ready.then(() => {
+      setNotificationServiceWorkerReady(true);
+    });
+
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type === "open-view" && workspaceViews.has(event.data.view)) {
         navTo(event.data.view);
@@ -710,6 +741,39 @@ function Dashboard({
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, []);
+
+  useEffect(() => {
+    const updateNotificationStatus = () => {
+      setNotificationStatus(getNotificationPermissionStatus());
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistration().then((registration) => {
+          setNotificationServiceWorkerReady(Boolean(registration));
+        });
+      }
+    };
+
+    window.addEventListener("focus", updateNotificationStatus);
+    document.addEventListener("visibilitychange", updateNotificationStatus);
+    return () => {
+      window.removeEventListener("focus", updateNotificationStatus);
+      document.removeEventListener("visibilitychange", updateNotificationStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (countdownNotificationPermissionPrompted) return;
+    if (getCountdownNotificationPermission() !== "default") return;
+
+    countdownNotificationPermissionPrompted = true;
+    void requestCountdownNotificationPermission().then((permission) => {
+      setNotificationStatus(getNotificationPermissionStatus());
+      if (permission === "granted") {
+        onToast("success", "Countdown notifications enabled.");
+      } else if (permission === "denied") {
+        onToast("error", "Notifications are blocked by the browser.");
+      }
+    });
+  }, [onToast]);
 
   useEffect(() => {
     // Seed expired ids once so existing overdue countdowns do not notify on page load.
@@ -753,6 +817,14 @@ function Dashboard({
           <button type="button" className="topbar-refresh" aria-label="Refresh" onClick={onRefresh} disabled={loading}>
             <RefreshCw size={16} /><span>Refresh</span>
           </button>
+          <span
+            className={`notification-indicator ${notificationStatus === "granted" && notificationServiceWorkerReady ? "ok" : "error"}`}
+            aria-label={notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}
+            title={notificationStatusLabel(notificationStatus, notificationServiceWorkerReady)}
+            role="img"
+          >
+            <Bell size={16} />
+          </span>
           <button type="button" className="topbar-signout" onClick={onLogout}>
             <LogOut size={16} /> Sign out
           </button>
@@ -4504,7 +4576,6 @@ function Countdowns({
   const [linkToCurrentSession, setLinkToCurrentSession] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [notificationPermission, setNotificationPermission] = useState(getCountdownNotificationPermission());
 
   useEffect(() => {
     const timer = window.setInterval(() => tick((value) => value + 1), 1000);
@@ -4544,40 +4615,10 @@ function Countdowns({
     onToast("success", "Countdown removed.");
   };
 
-  const enableNotifications = async () => {
-    const permission = await requestCountdownNotificationPermission();
-    setNotificationPermission(permission);
-    if (permission === "granted") {
-      onToast("success", "Countdown notifications enabled.");
-    } else if (permission === "denied") {
-      onToast("error", "Notifications are blocked by the browser.");
-    } else {
-      onToast("error", "Notifications were not enabled.");
-    }
-  };
-
-  const notificationLabel = {
-    default: "Notifications are off. Enable them to receive an alert when a countdown expires.",
-    denied: "Notifications are blocked. Re-enable them from the browser or Android app settings.",
-    granted: "Notifications are enabled for countdown expiry alerts.",
-    unsupported: "This browser does not support web notifications."
-  }[notificationPermission];
-
   return (
     <section className="panel countdown-panel">
       <div className="panel-title">
         <h2>Countdowns</h2>
-      </div>
-      <div className={`countdown-notifications ${notificationPermission === "granted" ? "enabled" : ""}`}>
-        <div>
-          <strong><BellRing size={16} /> Expiry notifications</strong>
-          <span>{notificationLabel}</span>
-        </div>
-        {notificationPermission === "default" ? (
-          <button type="button" onClick={enableNotifications}>
-            Enable notifications
-          </button>
-        ) : null}
       </div>
       <form className="countdown-form" onSubmit={create}>
         <TextField label="Title" value={title} onChange={setTitle} placeholder="End focus block" />

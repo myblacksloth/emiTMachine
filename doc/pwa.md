@@ -30,8 +30,8 @@ API calls under `/api` are intentionally not cached. Time tracking, authenticati
 
 Countdown expiry notifications are available inside the installed PWA and regular supported browsers.
 
-1. Open the `Countdowns` tab.
-2. Use `Enable notifications` in the `Expiry notifications` panel.
+1. Open the web app and sign in.
+2. Accept the browser notification permission prompt when it appears.
 3. Create a countdown.
 4. Keep the PWA open or recently active so the frontend can watch the countdown.
 5. When the target time is reached, the service worker shows a `Countdown expired` notification.
@@ -39,6 +39,8 @@ Countdown expiry notifications are available inside the installed PWA and regula
 Tapping the notification focuses emiTMachine and opens the Countdowns view when the browser supports service worker notification click handling.
 
 These are local browser notifications. They are not server push notifications, so the backend does not store push subscriptions and the app does not send alerts after the browser has fully stopped the PWA.
+
+If notifications are blocked, re-enable them from the browser site settings or from the Android app notification settings for the installed PWA.
 
 ## Icon Placeholders
 
