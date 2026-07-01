@@ -9,12 +9,19 @@ Activity editing is enabled by default for the authenticated owner of the sessio
 Users can:
 
 - insert a manual activity from the `Activities` panel;
+- start a live activity with an optional local notification after a chosen number of hours and minutes;
 - view their latest recorded sessions in the `Activities` panel;
 - edit start time, end time, timezones, tags, note, and correction reason;
 - set a `No count` duration in hours and minutes when creating or editing an activity;
 - delete a session permanently.
 
 Critical actions are intentionally guarded in the UI. Clock-in and clock-out require a slide-to-confirm gesture after the user opens the confirmation dialog. Manual inserts, edits, deletes, administrative decisions, profile/security changes, imports, and other state-changing dashboard actions ask for explicit confirmation before the API call is sent.
+
+When clocking in, users can set a live activity reminder by entering a delay in hours and minutes. The reminder is calculated from the confirmed event time. For example, clocking in at `08:00` with `7h 55m` creates a local notification target at `15:55`.
+
+Live activity reminders are stored in browser `localStorage` and are tied to the active session id returned by the backend. If the page is refreshed while the same session is still open, the frontend rebuilds the timer from the stored target time. Clocking out clears the stored reminder. This is intentionally frontend-only state; the backend stores the work session, not the local notification preference.
+
+If a user enters a non-zero reminder delay while browser notifications are not enabled, the clock-in dialog asks them to enable notifications or leave the reminder at `0h 00m`.
 
 Default tags:
 

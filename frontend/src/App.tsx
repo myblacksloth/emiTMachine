@@ -36,7 +36,7 @@ import {
   Zap
 } from "lucide-react";
 import { api } from "./api";
-import { getCountdownNotificationPermission, notifyCountdownExpired, requestCountdownNotificationPermission, type CountdownNotificationPermission } from "./pwa";
+import { getCountdownNotificationPermission, notifyCountdownExpired, notifyLiveActivityReminder, requestCountdownNotificationPermission, type CountdownNotificationPermission } from "./pwa";
 import type {
   ActivitySession,
   AdminUser,
@@ -77,6 +77,15 @@ const emptyDashboard: DashboardData = {
 
 const palette = ["#27b3a8", "#ff8a4c", "#7c6ee6", "#e14f77", "#3f8cff", "#8abf45"];
 let countdownNotificationPermissionPrompted = false;
+const liveActivityReminderStorageKey = "emitmachine.liveActivityReminder";
+
+type LiveActivityReminder = {
+  sessionId: string;
+  startedAt: string;
+  notifyAt: string;
+  reminderMinutes: number;
+  notified: boolean;
+};
 
 function initialWorkspaceView(): WorkspaceView {
   const view = new URLSearchParams(window.location.search).get("view");
@@ -102,6 +111,38 @@ function notificationStatusLabel(status: CountdownNotificationPermission, servic
     default: "Notifications not enabled",
     unsupported: "Notifications unavailable"
   }[status];
+}
+
+function readLiveActivityReminder() {
+  try {
+    const raw = window.localStorage.getItem(liveActivityReminderStorageKey);
+    if (!raw) return null;
+    const reminder = JSON.parse(raw) as Partial<LiveActivityReminder>;
+    if (!reminder.sessionId || !reminder.startedAt || !reminder.notifyAt || !reminder.reminderMinutes) return null;
+    return reminder as LiveActivityReminder;
+  } catch {
+    return null;
+  }
+}
+
+function writeLiveActivityReminder(reminder: LiveActivityReminder) {
+  window.localStorage.setItem(liveActivityReminderStorageKey, JSON.stringify(reminder));
+}
+
+function clearLiveActivityReminder() {
+  window.localStorage.removeItem(liveActivityReminderStorageKey);
+}
+
+function createLiveActivityReminder(session: NonNullable<DashboardData["activeSession"]>, reminderMinutes: number) {
+  const notifyAt = new Date(new Date(session.startedAt).getTime() + reminderMinutes * 60_000);
+  const reminder: LiveActivityReminder = {
+    sessionId: session.id,
+    startedAt: session.startedAt,
+    notifyAt: notifyAt.toISOString(),
+    reminderMinutes,
+    notified: false
+  };
+  writeLiveActivityReminder(reminder);
 }
 
 function normalizedTagName(tag?: Tag) {
@@ -706,6 +747,7 @@ function Dashboard({
   const [notificationStatus, setNotificationStatus] = useState<CountdownNotificationPermission>(getNotificationPermissionStatus);
   const [notificationServiceWorkerReady, setNotificationServiceWorkerReady] = useState(false);
   const countdownNotificationsRef = useRef<Set<string> | null>(null);
+  const liveActivityReminderTimeoutRef = useRef<number | null>(null);
 
   const moreViews = ["overtime", "tags", "tools", "countdowns", "admin", "audit"] as const;
   const isMoreActive = (moreViews as readonly string[]).includes(view);
@@ -801,6 +843,60 @@ function Dashboard({
 
     return () => window.clearInterval(timer);
   }, [data.countdowns]);
+
+  useEffect(() => {
+    if (liveActivityReminderTimeoutRef.current !== null) {
+      window.clearTimeout(liveActivityReminderTimeoutRef.current);
+      liveActivityReminderTimeoutRef.current = null;
+    }
+
+    if (!data.activeSession) {
+      clearLiveActivityReminder();
+      return;
+    }
+
+    const reminder = readLiveActivityReminder();
+    if (!reminder) return;
+    if (reminder.sessionId !== data.activeSession.id) {
+      clearLiveActivityReminder();
+      return;
+    }
+    if (reminder.notified) return;
+
+    const fireReminder = () => {
+      const currentReminder = readLiveActivityReminder();
+      if (!currentReminder || currentReminder.sessionId !== data.activeSession?.id || currentReminder.notified) return;
+
+      writeLiveActivityReminder({ ...currentReminder, notified: true });
+      void notifyLiveActivityReminder({
+        sessionId: data.activeSession.id,
+        startedAt: data.activeSession.startedAt,
+        reminderMinutes: currentReminder.reminderMinutes
+      }).catch((error: unknown) => {
+        console.error("Live activity notification failed", error);
+      });
+    };
+
+    const notifyAtMs = new Date(reminder.notifyAt).getTime();
+    if (Number.isNaN(notifyAtMs)) {
+      clearLiveActivityReminder();
+      return;
+    }
+
+    const delayMs = notifyAtMs - Date.now();
+    if (delayMs <= 0) {
+      fireReminder();
+      return;
+    }
+
+    liveActivityReminderTimeoutRef.current = window.setTimeout(fireReminder, delayMs);
+    return () => {
+      if (liveActivityReminderTimeoutRef.current !== null) {
+        window.clearTimeout(liveActivityReminderTimeoutRef.current);
+        liveActivityReminderTimeoutRef.current = null;
+      }
+    };
+  }, [data.activeSession]);
   const activeTagNames = data.activeSession?.tagIds
     .map((tagId) => data.tags.find((tag) => tag.id === tagId)?.name)
     .filter(Boolean)
@@ -936,7 +1032,14 @@ function Dashboard({
           tags={data.tags}
           defaultTagIds={data.activeSession?.tagIds ?? []}
           onClose={() => setConfirming(null)}
-          onSuccess={(updated) => {
+          onSuccess={(updated, liveReminderMinutes) => {
+            if (confirming === "in" && updated.activeSession && liveReminderMinutes > 0) {
+              createLiveActivityReminder(updated.activeSession, liveReminderMinutes);
+            } else if (confirming === "in") {
+              clearLiveActivityReminder();
+            } else if (confirming === "out") {
+              clearLiveActivityReminder();
+            }
             onData(updated);
             setConfirming(null);
             onToast("success", confirming === "in" ? "Clock-in recorded." : "Clock-out recorded.");
@@ -3691,20 +3794,38 @@ function PunchDialog({
   tags: Tag[];
   defaultTagIds: string[];
   onClose: () => void;
-  onSuccess: (data: DashboardData) => void;
+  onSuccess: (data: DashboardData, liveReminderMinutes: number) => void;
 }) {
   const [occurredAt, setOccurredAt] = useState(clientDateTimeValue());
   const defaultTag = presenceTag(tags);
   const [selectedTags, setSelectedTags] = useState<string[]>(defaultTagIds.length ? defaultTagIds : mode === "in" && defaultTag ? [defaultTag.id] : []);
   const [note, setNote] = useState("");
+  const [reminderHours, setReminderHours] = useState("0");
+  const [reminderMinutes, setReminderMinutes] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const submit = async () => {
     setBusy(true);
     setError("");
+    const parsedReminderHours = Number.parseInt(reminderHours, 10) || 0;
+    const parsedReminderMinutes = Number.parseInt(reminderMinutes, 10) || 0;
+    const liveReminderMinutes = mode === "in" ? parsedReminderHours * 60 + parsedReminderMinutes : 0;
     if (mode === "in" && selectedTags.length === 0) {
       setError("Select at least one tag before clocking in.");
+      setBusy(false);
+      return;
+    }
+    if (
+      mode === "in" &&
+      (parsedReminderHours < 0 || parsedReminderHours > 24 || parsedReminderMinutes < 0 || parsedReminderMinutes > 59 || liveReminderMinutes > 24 * 60)
+    ) {
+      setError("Notification delay must be between 0 minutes and 24 hours. Minutes must be 0-59.");
+      setBusy(false);
+      return;
+    }
+    if (mode === "in" && liveReminderMinutes > 0 && getCountdownNotificationPermission() !== "granted") {
+      setError("Enable browser notifications before adding a live activity reminder, or leave both reminder values at 0.");
       setBusy(false);
       return;
     }
@@ -3715,7 +3836,7 @@ function PunchDialog({
     }
     try {
       const updated = mode === "in" ? await api.clockIn(isoFromLocalValue(occurredAt), selectedTags, note) : await api.clockOut(isoFromLocalValue(occurredAt), selectedTags, note);
-      onSuccess(updated);
+      onSuccess(updated, liveReminderMinutes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to record the event.");
     } finally {
@@ -3730,6 +3851,37 @@ function PunchDialog({
         <h2 id="punch-title">Confirm {mode === "in" ? "clock in" : "clock out"}</h2>
         <p className="muted">Review the client time before recording this event.</p>
         <DateTimeField label="Event time" value={occurredAt} onChange={setOccurredAt} />
+        {mode === "in" ? (
+          <div className="live-reminder-fields">
+            <p className="muted small">Set when this live activity should notify you. Leave both values at 0 to skip the reminder.</p>
+            <div className="duration-fields">
+              <label className="field">
+                <span>Notify after hours</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="24"
+                  step="1"
+                  inputMode="numeric"
+                  value={reminderHours}
+                  onChange={(event) => setReminderHours(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>Notify after minutes</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="1"
+                  inputMode="numeric"
+                  value={reminderMinutes}
+                  onChange={(event) => setReminderMinutes(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+        ) : null}
         <fieldset className="tag-picker">
           <legend>Tags</legend>
           {tags.length === 0 ? <p className="empty-state">Create a tag before assigning one.</p> : null}

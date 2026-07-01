@@ -46,7 +46,37 @@ export async function notifyCountdownExpired(countdown: Countdown) {
     badge: COUNTDOWN_NOTIFICATION_BADGE,
     data: {
       countdownId: countdown.id,
-      url: "/?view=countdowns"
+      url: "/?view=countdowns",
+      view: "countdowns"
+    },
+    requireInteraction: true
+  };
+
+  if ("serviceWorker" in navigator) {
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification(title, options);
+    return true;
+  }
+
+  new Notification(title, options);
+  return true;
+}
+
+export async function notifyLiveActivityReminder(input: { sessionId: string; startedAt: string; reminderMinutes: number }) {
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return false;
+  }
+
+  const title = "Activity reminder";
+  const options: NotificationOptions = {
+    body: `Your live activity has reached ${Math.floor(input.reminderMinutes / 60)}h ${String(input.reminderMinutes % 60).padStart(2, "0")}m.`,
+    tag: `live-activity-${input.sessionId}`,
+    icon: COUNTDOWN_NOTIFICATION_ICON,
+    badge: COUNTDOWN_NOTIFICATION_BADGE,
+    data: {
+      sessionId: input.sessionId,
+      url: "/",
+      view: "dashboard"
     },
     requireInteraction: true
   };
