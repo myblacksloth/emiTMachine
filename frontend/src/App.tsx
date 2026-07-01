@@ -32,6 +32,8 @@ import {
   Trash2,
   UploadCloud,
   UserRound,
+  Wifi,
+  WifiOff,
   X,
   Zap
 } from "lucide-react";
@@ -480,8 +482,53 @@ function App() {
 }
 
 function Shell({ children, toasts }: { children: ReactNode; toasts: Toast[] }) {
+  const [connectivity, setConnectivity] = useState<"online" | "offline" | "restored">(() => (navigator.onLine ? "online" : "offline"));
+
+  useEffect(() => {
+    let restoredTimer: number | null = null;
+
+    const clearRestoredTimer = () => {
+      if (restoredTimer !== null) {
+        window.clearTimeout(restoredTimer);
+        restoredTimer = null;
+      }
+    };
+
+    const handleOffline = () => {
+      clearRestoredTimer();
+      setConnectivity("offline");
+    };
+
+    const handleOnline = () => {
+      clearRestoredTimer();
+      setConnectivity("restored");
+      restoredTimer = window.setTimeout(() => setConnectivity("online"), 3200);
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      clearRestoredTimer();
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
   return (
     <div className="app-shell">
+      {connectivity !== "online" ? (
+        <div className={`connectivity-banner ${connectivity}`} role="status" aria-live="polite">
+          {connectivity === "offline" ? <WifiOff size={16} /> : <Wifi size={16} />}
+          <div>
+            <strong>{connectivity === "offline" ? "Offline" : "Back online"}</strong>
+            <span>
+              {connectivity === "offline"
+                ? "You can view cached screens, but actions and fresh data need a connection."
+                : "Connection restored. Refresh if you need the latest data."}
+            </span>
+          </div>
+        </div>
+      ) : null}
       {children}
       <div className="toast-region" aria-live="polite">
         {toasts.map((toast) => (

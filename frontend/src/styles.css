@@ -211,6 +211,55 @@ legend {
   padding-bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
 }
 
+.connectivity-banner {
+  position: sticky;
+  top: max(0.5rem, env(safe-area-inset-top, 0px));
+  z-index: 70;
+  width: min(1200px, 100%);
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-toast);
+}
+
+.connectivity-banner svg {
+  flex: 0 0 auto;
+}
+
+.connectivity-banner div {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.connectivity-banner strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.connectivity-banner span {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.connectivity-banner.offline {
+  border-color: rgba(255, 59, 48, 0.36);
+  background: rgba(255, 59, 48, 0.10);
+  color: var(--red);
+}
+
+.connectivity-banner.restored {
+  border-color: rgba(52, 199, 89, 0.36);
+  background: rgba(52, 199, 89, 0.10);
+  color: var(--green);
+}
+
 /* ── Auth layout ────────────────────────────────────────────── */
 .auth-layout {
   width: min(1080px, 100%);

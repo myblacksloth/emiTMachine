@@ -26,6 +26,8 @@ The service worker caches the frontend shell and same-origin static assets. This
 
 API calls under `/api` are intentionally not cached. Time tracking, authentication, reports, CSV import/export, and administrative workflows still require the backend and PostgreSQL to be reachable. This avoids showing stale or misleading business data.
 
+The UI shows a connectivity banner when the browser reports that it is offline. The banner stays visible while offline and briefly changes to `Back online` when the connection returns. Offline mode should be treated as read-only for cached screens: users should wait for the online state before relying on writes or fresh data.
+
 ## Notifications
 
 Countdown expiry and live activity reminder notifications are available inside the installed PWA and regular supported browsers.
